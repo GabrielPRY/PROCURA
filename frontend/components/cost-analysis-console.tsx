@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { AlertTriangle, BarChart3, Database, Loader2, Search, Target, TrendingDown, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Search, Target, TrendingDown, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type AuthUser } from "@/lib/auth";
 import { getHistorico, type HistoricoRow } from "@/lib/historico";
@@ -11,6 +11,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 type CostRow = RfqItem & Record<string, unknown>;
+type ItemHistoryMatch = { search: string; rows: HistoricoRow[]; error?: string };
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -57,6 +58,19 @@ function minPositive(values: number[]) {
   const valid = values.filter((value) => value > 0);
   return valid.length ? Math.min(...valid) : 0;
 }
+function historyPricesFromRows(rows: HistoricoRow[]) {
+  return rows.flatMap((row) => {
+    const record = row as Record<string, unknown>;
+    return [
+      priceFrom(record, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]),
+      priceFrom(record, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"])
+    ].filter((value) => value > 0);
+  });
+}
+
+function bestHistoryPrice(rows: HistoricoRow[]) {
+  return minPositive(historyPricesFromRows(rows));
+}
 
 function itemLabel(item: CostRow, index: number) {
   const renglon = cleanValue(item.renglon, String(index + 1));
@@ -77,7 +91,10 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [manualSearch, setManualSearch] = useState("");
   const [historicoRows, setHistoricoRows] = useState<HistoricoRow[]>([]);
+  const [itemHistoryMap, setItemHistoryMap] = useState<Record<number, ItemHistoryMatch>>({});
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingBatchHistory, setLoadingBatchHistory] = useState(false);
+  const [batchHistoryReady, setBatchHistoryReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +106,50 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const items = useMemo(() => (rfq?.items || []) as CostRow[], [rfq]);
   const selectedItem = items[selectedIndex] || null;
   const activeSearch = manualSearch.trim() || itemSearchTerm(selectedItem);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBatchHistoryReady(false);
+    setItemHistoryMap({});
+
+    const targets = items
+      .map((item, index) => ({ index, search: itemSearchTerm(item) }))
+      .filter((target) => target.search);
+
+    if (!targets.length) {
+      setLoadingBatchHistory(false);
+      setBatchHistoryReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoadingBatchHistory(true);
+    Promise.all(
+      targets.map(async (target) => {
+        try {
+          const response = await getHistorico({ search: target.search, anio: "Todos", limit: 80 });
+          return [target.index, { search: target.search, rows: response.rows || [] }] as const;
+        } catch (err) {
+          return [target.index, { search: target.search, rows: [], error: err instanceof Error ? err.message : "Error consultando histórico" }] as const;
+        }
+      })
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setItemHistoryMap(Object.fromEntries(entries));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingBatchHistory(false);
+          setBatchHistoryReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   useEffect(() => {
     if (!activeSearch) {
@@ -123,20 +184,26 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     const qty = toNumber(item.cantidad);
     const comp = priceFrom(item, ["precio_comp_hist", "PRECIO COMPETENCIA", "Precio Competencia", "precio_competencia"]);
     const proy = priceFrom(item, ["precio_proy_hist", "PRECIO PROYELEC", "Precio Proyelec", "precio_proyelec"]);
-    const best = minPositive([comp, proy]);
+    const autoHistory = itemHistoryMap[index]?.rows || [];
+    const historyBest = bestHistoryPrice(autoHistory);
+    const best = minPositive([comp, proy, historyBest]);
     return {
       index,
       item,
       qty,
       comp,
       proy,
+      historyBest,
+      historyRows: autoHistory,
       best,
       valueBest: qty * best,
-      hasEmbeddedHistory: comp > 0 || proy > 0
+      hasEmbeddedHistory: comp > 0 || proy > 0,
+      hasAutoHistory: autoHistory.length > 0,
+      hasHistoricalPrice: best > 0
     };
   });
 
-  const embeddedMatches = itemRows.filter((row) => row.hasEmbeddedHistory).length;
+  const embeddedMatches = itemRows.filter((row) => row.hasHistoricalPrice).length;
   const totalReference = itemRows.reduce((sum, row) => sum + row.valueBest, 0);
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion || rfq?.condiciones_generales?.licitacion, "RFQ activo");
 
@@ -153,7 +220,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const selectedQty = toNumber(selectedItem?.cantidad) || 1;
   const selectedEmbeddedComp = selectedItem ? priceFrom(selectedItem, ["precio_comp_hist", "PRECIO COMPETENCIA", "Precio Competencia", "precio_competencia"]) : 0;
   const selectedEmbeddedProy = selectedItem ? priceFrom(selectedItem, ["precio_proy_hist", "PRECIO PROYELEC", "Precio Proyelec", "precio_proyelec"]) : 0;
-  const selectedBest = minPositive([selectedEmbeddedComp, selectedEmbeddedProy, minHistory]);
+  const selectedAutoBest = selectedIndex >= 0 ? bestHistoryPrice(itemHistoryMap[selectedIndex]?.rows || []) : 0;
+  const selectedBest = minPositive([selectedEmbeddedComp, selectedEmbeddedProy, minHistory, selectedAutoBest]);
 
   const summaryCards = [
     ["Renglones RFQ", String(items.length), "Cantidad de partidas detectadas."],
@@ -181,10 +249,22 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
 
       <section className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         <StatCard label="Renglones RFQ" value={items.length} hint="Cantidad de partidas detectadas" icon={Database} />
-        <StatCard label="Cruce directo" value={`${embeddedMatches}/${items.length}`} hint="Historial ya cruzado durante el RFQ" icon={BarChart3} />
-        <StatCard label="Referencia total" value={money(totalReference)} hint="Mejor precio historico por renglon" icon={Target} />
+        <StatCard label="Cruce historico" value={loadingBatchHistory ? "..." : `${embeddedMatches}/${items.length}`} hint={batchHistoryReady ? "Matches automaticos del RFQ" : "Consultando historico por renglon"} icon={BarChart3} />
+        <StatCard label="Referencia total" value={money(totalReference)} hint="Suma del mejor historico por renglon" icon={Target} />
         <StatCard label="Historico consultado" value={historicoRows.length} hint="Registros del renglon activo" icon={Search} />
       </section>
+
+      {loadingBatchHistory ? (
+        <section className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Cruzando automáticamente los renglones del RFQ contra el histórico de precios...
+        </section>
+      ) : batchHistoryReady && items.length ? (
+        <section className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+          <CheckCircle2 className="h-4 w-4" />
+          Cruce histórico terminado: {embeddedMatches} de {items.length} renglones con referencia de precio.
+        </section>
+      ) : null}
 
       {error ? <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section> : null}
 
@@ -216,7 +296,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                     <div className="flex min-w-0 items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-semibold leading-5 text-slate-900 line-clamp-2 break-words">{itemLabel(row.item, row.index)}</div>
-                        <div className="mt-1 text-xs text-muted">Cant. {row.qty || "N/D"} | Mejor ref. {row.best ? money(row.best) : "Sin cruce"}</div>
+                        <div className="mt-1 text-xs text-muted">Cant. {row.qty || "N/D"} | Mejor ref. {row.best ? money(row.best) : "Sin cruce"} | Registros {row.historyRows.length}</div>
                       </div>
                       <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${row.hasEmbeddedHistory ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                         {row.hasEmbeddedHistory ? "Match" : "Buscar"}
@@ -334,4 +414,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
+
+
 
