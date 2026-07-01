@@ -1,10 +1,14 @@
-"use client";
+﻿"use client";
 
-import { CheckCircle2, LogOut, Moon, Sun } from "lucide-react";
+import { CheckCircle2, ChevronDown, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
+import { cn } from "@/lib/ui/cn";
 import { getAllowedModules, getModuleLabel, type ModuleId } from "@/lib/navigation";
+import { cleanValue, loadLastRfq } from "@/lib/rfq";
 
 function roleDescription(role: string) {
   if (role === "Admin") return "Usuarios, roles, llaves y salud del sistema.";
@@ -14,13 +18,10 @@ function roleDescription(role: string) {
   return "RFQ, proveedores, historico y evaluacion tecnica.";
 }
 
-function sectionLabel(moduleId: ModuleId) {
-  if (["dashboard", "rfq", "evaluacion", "rfq_email", "ai_command"].includes(moduleId)) return "Trabajo diario";
-  if (["proveedores", "auditor_empresas"].includes(moduleId)) return "Proveedores";
-  if (["costos", "historico", "workspaces", "logistica"].includes(moduleId)) return "Datos y costos";
-  if (["radar", "seguimiento"].includes(moduleId)) return "Supervision";
-  if (["metricas", "admin"].includes(moduleId)) return "Administracion";
-  return "Modulos";
+function shellCopy(role: string) {
+  if (role === "Admin") return { eyebrow: "Procura AI Control", title: "Admin Console", environment: "Consola administrativa" };
+  if (role === "Logistica") return { eyebrow: "Procura AI", title: "Logistics Desk", environment: "Beta interna" };
+  return { eyebrow: "Procura AI", title: "Sourcing Console", environment: "Beta interna" };
 }
 
 export function AppShell({
@@ -37,18 +38,13 @@ export function AppShell({
   onLogout: () => void;
 }) {
   const role = normalizeRole(user.role);
-  const visibleItems = getAllowedModules(user);
+  const visibleItems = useMemo(() => getAllowedModules(user), [user]);
   const activeItem = visibleItems.find((item) => item.id === activeModule);
-  const groupedItems = visibleItems.reduce<Record<string, typeof visibleItems>>((groups, item) => {
-    const label = sectionLabel(item.id);
-    groups[label] = groups[label] || [];
-    groups[label].push(item);
-    return groups;
-  }, {});
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const shellTitle = role === "Admin" ? "Admin Console" : "Sourcing Console";
-  const shellEyebrow = role === "Admin" ? "Procura AI Control" : "Procura AI";
-  const environmentLabel = role === "Admin" ? "Consola administrativa" : "Beta interna";
+  const [navOpen, setNavOpen] = useState(true);
+  const [activeRfqLabel, setActiveRfqLabel] = useState("");
+  const shell = shellCopy(role);
+  const userInitial = String(user.username || "U").slice(0, 1).toUpperCase();
 
   useEffect(() => {
     try {
@@ -57,7 +53,40 @@ export function AppShell({
     } catch {
       setTheme("light");
     }
+    try {
+      const savedNav = window.localStorage.getItem("procura_nav_open");
+      // Default open; only collapse if explicitly saved as closed
+      if (savedNav === "false") setNavOpen(false);
+    } catch {
+      // keep default open
+    }
   }, []);
+
+  useEffect(() => {
+    if (!visibleItems.some((item) => item.id === activeModule) && visibleItems[0]) {
+      onModuleChange(visibleItems[0].id);
+    }
+  }, [activeModule, onModuleChange, visibleItems]);
+
+  useEffect(() => {
+    if (role === "Admin") {
+      setActiveRfqLabel("");
+      return;
+    }
+    try {
+      const saved = loadLastRfq(user.username);
+      if (!saved) {
+        setActiveRfqLabel("");
+        return;
+      }
+      const cg = (saved.condiciones_generales || {}) as Record<string, unknown>;
+      const number = cleanValue(cg.numero_licitacion || cg.licitacion || cg.rfq_id, "RFQ sin numero");
+      const count = saved.items?.length || 0;
+      setActiveRfqLabel(`${number} | ${count} renglon(es)`);
+    } catch {
+      setActiveRfqLabel("");
+    }
+  }, [activeModule, role, user.username]);
 
   function toggleTheme() {
     setTheme((current) => {
@@ -71,140 +100,124 @@ export function AppShell({
     });
   }
 
+  function toggleNav() {
+    setNavOpen((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem("procura_nav_open", String(next));
+      } catch {
+        // Nav still toggles for this session.
+      }
+      return next;
+    });
+  }
+
   return (
-    <div className={`app-shell-root ${theme === "dark" ? "dark" : ""}`}>
-      <aside className="app-sidebar app-sidebar-premium fixed inset-y-0 left-0 hidden w-[17rem] flex-col border-r lg:flex">
-        <div className="shrink-0 border-b border-line px-4 py-4">
-          <div className="flex items-start justify-between gap-3">
+    <div className={cn("app-shell-root min-h-screen", theme === "dark" && "dark")}>
+      <header className="sticky top-0 z-40 border-b border-line bg-white/95 shadow-sm backdrop-blur dark:bg-slate-950/95">
+        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-4 py-3 sm:px-5 xl:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-sm">PA</div>
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="app-brand-mark grid h-10 w-10 shrink-0 place-items-center rounded-lg text-sm font-black shadow-sm">
-                  PA
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-bold uppercase tracking-wide text-blue-200">{shellEyebrow}</div>
-                  <div className="mt-0.5 truncate text-lg font-semibold text-white">{shellTitle}</div>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-100">
-                  {role}
-                </span>
-                <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-100">
-                  Beta
-                </span>
-              </div>
+              <div className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-brand">{shell.eyebrow}</div>
+              <div className="truncate text-lg font-semibold text-slate-950 dark:text-white">{shell.title}</div>
             </div>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-slate-100 transition hover:bg-white/15"
-              title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+            <div className="hidden items-center gap-2 border-l border-line pl-3 lg:flex">
+              <StatusBadge tone="info">{role}</StatusBadge>
+              <StatusBadge tone="ok">Beta</StatusBadge>
+            </div>
           </div>
-        </div>
-        <nav className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
-          {Object.entries(groupedItems).map(([group, items]) => (
-            <div key={group}>
-              <div className="mb-1.5 px-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{group}</div>
-              <div className="space-y-1">
-                {items.map((item) => {
-                  const active = item.id === activeModule;
-                  return (
-                    <button
-                      key={item.label}
-                      onClick={() => onModuleChange(item.id)}
-                      title={`${item.label}: ${item.description}`}
-                      className={`app-nav-item group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition ${
-                        active
-                          ? "app-nav-item-active border-blue-300 bg-blue-50 text-brand shadow-sm"
-                          : "border-transparent text-slate-700 hover:border-blue-200 hover:bg-blue-50/70"
-                      }`}
-                    >
-                      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${
-                        active ? "bg-white text-brand" : "bg-slate-100 text-slate-500 group-hover:text-brand"
-                      }`}>
-                        <item.icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{item.label}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-        <div className="shrink-0 border-t border-white/10 bg-slate-950/65 p-3 backdrop-blur">
-          <div className="rounded-lg border border-white/10 bg-white/10 p-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-white">{user.username}</div>
-                <div className="mt-0.5 truncate text-xs font-medium text-blue-200">{role}</div>
-              </div>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-500 text-xs font-bold text-white">
-                {String(user.username || "U").slice(0, 1).toUpperCase()}
+
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="hidden max-w-[16rem] items-center gap-2 rounded-xl border border-line bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200 md:flex">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-black text-white">{userInitial}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{user.username}</span>
+                <span className="block truncate text-[11px] text-muted">{roleDescription(role)}</span>
               </span>
             </div>
-            <div className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{roleDescription(role)}</div>
+            <StatusBadge tone="ok" className="hidden sm:inline-flex">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Sistema
+            </StatusBadge>
+            <Button type="button" onClick={toggleTheme} variant="secondary" size="icon" title={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            
+            <button
+              type="button"
+              onClick={toggleNav}
+              aria-expanded={navOpen}
+              aria-controls="app-main-nav"
+              title={navOpen ? "Ocultar menu" : "Mostrar menu"}
+              className="app-nav-toggle-btn inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-brand focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-95 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {navOpen ? <X className="h-4 w-4 shrink-0" /> : <Menu className="h-4 w-4 shrink-0" />}
+              <span className="hidden sm:inline">{navOpen ? "Menu" : "Menu"}</span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-300 ${
+                  navOpen ? "rotate-180" : "rotate-0"
+                }`}
+              />
+            </button>
+            <Button onClick={onLogout} variant="secondary" className="hidden sm:inline-flex">
+              <LogOut className="h-4 w-4" />
+              Salir
+            </Button>
           </div>
-          <button
-            onClick={onLogout}
-            className="app-btn app-btn-secondary mt-2 w-full border-white/10 bg-white/10 text-slate-100 hover:bg-white/15"
-          >
-            <LogOut className="h-4 w-4" />
-            Cerrar sesion
-          </button>
         </div>
-      </aside>
-      <main className="app-content lg:pl-[17rem]">
-        <header className="app-topbar sticky top-0 z-10 border-b border-line px-5 py-3 backdrop-blur">
-          <div className="flex min-w-0 items-center justify-between gap-4">
+
+        <div
+          id="app-main-nav"
+          className="mx-auto w-full max-w-[1800px] overflow-hidden px-4 sm:px-5 xl:px-7"
+          style={{
+            maxHeight: navOpen ? "200px" : "0px",
+            paddingBottom: navOpen ? "0.75rem" : "0px",
+            transition: "max-height 0.28s cubic-bezier(0.4,0,0.2,1), padding-bottom 0.28s cubic-bezier(0.4,0,0.2,1)",
+          }}
+        >
+          <div className="mb-2 flex min-w-0 flex-wrap items-end justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted">{environmentLabel}</div>
-              <h1 className="mt-0.5 truncate text-xl font-semibold">{getModuleLabel(activeModule)}</h1>
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted">{shell.environment}</div>
+              <h1 className="mt-0.5 truncate text-xl font-semibold text-slate-950 dark:text-white">{getModuleLabel(activeModule)}</h1>
               {activeItem?.description ? <p className="mt-0.5 hidden truncate text-xs text-muted md:block">{activeItem.description}</p> : null}
             </div>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 lg:hidden"
-              >
-                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                Tema
-              </button>
-              <div className="hidden max-w-52 truncate rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-700 sm:block">
-                {user.username} | {role}
+            {activeRfqLabel ? (
+              <div className="max-w-full truncate rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand dark:border-blue-500/40 dark:bg-blue-500/10">
+                RFQ activo: {activeRfqLabel}
               </div>
-              <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700" title="Sistema disponible">
-                <CheckCircle2 className="h-4 w-4" />
-                Sistema
-              </div>
-            </div>
+            ) : null}
           </div>
-        </header>
-        <div className="border-b border-line bg-white px-4 py-3 lg:hidden">
-          <div className="app-scrollbar flex gap-2 overflow-x-auto pb-1">
-            {visibleItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onModuleChange(item.id)}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                  item.id === activeModule ? "border-blue-200 bg-blue-50 text-brand" : "border-line bg-white text-slate-700"
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
-          </div>
+
+          <nav className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" aria-label="Navegacion principal">
+            {visibleItems.map((item) => {
+              const active = item.id === activeModule;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onModuleChange(item.id)}
+                  title={`${item.label}: ${item.description}`}
+                  className={cn(
+                    "app-top-nav-button inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border px-2.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-300 sm:justify-start lg:px-3 xl:text-sm",
+                    active
+                      ? "border-blue-200 bg-brand text-white shadow-sm shadow-blue-950/10"
+                      : "border-line bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-        <div className="app-page-frame mx-auto w-full max-w-[1600px] min-w-0 p-4 sm:p-5 xl:p-6">{children}</div>
-      </main>
+      </header>
+
+      <main className="mx-auto w-full max-w-[1800px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">{children}</main>
     </div>
   );
 }
+
+

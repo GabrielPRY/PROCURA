@@ -817,3 +817,872 @@ textarea:focus-visible {
 .dark .app-module-tile:hover {
   background: rgba(37, 99, 235, 0.18) !important;
 }
+/* UX closeout v2: strong product shell and universal affordances. */
+.app-shell-root {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.12), transparent 24rem),
+    linear-gradient(180deg, #eef4fb 0%, #f8fafc 30%, #eef2f7 100%) !important;
+}
+
+.app-content h1,
+.app-content h2,
+.app-content h3 {
+  letter-spacing: 0;
+}
+
+.app-content section.rounded-xl,
+.app-content div.rounded-xl.border.border-line.bg-panel,
+.app-content form.rounded-xl.border.border-line.bg-panel,
+.app-content details.rounded-xl.border.border-line.bg-panel {
+  border-color: rgba(148, 163, 184, 0.38) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055) !important;
+}
+
+.app-content .bg-panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+.app-content input:not([type="checkbox"]):not([type="radio"]),
+.app-content select,
+.app-content textarea {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.72rem !important;
+  color: #0f172a !important;
+  min-height: 2.65rem;
+  outline: none;
+}
+
+.app-content input:not([type="checkbox"]):not([type="radio"]):focus,
+.app-content select:focus,
+.app-content textarea:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14) !important;
+}
+
+.app-content textarea {
+  line-height: 1.6;
+}
+
+.app-content button:not(.app-nav-item):not(.app-tab-button):not(.app-btn):not(.app-btn-mini),
+.app-content a[target="_blank"]:not(.app-btn-mini) {
+  border-radius: 0.7rem;
+  font-weight: 750;
+}
+
+.app-content button:not(.app-nav-item):not(:disabled):hover,
+.app-content a[target="_blank"]:hover {
+  transform: translateY(-1px);
+}
+
+.app-content button.bg-brand,
+.app-content button.bg-slate-950,
+.app-content button[class*="bg-brand"],
+.app-content button[class*="bg-slate-950"] {
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.20) !important;
+}
+
+.app-content button.bg-brand:hover,
+.app-content button.bg-slate-950:hover,
+.app-content button[class*="bg-brand"]:hover,
+.app-content button[class*="bg-slate-950"]:hover {
+  background: #1d4ed8 !important;
+}
+
+.app-content button[class*="border-line"][class*="bg-white"],
+.app-content button[class*="border border-line"],
+.app-content a[class*="border-line"][class*="bg-white"] {
+  border-color: #cbd5e1 !important;
+}
+
+.app-content button[class*="border-line"][class*="bg-white"]:hover,
+.app-content button[class*="border border-line"]:hover,
+.app-content a[class*="border-line"][class*="bg-white"]:hover {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #2563eb !important;
+}
+
+.app-content button[class*="rose"],
+.app-content button[class*="text-rose"],
+.app-content button[class*="border-rose"] {
+  border-color: rgba(244, 63, 94, 0.38) !important;
+}
+
+.app-content table.app-table thead,
+.app-content table thead {
+  background: #f1f5f9 !important;
+}
+
+.app-content table.app-table tbody tr,
+.app-content table tbody tr {
+  transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.app-content table.app-table tbody tr:hover,
+.app-content table tbody tr:hover {
+  background: #eff6ff !important;
+}
+
+.app-content .app-card,
+.app-content .app-data-card,
+.app-content .app-stat-card {
+  border-color: rgba(148, 163, 184, 0.38) !important;
+}
+
+.app-content .app-data-card,
+.app-content div[class*="bg-slate-50"][class*="border"] {
+  background: #f8fafc !important;
+}
+
+.app-section-band {
+  background: linear-gradient(135deg, #0f172a, #1d4ed8 62%, #0284c7);
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  border-radius: 0.95rem;
+  color: #ffffff;
+  overflow: hidden;
+  position: relative;
+}
+
+.app-section-band::after {
+  background: linear-gradient(90deg, rgba(255,255,255,0.16), transparent 60%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.app-section-band > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-workflow-card {
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+}
+
+.app-chip-info {
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  min-height: 1.85rem;
+  padding: 0.32rem 0.65rem;
+}
+
+.app-action-zone {
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.9rem;
+  padding: 1rem;
+}
+
+@media (max-width: 900px) {
+  .app-content section.rounded-xl,
+  .app-content .app-card {
+    border-radius: 0.78rem !important;
+  }
+  .app-content button:not(.app-nav-item) {
+    white-space: normal;
+  }
+}
+
+.dark .app-shell-root {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.18), transparent 24rem),
+    #07111f !important;
+}
+
+.dark .app-content .bg-panel,
+.dark .app-workflow-card {
+  background: rgba(15, 23, 42, 0.92) !important;
+}
+
+.dark .app-content input:not([type="checkbox"]):not([type="radio"]),
+.dark .app-content select,
+.dark .app-content textarea {
+  background: #0d1726 !important;
+  border-color: #334155 !important;
+  color: #e5e7eb !important;
+}
+
+.dark .app-content .app-data-card,
+.dark .app-content div[class*="bg-slate-50"][class*="border"] {
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+/* Hero contrast safeguards */
+.app-section-band .text-slate-900,
+.app-section-band .text-slate-800,
+.app-section-band .text-slate-700 {
+  color: #ffffff !important;
+}
+
+.app-section-band .text-muted,
+.app-section-band .text-brand {
+  color: #dbeafe !important;
+}
+
+.app-section-band .app-data-card,
+.app-section-band .bg-white,
+.app-section-band .bg-slate-50 {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.app-section-band .app-chip-info {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  color: #ffffff !important;
+}
+
+.app-section-band .app-data-card .text-muted,
+.app-section-band .app-data-card .text-brand {
+  color: #bfdbfe !important;
+}
+
+/* Layout overflow guardrails */
+.app-content *,
+.app-content *::before,
+.app-content *::after {
+  min-width: 0;
+}
+
+.app-content .app-card,
+.app-content .app-data-card,
+.app-content section,
+.app-content article,
+.app-content form {
+  max-width: 100%;
+}
+
+.app-content table {
+  width: 100%;
+}
+
+.app-content .overflow-hidden table,
+.app-content .overflow-auto table,
+.app-content .overflow-x-auto table {
+  min-width: 720px;
+}
+
+.app-content p,
+.app-content div,
+.app-content span,
+.app-content td,
+.app-content th {
+  overflow-wrap: anywhere;
+}
+
+.app-content .truncate {
+  overflow-wrap: normal;
+}
+
+.app-content button,
+.app-content a {
+  max-width: 100%;
+}
+
+/* Phase 1 visual baseline: calm, light, procurement-first UI. */
+:root {
+  --app-bg: #f3f6fb;
+  --app-soft: #f8fafc;
+  --app-raised: #ffffff;
+  --color-panel: #ffffff;
+  --color-line: #dbe3ef;
+  --color-muted: #64748b;
+  --color-ink: #0f172a;
+}
+
+.app-shell-root {
+  background: #f3f6fb !important;
+}
+
+.app-sidebar {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.app-topbar {
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.05) !important;
+}
+
+.app-page-frame {
+  background: transparent !important;
+}
+
+.app-card,
+.app-content section.rounded-xl,
+.app-content div.rounded-xl.border.border-line.bg-panel,
+.app-content form.rounded-xl.border.border-line.bg-panel,
+.app-content details.rounded-xl.border.border-line.bg-panel {
+  border-radius: 0.85rem !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.app-dashboard-hero,
+.app-section-band {
+  background: #ffffff !important;
+  border: 1px solid var(--color-line) !important;
+  color: #0f172a !important;
+}
+
+.app-dashboard-hero::after,
+.app-section-band::after,
+.app-module-tile::after {
+  display: none !important;
+}
+
+.app-dashboard-hero .text-white,
+.app-section-band .text-white,
+.app-dashboard-hero .text-blue-100,
+.app-section-band .text-blue-100,
+.app-dashboard-hero .text-muted,
+.app-section-band .text-muted,
+.app-dashboard-hero .text-brand,
+.app-section-band .text-brand,
+.app-dashboard-hero .text-slate-900,
+.app-section-band .text-slate-900,
+.app-dashboard-hero .text-slate-950,
+.app-section-band .text-slate-950 {
+  color: inherit !important;
+}
+
+.app-section-band .app-chip-info,
+.app-section-band .app-data-card,
+.app-section-band .bg-white,
+.app-section-band .bg-slate-50 {
+  background: #f8fafc !important;
+  border-color: var(--color-line) !important;
+  color: #0f172a !important;
+}
+
+.app-content button:not(.app-nav-item):not(.app-tab-button):not(.app-btn):not(.app-btn-mini),
+.app-content a[target="_blank"]:not(.app-btn-mini) {
+  border-radius: 0.65rem;
+}
+
+.app-content .app-data-card,
+.app-content div[class*="bg-slate-50"][class*="border"] {
+  background: #f8fafc !important;
+}
+
+.dark .app-shell-root {
+  background: #07111f !important;
+}
+
+.dark .app-sidebar,
+.dark .app-topbar,
+.dark .app-content .bg-panel,
+.dark .app-card,
+.dark .app-content section.rounded-xl,
+.dark .app-workflow-card {
+  background: #0f172a !important;
+  border-color: #253244 !important;
+}
+
+.dark .app-content .app-data-card,
+.dark .app-content div[class*="bg-slate-50"][class*="border"] {
+  background: #111c2d !important;
+}
+
+
+/* ============================================================
+   AFFORDANCES SYSTEM — Hace obvio que es clickeable y que no
+   ============================================================ */
+
+/* 1. Cursor pointer en todos los elementos interactivos */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 2. Botón toggle de nav — elevado con sombra propia */
+.app-nav-toggle-btn {
+  box-shadow: 0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06);
+}
+
+/* Pulso suave cuando la nav está cerrada (3 veces, luego para) */
+.app-nav-toggle-btn[aria-expanded="false"] {
+  animation: nav-toggle-pulse 2.8s ease-in-out 1s 3;
+}
+
+@keyframes nav-toggle-pulse {
+  0%,100% { box-shadow: 0 1px 3px rgba(15,23,42,0.10); }
+  50%      { box-shadow: 0 0 0 5px rgba(37,99,235,0.16), 0 1px 3px rgba(15,23,42,0.10); }
+}
+
+/* 3. Cards solo-lectura: sin hover ni cursor pointer */
+.app-data-card:not(button):not([role="button"]),
+.app-stat-card:not(button):not([role="button"]) {
+  cursor: default;
+}
+
+/* 4. Botones CTA primarios: gradiente + sombra de color = reconocibles */
+.app-btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.30) !important;
+}
+
+.app-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+  box-shadow: 0 6px 20px rgba(37,99,235,0.38) !important;
+  transform: translateY(-1px);
+}
+
+/* 5. Botones deshabilitados: claramente inactivos */
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: 0.48;
+  transform: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+/* 6. Filas de tabla clickeables: borde izquierdo activo */
+tr[class*="cursor-pointer"]:hover td:first-child {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+tr[class*="bg-blue-50"] td:first-child {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+/* 7. Focus visible mejorado para teclado y accesibilidad */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.18) !important;
+}
+
+/* 8. Skeleton loader — usado en StatCard mientras carga */
+@keyframes skeleton-pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.app-skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  border-radius: 0.4rem;
+  display: block;
+}
+
+.dark .app-skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #253244 50%, #1e293b 75%);
+  background-size: 200% 100%;
+}
+
+/* 9. Steps de progreso RFQ */
+.app-progress-step {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.app-progress-step-dot {
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.app-progress-step-dot-active {
+  animation: progress-dot-pulse 1s ease-in-out infinite;
+  background: #2563eb;
+}
+
+.app-progress-step-dot-done {
+  background: #10b981;
+}
+
+.app-progress-step-dot-pending {
+  background: #cbd5e1;
+}
+
+@keyframes progress-dot-pulse {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.7; }
+}
+
+/* Dark mode affordances */
+.dark .app-nav-toggle-btn {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible {
+  outline-color: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(96,165,250,0.20) !important;
+}
+
+.dark tr[class*="bg-blue-50"] td:first-child {
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+.dark .app-skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #253244 50%, #1e293b 75%);
+}
+
+/* ============================================================
+   UX VISUAL CLARITY PASS - colores, botones y affordances
+   ============================================================ */
+:root {
+  --action-primary: #2563eb;
+  --action-primary-hover: #1d4ed8;
+  --action-primary-pressed: #1e40af;
+  --action-secondary-bg: #ffffff;
+  --action-secondary-border: #bfdbfe;
+  --action-secondary-hover: #eff6ff;
+  --action-danger: #e11d48;
+  --action-danger-hover: #be123c;
+  --readonly-bg: #f8fafc;
+  --interactive-ring: rgba(37, 99, 235, 0.2);
+}
+
+/* Todo control accionable debe parecer accionable */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select,
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+/* Campos editables: fondo claro, borde visible y foco azul */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.app-input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):hover,
+select:hover,
+textarea:hover,
+.app-input:hover {
+  border-color: #93c5fd !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus,
+.app-input:focus {
+  border-color: var(--action-primary) !important;
+  box-shadow: 0 0 0 4px var(--interactive-ring) !important;
+}
+
+select {
+  color: #0f172a !important;
+  font-weight: 650;
+}
+
+/* Botones: sistema semantico consistente */
+.app-btn,
+.app-btn-mini,
+.app-top-nav-button,
+.app-nav-toggle-btn,
+.app-tab-button,
+.app-filter-pill,
+button[class*="rounded-lg"],
+button[class*="rounded-xl"] {
+  position: relative;
+  transform: translateY(0);
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.app-btn-primary,
+button[class*="bg-brand"],
+button[class*="bg-blue-600"],
+button[class*="bg-slate-950"] {
+  background: linear-gradient(135deg, var(--action-primary), var(--action-primary-hover)) !important;
+  border-color: var(--action-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24) !important;
+}
+
+.app-btn-primary:hover:not(:disabled),
+button[class*="bg-brand"]:hover:not(:disabled),
+button[class*="bg-blue-600"]:hover:not(:disabled),
+button[class*="bg-slate-950"]:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--action-primary-hover), var(--action-primary-pressed)) !important;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.32) !important;
+  transform: translateY(-1px);
+}
+
+.app-btn-secondary,
+.app-top-nav-button:not(.bg-brand),
+.app-nav-toggle-btn,
+button[class*="border-line"][class*="bg-white"],
+button[class*="border-blue-200"][class*="bg-white"] {
+  background: var(--action-secondary-bg) !important;
+  border-color: var(--action-secondary-border) !important;
+  color: #1e3a8a !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.app-btn-secondary:hover:not(:disabled),
+.app-top-nav-button:not(.bg-brand):hover:not(:disabled),
+.app-nav-toggle-btn:hover:not(:disabled),
+button[class*="border-line"][class*="bg-white"]:hover:not(:disabled),
+button[class*="border-blue-200"][class*="bg-white"]:hover:not(:disabled) {
+  background: var(--action-secondary-hover) !important;
+  border-color: #60a5fa !important;
+  color: var(--action-primary) !important;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.app-btn-danger,
+button[class*="text-rose"],
+button[class*="border-rose"],
+button[class*="bg-rose"] {
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+.app-btn-danger:hover:not(:disabled),
+button[class*="text-rose"]:hover:not(:disabled),
+button[class*="border-rose"]:hover:not(:disabled),
+button[class*="bg-rose"]:hover:not(:disabled) {
+  background: #fff1f2 !important;
+  border-color: #fb7185 !important;
+  color: var(--action-danger-hover) !important;
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: translateY(0) scale(0.99);
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  cursor: not-allowed !important;
+  opacity: 0.58 !important;
+  pointer-events: none;
+}
+
+/* Navbar superior: activo claro, inactivo clickeable */
+.app-top-nav-button {
+  min-height: 2.5rem;
+}
+
+.app-top-nav-button.bg-brand,
+.app-top-nav-button[class*="bg-brand"] {
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24) !important;
+}
+
+.app-top-nav-button:not(.bg-brand):not([class*="bg-brand"])::after,
+.app-nav-toggle-btn::after,
+.app-btn-secondary::after {
+  content: "";
+  border-radius: inherit;
+  inset: -2px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.16s ease;
+}
+
+.app-top-nav-button:not(.bg-brand):not([class*="bg-brand"]):hover::after,
+.app-nav-toggle-btn:hover::after,
+.app-btn-secondary:hover::after {
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+/* Tabs y filtros: seleccion actual muy visible */
+.app-tab-button,
+.app-filter-pill,
+.app-filter-pill-idle {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.app-tab-button:hover:not(:disabled),
+.app-filter-pill:hover:not(:disabled),
+.app-filter-pill-idle:hover:not(:disabled) {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+
+.app-tab-button-active,
+.app-filter-pill-active {
+  background: #dbeafe !important;
+  border-color: #2563eb !important;
+  color: #1d4ed8 !important;
+  box-shadow: inset 0 -2px 0 #2563eb !important;
+}
+
+/* Tablas: hover solo comunica seleccion cuando hay cursor-pointer */
+.app-content table tbody tr {
+  background: transparent;
+}
+
+.app-content table tbody tr:not([class*="cursor-pointer"]):hover {
+  background: transparent !important;
+}
+
+.app-content table tbody tr[class*="cursor-pointer"] {
+  cursor: pointer;
+}
+
+.app-content table tbody tr[class*="cursor-pointer"]:hover {
+  background: #eff6ff !important;
+  box-shadow: inset 3px 0 0 var(--action-primary);
+}
+
+.app-content table tbody tr[class*="cursor-pointer"]:active {
+  background: #dbeafe !important;
+}
+
+/* Cards informativas no deben parecer botones */
+.app-card:not(button):not([role="button"]),
+.app-data-card:not(button):not([role="button"]),
+.app-stat-card:not(button):not([role="button"]),
+.app-content section:not([role="button"]),
+.app-content article:not([role="button"]) {
+  cursor: default;
+}
+
+/* Cuando una tarjeta SI es accionable, clase o role la hace obvia */
+.app-clickable,
+[role="button"],
+button.app-card,
+button.app-data-card,
+button.app-stat-card {
+  cursor: pointer;
+  border-color: #bfdbfe !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08) !important;
+}
+
+.app-clickable:hover,
+[role="button"]:hover,
+button.app-card:hover,
+button.app-data-card:hover,
+button.app-stat-card:hover {
+  background: #eff6ff !important;
+  border-color: #60a5fa !important;
+  transform: translateY(-1px);
+}
+
+/* Links externos o de accion: azul y subrayado al hover */
+.app-content a[target="_blank"]:not(.app-btn-mini),
+.app-content a[href^="http"]:not(.app-btn-mini) {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.app-content a[target="_blank"]:hover,
+.app-content a[href^="http"]:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Mini botones: que no se confundan con badges */
+.app-btn-mini {
+  background: #ffffff !important;
+  border: 1px solid #bfdbfe !important;
+  color: #1d4ed8 !important;
+  font-weight: 800;
+  min-height: 2rem;
+}
+
+.app-btn-mini:hover:not(:disabled) {
+  background: #eff6ff !important;
+  border-color: #60a5fa !important;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.14);
+}
+
+/* Badges/chips: sin cursor para no parecer botones */
+.app-chip-info,
+[class*="rounded-full"][class*="text-xs"]:not(button):not([role="button"]) {
+  cursor: default;
+}
+
+/* Modo oscuro real para la capa nueva */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea,
+.dark .app-input {
+  background: #0d1726 !important;
+  border-color: #334155 !important;
+  color: #e5e7eb !important;
+}
+
+.dark .app-btn-secondary,
+.dark .app-top-nav-button:not(.bg-brand),
+.dark .app-nav-toggle-btn,
+.dark button[class*="border-line"][class*="bg-white"],
+.dark button[class*="border-blue-200"][class*="bg-white"] {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #bfdbfe !important;
+}
+
+.dark .app-btn-secondary:hover:not(:disabled),
+.dark .app-top-nav-button:not(.bg-brand):hover:not(:disabled),
+.dark .app-nav-toggle-btn:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.18) !important;
+  border-color: #60a5fa !important;
+  color: #dbeafe !important;
+}
+
+.dark .app-tab-button,
+.dark .app-filter-pill,
+.dark .app-filter-pill-idle,
+.dark .app-btn-mini {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.dark .app-tab-button-active,
+.dark .app-filter-pill-active {
+  background: rgba(37, 99, 235, 0.24) !important;
+  border-color: #60a5fa !important;
+  color: #dbeafe !important;
+}
+
+.dark .app-content table tbody tr[class*="cursor-pointer"]:hover {
+  background: rgba(37, 99, 235, 0.14) !important;
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+.dark .app-clickable:hover,
+.dark [role="button"]:hover,
+.dark button.app-card:hover,
+.dark button.app-data-card:hover,
+.dark button.app-stat-card:hover {
+  background: rgba(37, 99, 235, 0.16) !important;
+  border-color: #60a5fa !important;
+}

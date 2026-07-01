@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, ExternalLink, EyeOff, RefreshCcw, Search, ShieldCheck, XCircle, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +20,10 @@ import {
 import { SliLookupPanel } from "@/components/sli-lookup-panel";
 import { createSeguimiento } from "@/lib/seguimiento";
 import { type AuthUser } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type FilterMode = "todas" | "nuevas" | "alertas" | "seguimiento" | "cierre72" | "descartadas" | "hoy";
 type SortMode = "publicacion" | "cierre" | "score";
@@ -410,42 +414,26 @@ export function RadarConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Radar Supervisor</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Licitaciones abiertas del SLI</h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted">
-              Vista operativa para filtrar, ordenar, detectar enmiendas y decidir que procesos pasan a seguimiento.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-slate-700">
-                Autoescaneo: {scheduler?.enabled === false ? "apagado" : `cada ${scheduler?.interval_minutes || 25} min`}
-              </span>
-              <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-slate-700">
-                Proximo: {scheduler?.next_run_at || "N/D"}
-              </span>
-              <span className={`rounded-full border px-3 py-1 ${scheduler?.last_error ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                {scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Ultimo escaneo con error" : "Scheduler listo"}
-              </span>
-              <span className="rounded-full border border-line bg-white px-3 py-1 text-slate-700">
-                Ultimo escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}
-              </span>
-              <span className="rounded-full border border-line bg-white px-3 py-1 text-slate-700">
-                Vista actualizada: {formatDate(lastFrontendRefresh)}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={handleScan}
-            disabled={busy}
-            className="app-btn app-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
-            Escanear SLI ahora
-          </button>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Radar Supervisor"
+          title="Licitaciones abiertas del SLI"
+          copy="Vista operativa para filtrar, ordenar, detectar enmiendas y decidir que procesos pasan a seguimiento."
+          actions={
+            <Button onClick={handleScan} disabled={busy} variant="primary" size="lg">
+              <RefreshCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+              Escanear SLI ahora
+            </Button>
+          }
+        />
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <StatusBadge tone="neutral">Autoescaneo: {scheduler?.enabled === false ? "apagado" : `cada ${scheduler?.interval_minutes || 25} min`}</StatusBadge>
+          <StatusBadge tone="neutral">Proximo: {scheduler?.next_run_at || "N/D"}</StatusBadge>
+          <StatusBadge tone={scheduler?.last_error ? "danger" : "ok"}>{scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Ultimo escaneo con error" : "Scheduler listo"}</StatusBadge>
+          <StatusBadge tone="neutral">Ultimo escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}</StatusBadge>
+          <StatusBadge tone="info">Vista actualizada: {formatDate(lastFrontendRefresh)}</StatusBadge>
         </div>
-      </section>
+      </ModuleSection>
 
       <section className="grid gap-3 md:grid-cols-4">
         {summaryCards.map(([label, value, hint, Icon, tone]) => (
@@ -543,7 +531,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             <button
               type="button"
               onClick={clearFilters}
-              className="app-btn app-btn-secondary h-11"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand"
             >
               Limpiar
             </button>
@@ -601,7 +589,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 void loadRadarHealth();
               }}
               disabled={loading}
-              className="app-btn app-btn-secondary h-10 disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-60"
             >
               Actualizar
             </button>
@@ -869,7 +857,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   <button
                     type="button"
                     onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))}
-                    className="app-btn app-btn-primary"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-dark"
                   >
                     Consultar detalle SLI/RFQ
                   </button>
@@ -877,7 +865,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     type="button"
                     onClick={() => handleEnviarSeguimiento(selectedRow)}
                     disabled={busy || selectedRow.estado_radar === "en_seguimiento"}
-                    className="app-btn app-btn-secondary border-blue-200 text-blue-700 disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                   >
                     Enviar a seguimiento
                   </button>
@@ -885,7 +873,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     type="button"
                     onClick={() => handleEstado(selectedRow.id, (selectedRow.estado_radar as RadarEstado) || "nueva")}
                     disabled={busy}
-                    className="app-btn app-btn-secondary disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-50"
                   >
                     Guardar comentario
                   </button>
@@ -1099,3 +1087,5 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+

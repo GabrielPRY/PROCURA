@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { Calculator, Info, Loader2, MapPin, PackageCheck, Plus, Ruler, Save, Scale, Trash2, Truck } from "lucide-react";
+import { Calculator, Info, Loader2, MapPin, PackageCheck, Plus, Ruler, Save, Scale, Settings, Trash2, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cleanValue, loadActiveRfqContext, loadLastRfq, type ActiveRfqItemContext, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { type AuthUser } from "@/lib/auth";
@@ -9,12 +9,20 @@ import {
   getLogisticsCalculations,
   getLogisticsSettings,
   saveLogisticsCalculation,
+  saveLogisticsForwarder,
+  saveLogisticsFreightRate,
+  saveLogisticsLocalRate,
   type Forwarder,
   type FreightRate,
   type Incoterm,
   type LocalRate,
   type LogisticsCalculation
 } from "@/lib/logistics";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type LoadType = "Caja" | "Paquete" | "Bulto" | "Pallet" | "Crate" | "Tambor" | "Rollo";
 type WeightUnit = "lb" | "kg";
@@ -177,6 +185,29 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
   const [error, setError] = useState<string | null>(null);
   const [activeRfqContext, setActiveRfqContext] = useState<ActiveRfqItemContext | null>(null);
   const [packages, setPackages] = useState<PackageRow[]>([createPackageRow(1)]);
+  const [savingSettings, setSavingSettings] = useState<string | null>(null);
+  const [settingsSaved, setSettingsSaved] = useState<string | null>(null);
+  const [freightForm, setFreightForm] = useState({
+    agente: "",
+    tipo_servicio: "USA-Panama",
+    tipo_flete: "Aereo",
+    tarifa_por_libra: 3.75,
+    tiempo_transito_dias: 5,
+    minimo_envio: 35,
+    dia_corte: "",
+    salidas: "",
+    activo: true
+  });
+  const [forwarderForm, setForwarderForm] = useState({ nombre: "", direccion: "", observacion: "", activo: true });
+  const [localRateForm, setLocalRateForm] = useState({
+    agente: "",
+    destino: "Panama",
+    tipo_flete: "Terrestre",
+    hasta_400kg: 0,
+    kg_500_1000: 0,
+    mayor_1000kg: 0,
+    activo: true
+  });
 
   useEffect(() => {
     const savedRfq = loadLastRfq(user.username);
@@ -195,19 +226,8 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     Promise.all([getLogisticsSettings(), getLogisticsCalculations(25)])
       .then(([settings, history]) => {
         if (!mounted) return;
-        const activeRates = (settings.freight_rates || []).filter((item) => item.activo !== false);
-        setFreightRates(activeRates);
-        setForwarders((settings.forwarders || []).filter((item) => item.activo !== false));
-        setLocalRates((settings.local_rates || []).filter((item) => item.activo !== false));
-        setIncoterms(settings.incoterms || []);
+        applyLogisticsSettings(settings);
         setCalculations(history.calculations || []);
-        if (activeRates.length) {
-          const firstRate = activeRates[0];
-          setSelectedRateId(firstRate.id);
-          setRate(toNumber(firstRate.tarifa_por_libra, 3.75));
-          setHandling(toNumber(firstRate.minimo_envio, 35));
-        }
-        if (settings.incoterms?.length) setIncoterm(settings.incoterms[0].sigla);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "No se pudo cargar la configuracion logistica."))
       .finally(() => {
@@ -218,6 +238,103 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     };
   }, []);
 
+  const canManageLogistics = ["Logistica", "Admin"].includes(String(user.role || ""));
+
+  function applyLogisticsSettings(settings: { freight_rates?: FreightRate[]; forwarders?: Forwarder[]; local_rates?: LocalRate[]; incoterms?: Incoterm[] }) {
+    const activeRates = (settings.freight_rates || []).filter((item) => item.activo !== false);
+    const activeForwarders = (settings.forwarders || []).filter((item) => item.activo !== false);
+    const activeLocalRates = (settings.local_rates || []).filter((item) => item.activo !== false);
+    setFreightRates(activeRates);
+    setForwarders(activeForwarders);
+    setLocalRates(activeLocalRates);
+    setIncoterms(settings.incoterms || []);
+    if (activeRates.length) {
+      const firstRate = activeRates[0];
+      if (selectedRateId === "manual") setSelectedRateId(firstRate.id);
+      setRate(toNumber(firstRate.tarifa_por_libra, rate));
+      setHandling(toNumber(firstRate.minimo_envio, handling));
+      setFreightForm((current) => ({
+        ...current,
+        agente: firstRate.agente || current.agente,
+        tipo_servicio: firstRate.tipo_servicio || current.tipo_servicio,
+        tipo_flete: firstRate.tipo_flete || current.tipo_flete,
+        tarifa_por_libra: toNumber(firstRate.tarifa_por_libra, current.tarifa_por_libra),
+        tiempo_transito_dias: toNumber(firstRate.tiempo_transito_dias, current.tiempo_transito_dias),
+        minimo_envio: toNumber(firstRate.minimo_envio, current.minimo_envio),
+        dia_corte: firstRate.dia_corte || current.dia_corte,
+        salidas: firstRate.salidas || current.salidas,
+        activo: firstRate.activo !== false
+      }));
+    }
+    if (activeForwarders.length) {
+      const first = activeForwarders[0];
+      setForwarderForm((current) => ({ ...current, nombre: first.nombre || current.nombre, direccion: first.direccion || current.direccion, observacion: first.observacion || current.observacion, activo: first.activo !== false }));
+    }
+    if (activeLocalRates.length) {
+      const first = activeLocalRates[0];
+      setLocalRateForm((current) => ({
+        ...current,
+        agente: first.agente || current.agente,
+        destino: first.destino || current.destino,
+        tipo_flete: first.tipo_flete || current.tipo_flete,
+        hasta_400kg: toNumber(first.hasta_400kg, current.hasta_400kg),
+        kg_500_1000: toNumber(first.kg_500_1000, current.kg_500_1000),
+        mayor_1000kg: toNumber(first.mayor_1000kg, current.mayor_1000kg),
+        activo: first.activo !== false
+      }));
+    }
+    if (settings.incoterms?.length) setIncoterm(settings.incoterms[0].sigla);
+  }
+
+  async function refreshSettingsOnly() {
+    const settings = await getLogisticsSettings();
+    applyLogisticsSettings(settings);
+  }
+
+  async function saveFreightSettings() {
+    setError(null);
+    setSettingsSaved(null);
+    setSavingSettings("freight");
+    try {
+      await saveLogisticsFreightRate(freightForm);
+      await refreshSettingsOnly();
+      setSettingsSaved("Tarifa internacional actualizada para todos los usuarios.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la tarifa internacional.");
+    } finally {
+      setSavingSettings(null);
+    }
+  }
+
+  async function saveForwarderSettings() {
+    setError(null);
+    setSettingsSaved(null);
+    setSavingSettings("forwarder");
+    try {
+      await saveLogisticsForwarder(forwarderForm);
+      await refreshSettingsOnly();
+      setSettingsSaved("Forwarder/localidad actualizado para todos los usuarios.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el forwarder.");
+    } finally {
+      setSavingSettings(null);
+    }
+  }
+
+  async function saveLocalRateSettings() {
+    setError(null);
+    setSettingsSaved(null);
+    setSavingSettings("local");
+    try {
+      await saveLogisticsLocalRate(localRateForm);
+      await refreshSettingsOnly();
+      setSettingsSaved("Tarifa local actualizada para todos los usuarios.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la tarifa local.");
+    } finally {
+      setSavingSettings(null);
+    }
+  }
   const items = useMemo(() => rfq?.items || [], [rfq]);
   const selectedItem = items[selectedIndex];
   const selectedRate = freightRates.find((item) => item.id === selectedRateId);
@@ -371,58 +488,42 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="app-card overflow-hidden shadow-sm">
-        <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="p-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand">
-              <Truck className="h-3.5 w-3.5" />
-              Logistica USA a Panama
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Calculadora de costo logistico</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Calcula por paquete usando peso real contra peso volumetrico. El costo visible es referencial y debe
-              validarse con Logistica antes de enviar una cotizacion final.
-            </p>
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted">Modo</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{items.length ? "RFQ conectado" : "Manual"}</div>
-              </div>
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted">Forwarder</div>
-                <div className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedRate?.agente || "Manual"}</div>
-              </div>
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted">Base de cobro</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{chargeBasis}</div>
-              </div>
-            </div>
-          </div>
-          <aside className="border-t border-line bg-slate-50 p-6 2xl:border-l 2xl:border-t-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Total estimado</div>
-            <div className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">{money(estimatedCost)}</div>
-            <div className="mt-2 text-sm text-muted">Flete {money(internationalCost)} + manejo {money(handling)}</div>
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs text-muted">Peso cobrable</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">{chargeableWeight.toFixed(2)} lb</div>
-              </div>
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs text-muted">Piezas</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">{totalPieces}</div>
-              </div>
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs text-muted">USD/lb total</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">{money(costPerChargeableLb)}</div>
-              </div>
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs text-muted">Transito</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">{selectedRate?.tiempo_transito_dias || "N/D"} d</div>
-              </div>
-            </div>
-          </aside>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Logistica USA a Panama"
+          title="Calculadora de costo logistico"
+          copy="Calcula por paquete, caja, bulto o pallet usando peso real contra peso volumetrico. El resultado es referencial y debe validarse con Logistica antes de cotizar."
+          actions={
+            <>
+              <StatusBadge tone={items.length ? "ok" : "neutral"}>{items.length ? "RFQ conectado" : "Modo manual"}</StatusBadge>
+              <Button type="button" onClick={saveCalculation} disabled={saving} variant="primary" size="lg">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Guardar calculo
+              </Button>
+            </>
+          }
+        />
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Total estimado" value={money(estimatedCost)} hint={"Flete " + money(internationalCost) + " + manejo " + money(handling)} icon={Calculator} />
+          <StatCard label="Peso cobrable" value={chargeableWeight.toFixed(2) + " lb"} hint={"Base " + chargeBasis.toLowerCase()} icon={Scale} />
+          <StatCard label="Piezas" value={totalPieces} hint={totalVolumeFt3.toFixed(2) + " ft3 total"} icon={PackageCheck} />
+          <StatCard label="Modo sugerido" value={recommendedMode} hint={logisticsRisk} icon={Truck} />
         </div>
-      </section>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon / codigo</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedRenglon} | {selectedCode}</div>
+          </div>
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Forwarder</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedRate?.agente || "Manual"}</div>
+          </div>
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Ruta</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{origin || "Origen"} a {destination || "Destino"}</div>
+          </div>
+        </div>
+      </ModuleSection>
 
       {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
       {loadingSettings && (
@@ -432,9 +533,70 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
         </section>
       )}
 
+      {settingsSaved ? <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{settingsSaved}</section> : null}
+
+      {canManageLogistics ? (
+        <ModuleSection>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Settings className="h-4 w-4 text-brand" />
+                Valores logísticos que usan todos
+              </div>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                Esta zona es solo para Logística/Admin. Las tarifas guardadas aquí alimentan la calculadora de analistas, supervisores y gerencia.
+              </p>
+            </div>
+            <StatusBadge tone="info">Editable por Logística</StatusBadge>
+          </div>
+
+          <div className="mt-5 grid gap-4 2xl:grid-cols-3">
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Tarifa internacional</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Forwarder, modo, costo por libra cobrable y mínimo de envío.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Forwarder / agente<input value={freightForm.agente} onChange={(event) => setFreightForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" placeholder="Ej: Miami Forwarder" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Servicio<input value={freightForm.tipo_servicio} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_servicio: event.target.value }))} className="app-input" placeholder="USA-Panama" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tipo de flete<input value={freightForm.tipo_flete} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_flete: event.target.value }))} className="app-input" placeholder="Aéreo / Marítimo" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">USD/lb cobrable<input type="number" value={freightForm.tarifa_por_libra} min={0} step={0.01} onChange={(event) => setFreightForm((current) => ({ ...current, tarifa_por_libra: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mínimo USD<input type="number" value={freightForm.minimo_envio} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, minimo_envio: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tránsito días<input type="number" value={freightForm.tiempo_transito_dias} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, tiempo_transito_dias: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Día de corte<input value={freightForm.dia_corte} onChange={(event) => setFreightForm((current) => ({ ...current, dia_corte: event.target.value }))} className="app-input" placeholder="Viernes 12:00" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Salidas<input value={freightForm.salidas} onChange={(event) => setFreightForm((current) => ({ ...current, salidas: event.target.value }))} className="app-input" placeholder="Semanal / diario" /></label>
+              </div>
+              <Button type="button" onClick={saveFreightSettings} disabled={savingSettings === "freight"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "freight" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa internacional</Button>
+            </div>
+
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Forwarder y localidad</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Dirección operativa y notas que verán los usuarios al calcular.</p>
+              <div className="mt-4 grid gap-3">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Nombre<input value={forwarderForm.nombre} onChange={(event) => setForwarderForm((current) => ({ ...current, nombre: event.target.value }))} className="app-input" placeholder="Ej: Bodega Miami" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Dirección / localidad<input value={forwarderForm.direccion} onChange={(event) => setForwarderForm((current) => ({ ...current, direccion: event.target.value }))} className="app-input" placeholder="Miami, FL" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Observación<textarea value={forwarderForm.observacion} onChange={(event) => setForwarderForm((current) => ({ ...current, observacion: event.target.value }))} className="min-h-24 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100" placeholder="Horario, contacto, restricción o nota operativa" /></label>
+              </div>
+              <Button type="button" onClick={saveForwarderSettings} disabled={savingSettings === "forwarder"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "forwarder" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar forwarder</Button>
+            </div>
+
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Tarifa local Panamá</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Referencias locales por destino y rango de peso.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Agente local<input value={localRateForm.agente} onChange={(event) => setLocalRateForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" placeholder="Ej: Transporte local" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Destino<input value={localRateForm.destino} onChange={(event) => setLocalRateForm((current) => ({ ...current, destino: event.target.value }))} className="app-input" placeholder="Panamá / Corozal" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tipo<input value={localRateForm.tipo_flete} onChange={(event) => setLocalRateForm((current) => ({ ...current, tipo_flete: event.target.value }))} className="app-input" placeholder="Terrestre" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Hasta 400kg<input type="number" value={localRateForm.hasta_400kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, hasta_400kg: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">500-1000kg<input type="number" value={localRateForm.kg_500_1000} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, kg_500_1000: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mayor 1000kg<input type="number" value={localRateForm.mayor_1000kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, mayor_1000kg: Number(event.target.value) }))} className="app-input" /></label>
+              </div>
+              <Button type="button" onClick={saveLocalRateSettings} disabled={savingSettings === "local"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "local" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa local</Button>
+            </div>
+          </div>
+        </ModuleSection>
+      ) : null}
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5">
-          <div className="app-card p-5 shadow-sm">
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <StepHeader step="1" title="Ruta y tarifa" copy="Selecciona el renglon, forwarder, incoterm y ruta operativa. Por ahora el flujo esta calibrado para USA a Panama." />
               {activeRfqContext ? (
@@ -451,7 +613,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                   <select
                     value={selectedIndex}
                     onChange={(event) => setSelectedIndex(Number(event.target.value))}
-                    className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                    className="app-input"
                   >
                     {items.map((item, index) => (
                       <option key={`${item.renglon}-${index}`} value={index}>
@@ -484,7 +646,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <select
                   value={String(selectedRateId)}
                   onChange={(event) => handleRateChange(event.target.value)}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 >
                   <option value="manual">Manual</option>
                   {freightRates.map((item) => (
@@ -500,7 +662,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <select
                   value={incoterm}
                   onChange={(event) => setIncoterm(event.target.value)}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 >
                   {(incoterms.length ? incoterms : fallbackIncoterms.map(([sigla, notas]) => ({ sigla, notas }))).map((item) => (
                     <option key={item.sigla} value={item.sigla}>
@@ -518,7 +680,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                   min={0}
                   step={0.05}
                   onChange={(event) => setRate(Number(event.target.value))}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 />
               </label>
 
@@ -527,7 +689,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <input
                   value={origin}
                   onChange={(event) => setOrigin(event.target.value)}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 />
               </label>
 
@@ -536,7 +698,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <input
                   value={destination}
                   onChange={(event) => setDestination(event.target.value)}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 />
               </label>
 
@@ -545,7 +707,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <select
                   value={transportMode}
                   onChange={(event) => setTransportMode(event.target.value)}
-                  className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 >
                   <option value="Automatico">Automatico segun peso/volumen</option>
                   <option value="Courier / aereo rapido">Courier / aereo rapido</option>
@@ -557,17 +719,13 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
             </div>
           </div>
 
-          <div className="app-card p-5 shadow-sm">
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <StepHeader step="2" title="Paquetes y dimensiones" copy="Agrega cajas, bultos o pallets. El sistema compara peso real contra peso volumetrico y define la base cobrable." />
-              <button
-                type="button"
-                onClick={addPackage}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-3 text-xs font-semibold text-white hover:bg-brand-dark"
-              >
+              <Button type="button" onClick={addPackage} variant="primary" size="md">
                 <Plus className="h-3.5 w-3.5" />
                 Agregar carga
-              </button>
+              </Button>
             </div>
 
             <div className="mt-4 grid gap-4">
@@ -702,11 +860,11 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                     </div>
 
                     <div className="mt-4 grid gap-3 md:grid-cols-4">
-                      <div className="rounded-lg border border-line bg-slate-50 p-3">
+                      <div className="app-data-card">
                         <div className="text-xs text-muted">Peso real</div>
                         <div className="mt-1 font-semibold text-slate-900">{packageRealWeight(row).toFixed(2)} lb</div>
                       </div>
-                      <div className="rounded-lg border border-line bg-slate-50 p-3">
+                      <div className="app-data-card">
                         <div className="text-xs text-muted">Volumetrico</div>
                         <div className="mt-1 font-semibold text-slate-900">{packageVolumetricWeight(row).toFixed(2)} lb</div>
                       </div>
@@ -714,7 +872,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                         <div className="text-xs text-blue-700">Cobrable</div>
                         <div className="mt-1 font-semibold text-slate-950">{packageChargeableWeight(row).toFixed(2)} lb</div>
                       </div>
-                      <div className="rounded-lg border border-line bg-slate-50 p-3">
+                      <div className="app-data-card">
                         <div className="text-xs text-muted">Volumen</div>
                         <div className="mt-1 font-semibold text-slate-900">{packageCubicFeet(row).toFixed(2)} ft3</div>
                       </div>
@@ -730,14 +888,14 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <Scale className="h-3.5 w-3.5" />
                   Peso real
                 </div>
                 <div className="mt-1 text-xl font-semibold text-slate-900">{realWeight.toFixed(2)} lb</div>
               </div>
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   <Ruler className="h-3.5 w-3.5" />
                   Volumetrico
@@ -791,38 +949,29 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 <span className="font-semibold text-slate-900">{money(rate)} / lb</span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={saveCalculation}
-              disabled={saving}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Guardar calculo
-            </button>
           </div>
 
-          <div className="app-card p-5 shadow-sm">
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <MapPin className="h-4 w-4 text-brand" />
               Tarifa seleccionada
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-700">
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 <div className="font-semibold text-slate-950">{selectedRate?.agente || "Manual"}</div>
                 <div className="mt-1 text-xs text-muted">{selectedRate?.tipo_servicio || selectedRate?.tipo_flete || "Tarifa ingresada manualmente"}</div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-1">
-                <div className="rounded-lg border border-line bg-slate-50 p-3">Corte: {selectedRate?.dia_corte || "N/D"}</div>
-                <div className="rounded-lg border border-line bg-slate-50 p-3">Salidas: {selectedRate?.salidas || "N/D"}</div>
+                <div className="app-data-card">Corte: {selectedRate?.dia_corte || "N/D"}</div>
+                <div className="app-data-card">Salidas: {selectedRate?.salidas || "N/D"}</div>
               </div>
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 Transito estimado: {selectedRate?.tiempo_transito_dias || "N/D"} dias
               </div>
             </div>
           </div>
 
-          <div className="app-card p-5 shadow-sm">
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Info className="h-4 w-4 text-brand" />
               {selectedIncoterm?.sigla || fallbackIncoterm?.[0] || incoterm}
@@ -844,7 +993,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="text-sm font-semibold text-slate-900">Resumen para expediente</div>
           <p className="mt-1 text-sm text-muted">Texto limpio para copiar al expediente o usar como referencia interna.</p>
           <textarea
@@ -854,7 +1003,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
           />
         </div>
 
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="text-sm font-semibold text-slate-900">Calculos guardados</div>
           <p className="mt-1 text-sm text-muted">Historial real guardado para reutilizar estimaciones.</p>
           <div className="mt-4 overflow-hidden rounded-lg border border-line">
@@ -872,7 +1021,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                     <button
                       type="button"
                       onClick={() => deleteCalculation(item.id)}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700"
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Borrar
@@ -888,12 +1037,12 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-2">
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="text-sm font-semibold text-slate-900">Forwarders y localidades</div>
           <p className="mt-1 text-sm text-muted">Referencia visible de la ruta operativa actual.</p>
           <div className="mt-4 grid gap-3">
             {forwarders.length ? forwarders.slice(0, 6).map((item) => (
-              <div key={item.id} className="rounded-lg border border-line bg-white p-3">
+              <div key={item.id} className="app-data-card bg-white">
                 <div className="font-semibold text-slate-900">{item.nombre}</div>
                 <div className="mt-1 text-sm text-muted">{item.direccion || "Direccion no registrada"}</div>
                 {item.observacion ? <div className="mt-1 text-xs text-slate-600">{item.observacion}</div> : null}
@@ -904,7 +1053,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
           </div>
         </div>
 
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="text-sm font-semibold text-slate-900">Tarifas locales visibles</div>
           <p className="mt-1 text-sm text-muted">Referencia interna para validar manejo local cuando aplique.</p>
           <div className="mt-4 overflow-hidden rounded-lg border border-line">
@@ -930,3 +1079,10 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
+
+
+
+
+

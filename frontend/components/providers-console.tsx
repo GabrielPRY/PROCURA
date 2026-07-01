@@ -23,6 +23,10 @@ import { type AuthUser } from "@/lib/auth";
 import { COMPANY_AUDIT_DRAFT_KEY, listCompanyAudits, type CompanyAuditDraft, type CompanyAuditListItem } from "@/lib/company-audit";
 import type { ModuleId } from "@/lib/navigation";
 import { searchProviders, type SourcingProvider, type SourcingSearchPlan } from "@/lib/sourcing";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type SearchScope = "renglon" | "todos";
 type SourcingStrategy = "por_renglon" | "proveedor_integral";
@@ -436,49 +440,40 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm">
-        <div className="grid gap-0 xl:grid-cols-[1fr_360px]">
-          <div className="p-5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand">
-              <Sparkles className="h-3.5 w-3.5" />
-              Sourcing global asistido
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Proveedores</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Busca proveedores utiles por renglon o por RFQ completo. La prioridad es precio bajo, cumplimiento tecnico,
-              empresa real y riesgo comercial controlado.
-            </p>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Sourcing global asistido"
+          title="Proveedores"
+          copy="Busca 10 proveedores utiles por renglon o por RFQ completo. La prioridad es precio bajo, cumplimiento tecnico, empresa real y riesgo comercial controlado."
+          actions={
+            <>
+              <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "warn"}>
+                {loadingConfig ? "Verificando IA" : hasGeminiKey ? "IA lista" : "IA pendiente"}
+              </StatusBadge>
+              <Button onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" size="lg">
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Buscar 10 proveedores
+              </Button>
+            </>
+          }
+        />
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">RFQ activo</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{rfqNumber}</div>
           </div>
-          <div className="border-t border-line bg-slate-50 p-5 xl:border-l xl:border-t-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <PackageSearch className="h-4 w-4 text-brand" />
-              Contexto activo
-            </div>
-            <div className="mt-4 grid gap-2 text-sm">
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted">RFQ</div>
-                <div className="mt-1 font-semibold text-slate-900">{rfqNumber}</div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-lg border border-line bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon</div>
-                  <div className="mt-1 font-semibold text-slate-900">{selectedRenglon}</div>
-                </div>
-                <div className="rounded-lg border border-line bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Codigo ACP</div>
-                  <div className="mt-1 font-semibold text-slate-900">{selectedCode}</div>
-                </div>
-              </div>
-              <div className="rounded-lg border border-line bg-white p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted">Busqueda tecnica</div>
-                <div className="mt-1 line-clamp-3 text-sm leading-5 text-slate-700">{selectedDescription}</div>
-              </div>
-            </div>
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon / Codigo</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedRenglon} | {selectedCode}</div>
+          </div>
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Producto buscado</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedDescription}</div>
           </div>
         </div>
-      </section>
+      </ModuleSection>
 
-      <section className="rounded-xl border border-line bg-panel p-4 shadow-sm">
+      <ModuleSection>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
             <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 ${hasGeminiKey ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
@@ -503,9 +498,9 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
             </div>
           ) : null}
         </div>
-      </section>
+      </ModuleSection>
 
-      <section className="rounded-xl border border-line bg-panel p-2 shadow-sm">
+      <ModuleSection className="p-2">
         <div className="grid gap-2 md:grid-cols-3">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -518,10 +513,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                 disabled={disabled}
                 className={`rounded-lg border px-4 py-3 text-left transition ${
                   active
-                    ? "border-blue-200 bg-blue-50 text-brand shadow-sm"
+                    ? "border-blue-200 bg-blue-50 text-brand"
                     : disabled
-                      ? "border-transparent text-slate-400"
-                      : "border-transparent text-slate-700 hover:border-line hover:bg-slate-50"
+                      ? "border-transparent bg-white text-slate-400"
+                      : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"
                 }`}
               >
                 <span className="block text-sm font-semibold">{tab.label}</span>
@@ -530,7 +525,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
             );
           })}
         </div>
-      </section>
+      </ModuleSection>
 
       {!items.length ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
@@ -541,7 +536,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
           {(activeTab === "buscar" || activeTab === "ranking") ? (
           <section className={`grid gap-4 ${activeTab === "buscar" ? "xl:grid-cols-[0.95fr_1.05fr]" : "xl:grid-cols-1"}`}>
             {activeTab === "buscar" ? (
-            <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm">
+            <ModuleSection className="overflow-hidden p-0">
               <div className="border-b border-line p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -565,7 +560,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                   <select
                     value={scope}
                     onChange={(event) => setScope(event.target.value as SearchScope)}
-                    className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                    className="app-input"
                   >
                     <option value="renglon">Un renglon</option>
                     <option value="todos">Todos los renglones</option>
@@ -577,7 +572,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                     <select
                       value={selectedIndex}
                       onChange={(event) => setSelectedIndex(Number(event.target.value))}
-                      className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                      className="app-input"
                     >
                       {items.map((item, index) => (
                         <option key={`${item.renglon}-${index}`} value={index}>
@@ -593,7 +588,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                       <select
                         value={sourcingStrategy}
                         onChange={(event) => setSourcingStrategy(event.target.value as SourcingStrategy)}
-                        className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                        className="app-input"
                       >
                         <option value="proveedor_integral">Priorizar proveedor integral</option>
                         <option value="por_renglon">Mejor proveedor por renglon</option>
@@ -630,15 +625,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void runSmartSourcing()}
-                      disabled={searching || !items.length}
-                      className="inline-flex min-h-28 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <Button type="button" onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" className="min-h-28 py-4">
                       {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                       Buscar 10 proveedores
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -681,7 +671,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                       key={prompt}
                       type="button"
                       onClick={() => setInput(prompt)}
-                      className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-brand"
+                      className="app-btn-mini"
                     >
                       {prompt}
                     </button>
@@ -700,33 +690,22 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                     placeholder="Ej: prioriza fabricantes directos asiaticos, distribuidores con stock en USA, Net 30, o descarta usados/refurbished."
                   />
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void runSmartSourcing()}
-                      disabled={searching || !items.length}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <Button type="button" onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" size="lg">
                       {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                       Buscar con RFQ
-                    </button>
-                  <button
-                    type="button"
-                    onClick={() => runSourcing(input)}
-                    disabled={searching || !input.trim()}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-blue-300 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
-                    title="Buscar solo con la instruccion escrita"
-                  >
+                    </Button>
+                  <Button type="button" onClick={() => runSourcing(input)} disabled={searching || !input.trim()} variant="secondary" size="lg" title="Buscar solo con la instruccion escrita">
                     <Send className="h-5 w-5" />
                     Solo instruccion
-                  </button>
+                  </Button>
                   </div>
                 </div>
               </div>
-            </div>
+            </ModuleSection>
             ) : null}
 
             <div className="space-y-4">
-              <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <div className="app-card p-5 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-slate-900">Ranking de proveedores</div>
@@ -761,7 +740,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                     const previousAudit = auditForProvider(provider);
                     const previousAuditBlocks = String(previousAudit?.decision || "").toLowerCase().includes("descartar");
                     return (
-                    <div key={`${provider.proveedor}-${index}`} className="rounded-xl border border-line bg-white p-4 shadow-sm">
+                    <div key={`${provider.proveedor}-${index}`} className="app-workflow-card p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="text-xs font-semibold uppercase tracking-wide text-brand">Proveedor #{index + 1}</div>
@@ -780,14 +759,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                           ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => sendProviderToAudit(provider)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-brand px-3 text-xs font-semibold text-white shadow-sm hover:bg-brand-dark"
-                          >
+                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary" size="sm">
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Auditar
-                          </button>
+                          </Button>
                           {provider.url ? (
                             <a
                               href={provider.url}
@@ -830,7 +805,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                         </div>
                       ) : null}
                       <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                        <div className="rounded-lg border border-line bg-slate-50 p-3">
+                        <div className="app-data-card">
                           <div className="text-xs font-semibold uppercase tracking-wide text-muted">Match tecnico</div>
                           <div className="mt-1 text-xl font-semibold text-slate-900">{provider.match_tecnico ?? 0}%</div>
                         </div>
@@ -856,11 +831,11 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                         </div>
                       ) : null}
                       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        <div className="rounded-lg border border-line bg-slate-50 p-3">
+                        <div className="app-data-card">
                           <div className="text-xs font-semibold uppercase tracking-wide text-muted">Evidencia</div>
                           <div className="mt-1 text-sm leading-6 text-slate-700">{provider.evidencia || "Sin evidencia resumida."}</div>
                         </div>
-                        <div className="rounded-lg border border-line bg-slate-50 p-3">
+                        <div className="app-data-card">
                           <div className="text-xs font-semibold uppercase tracking-wide text-muted">Que validar</div>
                           <div className="mt-1 text-sm leading-6 text-slate-700">
                             {provider.que_validar || "Pedir ficha tecnica, precio, stock, lead time, Incoterm, validez y datos corporativos."}
@@ -884,14 +859,14 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                 </div>
               </div>
 
-              <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <div className="app-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
                   Criterios obligatorios
                 </div>
                 <div className="mt-3 grid gap-2">
                   {validationRows().map(([title, copy]) => (
-                    <div key={title} className="rounded-lg border border-line bg-slate-50 p-3">
+                    <div key={title} className="app-data-card">
                       <div className="text-sm font-semibold text-slate-900">{title}</div>
                       <div className="mt-1 text-xs leading-5 text-muted">{copy}</div>
                     </div>
@@ -903,7 +878,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
           ) : null}
 
           {activeTab === "validar" ? (
-          <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+          <section className="app-card p-5 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="text-sm font-semibold text-slate-900">Fuentes y plan de busqueda</div>
@@ -959,4 +934,9 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     </div>
   );
 }
+
+
+
+
+
 

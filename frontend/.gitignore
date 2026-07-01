@@ -1,8 +1,10 @@
-node_modules/
 .next/
+node_modules/
+.tools/
+.env.local
+*.log
 out/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .env
-.env.local
 .env*.local

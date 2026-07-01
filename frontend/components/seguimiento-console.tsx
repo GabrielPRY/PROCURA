@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, ExternalLink, Loader2, Plus, RefreshCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +13,10 @@ import {
   type SeguimientoHistorial
 } from "@/lib/seguimiento";
 import { consultarSli, type SliLookupResult } from "@/lib/sli";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const estadosBase = [
   "ANUNCIO",
@@ -370,34 +374,20 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Seguimiento</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Pipeline de licitaciones</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Control operativo de procesos enviados, evaluacion tecnica/economica, adjudicaciones y comentarios de seguimiento.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              {activeCount} activos
-            </span>
-            <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              {closedCount} cerrados
-            </span>
-            <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              SLI {sliCheckedCount} consultados
-            </span>
-            {sliAlertCount ? (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                {sliAlertCount} requieren revisar RFQ
-              </span>
-            ) : null}
-            {loading && <Loader2 className="h-5 w-5 animate-spin text-brand" />}
-          </div>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Seguimiento"
+          title="Pipeline de licitaciones"
+          copy="Control operativo de procesos enviados, evaluacion tecnica/economica, adjudicaciones y comentarios sincronizados con SLI cuando sea posible."
+          actions={loading ? <Loader2 className="h-5 w-5 animate-spin text-brand" /> : null}
+        />
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <StatusBadge tone="info">{activeCount} activos</StatusBadge>
+          <StatusBadge tone="neutral">{closedCount} cerrados</StatusBadge>
+          <StatusBadge tone="neutral">SLI {sliCheckedCount} consultados</StatusBadge>
+          {sliAlertCount ? <StatusBadge tone="warn">{sliAlertCount} requieren revisar RFQ</StatusBadge> : null}
         </div>
-      </section>
+      </ModuleSection>
 
       {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
 
@@ -426,10 +416,10 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
           <input value={form.objeto} onChange={(event) => setForm((current) => ({ ...current, objeto: event.target.value }))} placeholder="Objeto" className="app-input" />
           <input value={form.responsable} onChange={(event) => setForm((current) => ({ ...current, responsable: event.target.value }))} placeholder="Responsable" className="app-input" />
           <input value={form.notas} onChange={(event) => setForm((current) => ({ ...current, notas: event.target.value }))} placeholder="Notas iniciales" className="app-input" />
-          <button type="button" onClick={createItem} className="app-btn app-btn-primary h-11">
+          <Button type="button" onClick={createItem} variant="primary" size="lg">
             <Plus className="h-4 w-4" />
             Agregar
-          </button>
+          </Button>
         </div>
       </details>
 
@@ -447,7 +437,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                 type="button"
                 onClick={() => void checkVisibleSli()}
                 disabled={loading || bulkSync.running}
-                className="app-btn app-btn-secondary h-10 border-blue-200 text-blue-700 disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
               >
                 {bulkSync.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
                 {bulkSync.running ? `SLI ${bulkSync.done}/${bulkSync.total}` : "Sincronizar SLI"}
@@ -456,7 +446,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                 type="button"
                 onClick={() => void refresh()}
                 disabled={loading}
-                className="app-btn app-btn-secondary h-10 disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Actualizar
@@ -668,7 +658,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                   type="button"
                   onClick={() => void saveComment(selected)}
                   disabled={!notaEstado.trim()}
-                  className="app-btn app-btn-primary h-10 disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
                 >
                   Guardar comentario
                 </button>
@@ -692,3 +682,5 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+

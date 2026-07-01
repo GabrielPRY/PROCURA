@@ -1,17 +1,21 @@
-"use client";
+﻿"use client";
 
 import { ClipboardList, Download, FileText, Loader2, Search, UploadCloud } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { evaluateSupplierProposal, type EvaluationResultValue, type SupplierEvaluationRow } from "@/lib/evaluation";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { asBool, cleanValue, getUserConfig, loadActiveRfqContext, loadLastRfq, type ActiveRfqItemContext, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type Scope = "Todos los renglones" | "Renglon seleccionado desde RFQ" | "Solo renglones con propuesta tecnica" | "Solo renglones con ficha/catalogo";
 type ResultFilter = "Todos" | EvaluationResultValue;
 type EvaluationTab = "preparar" | "resultado";
 
 const resultOptions: EvaluationResultValue[] = ["Cumple", "No cumple", "Cumple parcialmente", "No encontrado"];
-const actionOptions = ["Aceptar", "Pedir aclaración", "Rechazar", "Revisar manualmente"];
+const actionOptions = ["Aceptar", "Pedir aclaracion", "Rechazar", "Revisar manualmente"];
 
 function statusTone(status: string) {
   if (status === "Cumple") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -230,22 +234,21 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Modulo Evaluacion</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Propuesta del proveedor vs RFQ</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Usa el ultimo RFQ analizado para marcar cumplimiento tecnico con evidencia. La IA no debe asumir datos no escritos.
-            </p>
-          </div>
-          <div className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-            RFQ: {licitacion}
-          </div>
-        </div>
-      </section>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Modulo Evaluacion"
+          title="Propuesta del proveedor vs RFQ"
+          copy="Marca cumplimiento tecnico contra el RFQ, anexos y enmiendas. Si la propuesta no evidencia un dato, se reporta como parcial o no encontrado."
+          actions={
+            <>
+              <StatusBadge tone={hasGeminiKey ? "ok" : "warn"}>{loadingConfig ? "Validando IA" : hasGeminiKey ? "Gemini lista" : "Gemini pendiente"}</StatusBadge>
+              <StatusBadge tone="info">RFQ: {licitacion}</StatusBadge>
+            </>
+          }
+        />
+      </ModuleSection>
 
-      <section className="rounded-xl border border-line bg-panel p-2 shadow-sm">
+      <ModuleSection className="p-2">
         <div className="grid gap-2 md:grid-cols-2">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -256,13 +259,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                 type="button"
                 onClick={() => !disabled && setActiveTab(tab.id)}
                 disabled={disabled}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
-                  active
-                    ? "border-blue-200 bg-blue-50 text-brand"
-                    : disabled
-                      ? "border-transparent text-slate-400"
-                      : "border-transparent text-slate-700 hover:border-line hover:bg-slate-50"
-                }`}
+                className={`rounded-lg border px-4 py-3 text-left transition ${active ? "border-blue-200 bg-blue-50 text-brand" : disabled ? "border-transparent bg-white text-slate-400" : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"}`}
               >
                 <span className="block text-sm font-semibold">{tab.label}</span>
                 <span className="mt-1 block text-xs leading-5 text-muted">{tab.detail}</span>
@@ -270,7 +267,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
             );
           })}
         </div>
-      </section>
+      </ModuleSection>
 
       {!rfq ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
@@ -284,7 +281,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
               <div className="text-base font-semibold">Entrada de proveedor</div>
               <p className="mt-2 text-sm leading-6 text-muted">PDF, Excel, Word, texto o CSV de la oferta/propuesta recibida.</p>
 
-              <label className="mt-5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center hover:bg-blue-50">
+              <label className="mt-5 grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center transition hover:border-brand hover:bg-blue-50">
                 <UploadCloud className="h-8 w-8 text-brand" />
                 <span className="mt-3 text-sm font-semibold text-slate-800">Seleccionar propuesta</span>
                 <span className="mt-1 text-xs text-muted">PDF, XLSX, DOCX, TXT o CSV</span>
@@ -307,7 +304,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                 <input
                   value={supplier}
                   onChange={(event) => setSupplier(event.target.value)}
-                  className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                   placeholder="Nombre del proveedor"
                 />
               </label>
@@ -328,7 +325,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                 <select
                   value={scope}
                   onChange={(event) => setScope(event.target.value as Scope)}
-                  className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="app-input"
                 >
                   <option>Todos los renglones</option>
                   {activeRfqContext ? <option>Renglon seleccionado desde RFQ</option> : null}
@@ -337,14 +334,10 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                 </select>
               </label>
 
-              <button
-                onClick={runEvaluation}
-                disabled={processing || loadingConfig}
-                className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              <Button onClick={runEvaluation} disabled={processing || loadingConfig} variant="primary" size="lg" className="mt-5 w-full">
                 {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
                 {processing ? "Evaluando..." : "Evaluar propuesta"}
-              </button>
+              </Button>
 
               {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
             </div>
@@ -366,7 +359,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   ["Proveedor", supplier || "No indicado"],
                   ["API", hasGeminiKey ? "Gemini lista" : "Falta Gemini"]
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
+                  <div key={label} className="app-data-card">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
                     <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
                   </div>
@@ -390,14 +383,10 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                     <div className="text-base font-semibold">Resultado de la evaluacion</div>
                     <p className="mt-1 text-sm text-muted">Vista resumida para decidir rapido. Abre el detalle solo cuando necesites auditar evidencia.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={downloadCsv}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
+                  <Button type="button" onClick={downloadCsv} variant="secondary" size="md">
                     <Download className="h-4 w-4" />
                     Descargar CSV
-                  </button>
+                  </Button>
                 </div>
                 <div className={`mt-4 rounded-xl border p-4 ${
                   counts.no > 0
@@ -439,7 +428,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                     <div className="text-sm font-semibold text-slate-900">Prioridad de revision</div>
                     <div className="mt-3 grid gap-2 lg:grid-cols-2">
                       {riskRows.slice(0, 4).map((row, index) => (
-                        <div key={`${row.renglon}-${index}-risk`} className="rounded-lg border border-line bg-white p-3">
+                        <div key={`${row.renglon}-${index}-risk`} className="app-data-card bg-white">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglon {cleanValue(row.renglon, "-")}</div>
@@ -462,7 +451,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                     ["Parcial", String(counts.parcial)],
                     ["No cumple / no encontrado", String(counts.no)]
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
+                    <div key={label} className="app-data-card">
                       <div className="text-xs text-muted">{label}</div>
                       <div className="mt-1 text-xl font-semibold">{value}</div>
                     </div>
@@ -551,3 +540,5 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+

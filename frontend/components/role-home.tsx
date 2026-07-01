@@ -2,27 +2,34 @@
 
 import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, FileText, FolderOpen, PackageSearch, Radar, RefreshCw, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ModuleSection } from "@/components/ui/module-section";
+import { StatCard } from "@/components/ui/stat-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
-import { getRadarLicitaciones, getRadarScheduler, radarFlag, type RadarSchedulerStatus } from "@/lib/radar";
-import { cleanValue, loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
 import { getAllowedModules, type ModuleId } from "@/lib/navigation";
+import { getRadarScheduler, getRadarStats, type RadarSchedulerStatus } from "@/lib/radar";
+import { cleanValue, loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
+import { formatCompactDate } from "@/lib/ui/format";
 import { listWorkspaces, type WorkspaceListItem } from "@/lib/workspaces";
 
-type DashboardCard = {
+type DashboardAction = {
   module: ModuleId;
   title: string;
   copy: string;
   icon: LucideIcon;
+  primary?: boolean;
 };
 
-const quickActions: DashboardCard[] = [
-  { module: "rfq", title: "Analizar RFQ", copy: "Cargar pliego, anexos y matriz tecnica.", icon: FileText },
-  { module: "proveedores", title: "Buscar proveedores", copy: "Sourcing global por renglon.", icon: PackageSearch },
-  { module: "auditor_empresas", title: "Auditar proveedor", copy: "Validar riesgo comercial.", icon: ShieldCheck },
+const quickActions: DashboardAction[] = [
+  { module: "rfq", title: "Analizar RFQ", copy: "Cargar pliego, anexos y matriz tecnica.", icon: FileText, primary: true },
   { module: "costos", title: "Comparar costos", copy: "Historico y referencia de precio.", icon: BarChart3 },
+  { module: "proveedores", title: "Buscar proveedores", copy: "Sourcing global por renglon.", icon: PackageSearch },
+  { module: "seguimiento", title: "Seguimiento", copy: "Estados SLI y comentarios operativos.", icon: ClipboardList },
   { module: "logistica", title: "Calcular logistica", copy: "Peso, dimensiones, forwarder e incoterm.", icon: Truck },
   { module: "radar", title: "Revisar Radar", copy: "Licitaciones abiertas y enmiendas.", icon: Radar },
-  { module: "seguimiento", title: "Seguimiento", copy: "Estados y comentarios operativos.", icon: ClipboardList },
+  { module: "auditor_empresas", title: "Auditar proveedor", copy: "Validar riesgo comercial.", icon: ShieldCheck },
   { module: "workspaces", title: "Abrir workspace", copy: "Recuperar analisis guardados.", icon: FolderOpen }
 ];
 
@@ -39,22 +46,16 @@ function roleIntro(role: string) {
       subtitle: "Resumen para decidir carga operativa, oportunidades, costos y salud del sistema."
     };
   }
+  if (role === "Logistica") {
+    return {
+      title: "Mesa logistica",
+      subtitle: "Administra calculos, forwarders, dimensiones y referencias historicas."
+    };
+  }
   return {
     title: "Mesa de analisis",
-    subtitle: "Tu punto de entrada para RFQ, costos, proveedores, historico y seguimiento."
+    subtitle: "Empieza por el RFQ, revisa costos, busca proveedores y deja seguimiento claro."
   };
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "N/D";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("es-PA", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
 }
 
 export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
@@ -86,19 +87,14 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
 
     if (allowed.has("radar")) {
       tasks.push(
-        getRadarLicitaciones({ limit: 150 })
+        getRadarStats()
           .then((response) => {
             if (!mounted) return;
-            const items = response.items || [];
-            const now = Date.now();
             setRadarStats({
-              total: response.total || items.length,
-              alertas: items.filter((item) => radarFlag(item.enmienda_alerta)).length,
-              seguimiento: items.filter((item) => item.estado_radar === "en_seguimiento").length,
-              cierre72h: items.filter((item) => {
-                const time = item.fecha_cierre_iso ? new Date(item.fecha_cierre_iso).getTime() : 0;
-                return time >= now && time <= now + 72 * 60 * 60 * 1000;
-              }).length
+              total: response.total ?? 0,
+              alertas: response.alertas ?? 0,
+              seguimiento: response.en_seguimiento ?? 0,
+              cierre72h: response.cierre_72h ?? 0,
             });
           })
           .catch(() => {
@@ -128,45 +124,43 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
   const cg = (rfq?.condiciones_generales || {}) as Record<string, unknown>;
   const rfqNumber = cleanValue(cg.numero_licitacion || cg.licitacion, "Sin RFQ activo");
   const filteredActions = quickActions.filter((action) => allowed.has(action.module));
+  const primaryAction = filteredActions.find((action) => action.primary) || filteredActions[0];
+  const secondaryActions = filteredActions.filter((action) => action.module !== primaryAction?.module);
   const lastWorkspace = [...workspaces].sort((a, b) => new Date(b.fecha_guardado || 0).getTime() - new Date(a.fecha_guardado || 0).getTime())[0];
-  const summaryCards: Array<[string, string, string, LucideIcon]> = [
-    ["RFQ activo", rfqNumber, `${items.length} renglones cargados`, FileText],
-    ["Workspaces", String(workspaces.length), lastWorkspace ? `Ultimo: ${lastWorkspace.licitacion}` : "Sin guardados", FolderOpen],
-    ["Radar abierto", allowed.has("radar") ? String(radarStats.total) : "N/D", allowed.has("radar") ? `${radarStats.alertas} alertas de enmienda` : "No aplica al rol", Radar],
-    ["Scheduler", scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`, scheduler?.last_finished ? `Ultimo: ${formatDate(scheduler.last_finished)}` : "Sin escaneo reciente", CheckCircle2]
-  ];
 
   return (
     <div className="space-y-5">
-      <section className="app-card p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-blue-100">Dashboard | {role}</div>
-            <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white">{intro.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">{intro.subtitle}</p>
+      <ModuleSection className="bg-white">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="info">Dashboard | {role}</StatusBadge>
+              <StatusBadge tone={loading ? "warn" : "ok"}>
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                {loading ? "Actualizando" : "Listo"}
+              </StatusBadge>
+            </div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">{intro.title}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{intro.subtitle}</p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white">
-            <RefreshCw className={`h-4 w-4 text-blue-100 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Actualizando" : "Datos cargados"}
-          </div>
+          {primaryAction ? (
+            <Button variant="primary" size="lg" onClick={() => onModuleChange?.(primaryAction.module)}>
+              <primaryAction.icon className="h-4 w-4" />
+              {primaryAction.title}
+            </Button>
+          ) : null}
         </div>
-      </section>
+      </ModuleSection>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map(([label, value, hint, Icon]) => (
-          <div key={String(label)} className="app-stat-card rounded-xl border border-line bg-panel p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-              <Icon className="h-4 w-4 text-brand" />
-            </div>
-            <div className="mt-2 truncate text-xl font-semibold text-slate-900">{String(value)}</div>
-            <div className="mt-1 text-xs leading-5 text-muted">{String(hint)}</div>
-          </div>
-        ))}
+        <StatCard loading={loading} label="RFQ activo" value={rfqNumber} hint={`${items.length} renglones cargados`} icon={FileText} />
+        <StatCard loading={loading} label="Workspaces" value={workspaces.length} hint={lastWorkspace ? `Ultimo: ${lastWorkspace.licitacion}` : "Sin guardados"} icon={FolderOpen} />
+        <StatCard loading={loading} label="Radar abierto" value={allowed.has("radar") ? radarStats.total : "N/D"} hint={allowed.has("radar") ? `${radarStats.alertas} alertas de enmienda` : "No aplica al rol"} icon={Radar} />
+        <StatCard loading={loading} label="Scheduler" value={scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`} hint={scheduler?.last_finished ? `Ultimo: ${formatCompactDate(scheduler.last_finished)}` : "Sin escaneo reciente"} icon={CheckCircle2} />
       </section>
 
       {allowed.has("radar") && (radarStats.alertas || radarStats.cierre72h) ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
@@ -176,46 +170,44 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
               </p>
             </div>
           </div>
-        </section>
+        </div>
       ) : null}
 
-      <section className="app-card p-5 shadow-sm">
+      <ModuleSection>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-sm font-semibold text-slate-900">Accesos de trabajo</div>
+            <div className="text-sm font-semibold text-slate-950">Accesos de trabajo</div>
             <p className="mt-1 text-sm text-muted">Solo se muestran las funciones permitidas para tu rol.</p>
           </div>
-          <div className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-            {filteredActions.length} modulos
-          </div>
+          <StatusBadge tone="neutral">{filteredActions.length} modulos</StatusBadge>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filteredActions.map((action) => (
+          {secondaryActions.map((action) => (
             <button
               key={action.module}
               type="button"
               onClick={() => onModuleChange?.(action.module)}
-              className="app-module-tile rounded-xl border border-line bg-white p-4 text-left shadow-sm transition"
+              className="group rounded-xl border border-line bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md"
             >
               <div className="flex items-start gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-600 text-white">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand transition group-hover:bg-brand group-hover:text-white">
                   <action.icon className="h-5 w-5" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-base font-semibold text-slate-900">{action.title}</span>
+                <span className="min-w-0 pr-10">
+                  <span className="block text-base font-semibold text-slate-950">{action.title}</span>
                   <span className="mt-1 block text-sm leading-5 text-muted">{action.copy}</span>
                 </span>
               </div>
             </button>
           ))}
         </div>
-      </section>
+      </ModuleSection>
 
       <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="app-card p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-900">RFQ activo</div>
+        <ModuleSection>
+          <div className="text-sm font-semibold text-slate-950">RFQ activo</div>
           {rfq ? (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[
                 ["Licitacion", rfqNumber],
                 ["Renglones", String(items.length)],
@@ -224,38 +216,32 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-muted">
-              No hay RFQ activo. Puedes analizar uno nuevo o abrir un workspace guardado.
-            </div>
+            <EmptyState title="No hay RFQ activo" copy="Puedes analizar uno nuevo o abrir un workspace guardado." icon={FileText} className="mt-4" />
           )}
-        </div>
+        </ModuleSection>
 
-        <div className="app-card p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-900">Workspaces recientes</div>
+        <ModuleSection>
+          <div className="text-sm font-semibold text-slate-950">Workspaces recientes</div>
           <div className="mt-4 space-y-2">
             {workspaces.slice(0, 5).map((item) => (
               <button
                 key={`${item.username}-${item.licitacion}`}
                 type="button"
                 onClick={() => onModuleChange?.("workspaces")}
-                className="app-row-button w-full rounded-lg border border-line bg-white p-3 text-left"
+                className="w-full rounded-lg border border-line bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/50"
               >
-                <div className="text-sm font-semibold text-slate-900">{item.licitacion}</div>
-                <div className="mt-1 text-xs leading-5 text-muted">{item.username} | {formatDate(item.fecha_guardado)}</div>
+                <div className="text-sm font-semibold text-slate-950">{item.licitacion}</div>
+                <div className="mt-1 text-xs leading-5 text-muted">{item.username} | {formatCompactDate(item.fecha_guardado)}</div>
               </button>
             ))}
-            {!workspaces.length ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-muted">
-              Aun no hay workspaces guardados.
-              </div>
-            ) : null}
+            {!workspaces.length ? <EmptyState title="Sin workspaces" copy="Aun no hay analisis guardados para mostrar aqui." icon={FolderOpen} /> : null}
           </div>
-        </div>
+        </ModuleSection>
       </section>
     </div>
   );

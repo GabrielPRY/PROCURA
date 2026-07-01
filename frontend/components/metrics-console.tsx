@@ -1,9 +1,13 @@
-"use client";
+﻿"use client";
 
 import { Activity, AlertTriangle, BarChart3, CircleDollarSign, Loader2, RefreshCw, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getUsageMetrics, type UsageOptions, type UsageSummary } from "@/lib/metrics";
 import { type AuthUser } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 function numberValue(value: unknown) {
   const parsed = Number(value);
@@ -101,31 +105,22 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Modulo Metricas</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Consumo y salud operativa</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Datos reales de usage_metrics: tokens, costos API, errores, usuarios activos y actividad por modulo.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <div className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${healthTone}`}>
-              <ShieldCheck className="h-4 w-4" />
-              Salud: {healthLabel}
-            </div>
-            <button
-              type="button"
-              onClick={() => setRefreshTick((current) => current + 1)}
-              className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <RefreshCw className="h-4 w-4 text-brand" />}
-              Refrescar
-            </button>
-          </div>
-        </div>
-      </section>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Modulo Metricas"
+          title="Consumo y salud operativa"
+          copy="Datos reales de usage_metrics: tokens, costos API, errores, usuarios activos y actividad por modulo."
+          actions={
+            <>
+              <StatusBadge tone={errorRate === 0 ? "ok" : errorRate <= 5 ? "warn" : "danger"}><ShieldCheck className="h-3.5 w-3.5" /> Salud: {healthLabel}</StatusBadge>
+              <Button type="button" onClick={() => setRefreshTick((current) => current + 1)} variant="secondary" size="md">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Refrescar
+              </Button>
+            </>
+          }
+        />
+      </ModuleSection>
 
       {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
 
@@ -225,3 +220,4 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+

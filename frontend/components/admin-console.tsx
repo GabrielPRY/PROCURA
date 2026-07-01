@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Activity, AlertTriangle, BarChart3, KeyRound, Loader2, RefreshCw, Save, Search, Settings, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +18,10 @@ import {
 } from "@/lib/admin";
 import { type AuthUser } from "@/lib/auth";
 import { getUsageMetrics, type UsageSummary } from "@/lib/metrics";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const roles = ["Analista", "Supervisor", "Gerencia", "Admin", "Logistica"];
 const adminTabs = [
@@ -222,29 +226,26 @@ export function AdminConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Modulo Admin</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Administracion del sistema</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Usuarios, roles, llaves visibles enmascaradas y mantenimiento basico conectado a Supabase por FastAPI.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={loadUsers}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700"
-          >
-            <RefreshCw className="h-4 w-4 text-brand" />
-            Refrescar
-          </button>
-        </div>
-      </section>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Modulo Admin"
+          title="Administracion del sistema"
+          copy="Usuarios, roles, llaves API, costos, errores y mantenimiento basico conectado a Supabase por FastAPI."
+          actions={
+            <>
+              <StatusBadge tone={apiStatus?.configured ? "ok" : "warn"}>Gemini global: {apiStatus?.configured ? "activa" : "pendiente"}</StatusBadge>
+              <Button type="button" onClick={loadUsers} variant="secondary" size="md">
+                <RefreshCw className="h-4 w-4" />
+                Refrescar
+              </Button>
+            </>
+          }
+        />
+      </ModuleSection>
 
       {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
 
-      <section className="rounded-xl border border-line bg-panel p-2 shadow-sm">
+      <ModuleSection className="p-2">
         <div className="grid gap-2 md:grid-cols-3">
           {adminTabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -263,7 +264,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             );
           })}
         </div>
-      </section>
+      </ModuleSection>
 
       {activeTab === "resumen" ? (
         <>
@@ -354,7 +355,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="app-workflow-card p-4">
             <div className="text-sm font-semibold text-slate-900">Uso por modulo</div>
             <div className="mt-3 overflow-hidden rounded-lg border border-line">
               <table className="w-full table-fixed border-collapse text-sm">
@@ -385,7 +386,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-line bg-white p-4">
+          <div className="app-workflow-card p-4">
             <div className="text-sm font-semibold text-slate-900">Errores recientes</div>
             <div className="mt-3 space-y-2">
               {recentErrors.slice(0, 6).map((row, index) => (
@@ -421,11 +422,11 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               Esta llave global se usa como respaldo cuando un usuario no tiene llave propia configurada. El sourcing nuevo se centraliza en Gemini.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted">Gemini</div>
                 <div className="mt-1 text-sm font-semibold text-slate-900">{apiStatus?.configured ? apiStatus.masked : "Sin configurar"}</div>
               </div>
-              <div className="rounded-lg border border-line bg-slate-50 p-3">
+              <div className="app-data-card">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted">Actualizado por</div>
                 <div className="mt-1 text-sm font-semibold text-slate-900">{apiStatus?.updated_by || "N/D"}</div>
               </div>
@@ -440,7 +441,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
                 onChange={(event) => setGlobalGeminiKey(event.target.value)}
                 placeholder="Pegar llave Gemini de la empresa"
                 type="password"
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+                className="app-input"
               />
             </label>
             <button
@@ -487,19 +488,19 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             value={newUsername}
             onChange={(event) => setNewUsername(event.target.value)}
             placeholder="Usuario"
-            className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+            className="app-input"
           />
           <input
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
             placeholder="Contrasena temporal"
             type="password"
-            className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+            className="app-input"
           />
           <select
             value={newRole}
             onChange={(event) => setNewRole(event.target.value)}
-            className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+            className="app-input"
           >
             {roles.map((role) => (
               <option key={role} value={role}>
@@ -635,3 +636,4 @@ export function AdminConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
