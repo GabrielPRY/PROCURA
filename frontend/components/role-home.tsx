@@ -1,18 +1,15 @@
-"use client";
+﻿"use client";
 
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, FileText, FolderOpen, PackageSearch, Radar, RefreshCw, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, ClipboardList, FileText, FolderOpen, Gauge, PackageSearch, Radar, RefreshCw, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ModuleSection } from "@/components/ui/module-section";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { getAllowedModules, type ModuleId } from "@/lib/navigation";
 import { getRadarScheduler, getRadarStats, type RadarSchedulerStatus } from "@/lib/radar";
-import { cleanValue, loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
 import { formatCompactDate } from "@/lib/ui/format";
-import { listWorkspaces, type WorkspaceListItem } from "@/lib/workspaces";
 
 type DashboardAction = {
   module: ModuleId;
@@ -61,29 +58,16 @@ function roleIntro(role: string) {
 export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
   const role = normalizeRole(user.role);
   const intro = roleIntro(role);
-  const allowed = useMemo(() => new Set(getAllowedModules(user).map((item) => item.id)), [user]);
-  const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
-  const [workspaces, setWorkspaces] = useState<WorkspaceListItem[]>([]);
+  const allowedModules = useMemo(() => getAllowedModules(user).map((item) => item.id), [user]);
+  const allowed = useMemo(() => new Set(allowedModules), [allowedModules]);
   const [radarStats, setRadarStats] = useState({ total: 0, alertas: 0, seguimiento: 0, cierre72h: 0 });
   const [scheduler, setScheduler] = useState<RadarSchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setRfq(loadLastRfq(user.username));
-  }, [user.username]);
-
-  useEffect(() => {
     let mounted = true;
     setLoading(true);
-    const tasks: Array<Promise<unknown>> = [
-      listWorkspaces(user.username, role === "Gerencia")
-        .then((response) => {
-          if (mounted) setWorkspaces(response.workspaces || []);
-        })
-        .catch(() => {
-          if (mounted) setWorkspaces([]);
-        })
-    ];
+    const tasks: Array<Promise<unknown>> = [];
 
     if (allowed.has("radar")) {
       tasks.push(
@@ -118,15 +102,32 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
     return () => {
       mounted = false;
     };
-  }, [allowed, role, user.username]);
+  }, [allowed]);
 
-  const items = rfq?.items || [];
-  const cg = (rfq?.condiciones_generales || {}) as Record<string, unknown>;
-  const rfqNumber = cleanValue(cg.numero_licitacion || cg.licitacion, "Sin RFQ activo");
   const filteredActions = quickActions.filter((action) => allowed.has(action.module));
   const primaryAction = filteredActions.find((action) => action.primary) || filteredActions[0];
   const secondaryActions = filteredActions.filter((action) => action.module !== primaryAction?.module);
-  const lastWorkspace = [...workspaces].sort((a, b) => new Date(b.fecha_guardado || 0).getTime() - new Date(a.fecha_guardado || 0).getTime())[0];
+  const PrimaryIcon = primaryAction?.icon;
+  const dashboardStats = allowed.has("radar")
+    ? [
+        { label: "Accesos", value: filteredActions.length, hint: "Funciones disponibles para tu rol", icon: Gauge },
+        { label: "Radar abierto", value: radarStats.total, hint: `${radarStats.seguimiento} en seguimiento`, icon: Radar },
+        { label: "Enmiendas", value: radarStats.alertas, hint: "Alertas detectadas por SLI", icon: AlertTriangle },
+        { label: "Scheduler", value: scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`, hint: scheduler?.last_finished ? `Ultimo: ${formatCompactDate(scheduler.last_finished)}` : "Sin escaneo reciente", icon: CheckCircle2 }
+      ]
+    : role === "Logistica"
+      ? [
+          { label: "Accesos", value: filteredActions.length, hint: "Funciones disponibles para tu rol", icon: Gauge },
+          { label: "Calculadora", value: "Lista", hint: "USA a Panama", icon: Truck },
+          { label: "Historico", value: "Activo", hint: "Referencias guardadas", icon: BarChart3 },
+          { label: "Tarifas", value: "Editable", hint: "Valores logisticos", icon: CheckCircle2 }
+        ]
+      : [
+          { label: "Accesos", value: filteredActions.length, hint: "Funciones disponibles para tu rol", icon: Gauge },
+          { label: "Inicio", value: "RFQ", hint: "Primer paso recomendado", icon: FileText },
+          { label: "Costos", value: "Historico", hint: "Validar referencia antes de ofertar", icon: BarChart3 },
+          { label: "Seguimiento", value: "Operativo", hint: "Guardar estado de cada proceso", icon: ClipboardList }
+        ];
 
   return (
     <div className="space-y-5">
@@ -143,9 +144,9 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">{intro.title}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{intro.subtitle}</p>
           </div>
-          {primaryAction ? (
+          {primaryAction && PrimaryIcon ? (
             <Button variant="primary" size="lg" onClick={() => onModuleChange?.(primaryAction.module)}>
-              <primaryAction.icon className="h-4 w-4" />
+              <PrimaryIcon className="h-4 w-4" />
               {primaryAction.title}
             </Button>
           ) : null}
@@ -153,10 +154,9 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
       </ModuleSection>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard loading={loading} label="RFQ activo" value={rfqNumber} hint={`${items.length} renglones cargados`} icon={FileText} />
-        <StatCard loading={loading} label="Workspaces" value={workspaces.length} hint={lastWorkspace ? `Ultimo: ${lastWorkspace.licitacion}` : "Sin guardados"} icon={FolderOpen} />
-        <StatCard loading={loading} label="Radar abierto" value={allowed.has("radar") ? radarStats.total : "N/D"} hint={allowed.has("radar") ? `${radarStats.alertas} alertas de enmienda` : "No aplica al rol"} icon={Radar} />
-        <StatCard loading={loading} label="Scheduler" value={scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`} hint={scheduler?.last_finished ? `Ultimo: ${formatCompactDate(scheduler.last_finished)}` : "Sin escaneo reciente"} icon={CheckCircle2} />
+        {dashboardStats.map((stat) => (
+          <StatCard key={stat.label} loading={loading} label={stat.label} value={stat.value} hint={stat.hint} icon={stat.icon} />
+        ))}
       </section>
 
       {allowed.has("radar") && (radarStats.alertas || radarStats.cierre72h) ? (
@@ -177,9 +177,9 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-slate-950">Accesos de trabajo</div>
-            <p className="mt-1 text-sm text-muted">Solo se muestran las funciones permitidas para tu rol.</p>
+            <p className="mt-1 text-sm text-muted">Estas tarjetas abren directamente cada modulo disponible para tu rol.</p>
           </div>
-          <StatusBadge tone="neutral">{filteredActions.length} modulos</StatusBadge>
+          <StatusBadge tone="neutral">Click para abrir</StatusBadge>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {secondaryActions.map((action) => (
@@ -187,13 +187,16 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
               key={action.module}
               type="button"
               onClick={() => onModuleChange?.(action.module)}
-              className="group rounded-xl border border-line bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md"
+              className="group relative w-full overflow-hidden rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
             >
-              <div className="flex items-start gap-3">
+              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-brand transition group-hover:bg-brand group-hover:text-white">
+                Abrir <ArrowRight className="h-3 w-3" />
+              </span>
+              <div className="flex items-start gap-3 pr-16">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand transition group-hover:bg-brand group-hover:text-white">
                   <action.icon className="h-5 w-5" />
                 </span>
-                <span className="min-w-0 pr-10">
+                <span className="min-w-0">
                   <span className="block text-base font-semibold text-slate-950">{action.title}</span>
                   <span className="mt-1 block text-sm leading-5 text-muted">{action.copy}</span>
                 </span>
@@ -202,47 +205,7 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
           ))}
         </div>
       </ModuleSection>
-
-      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <ModuleSection>
-          <div className="text-sm font-semibold text-slate-950">RFQ activo</div>
-          {rfq ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {[
-                ["Licitacion", rfqNumber],
-                ["Renglones", String(items.length)],
-                ["Garantia", cleanValue(cg.garantia_exigida || cg.garantia, "N/D")],
-                ["Entrega", cleanValue(cg.tiempo_de_entrega_global || cg.tiempo_entrega, "N/D")]
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No hay RFQ activo" copy="Puedes analizar uno nuevo o abrir un workspace guardado." icon={FileText} className="mt-4" />
-          )}
-        </ModuleSection>
-
-        <ModuleSection>
-          <div className="text-sm font-semibold text-slate-950">Workspaces recientes</div>
-          <div className="mt-4 space-y-2">
-            {workspaces.slice(0, 5).map((item) => (
-              <button
-                key={`${item.username}-${item.licitacion}`}
-                type="button"
-                onClick={() => onModuleChange?.("workspaces")}
-                className="w-full rounded-lg border border-line bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/50"
-              >
-                <div className="text-sm font-semibold text-slate-950">{item.licitacion}</div>
-                <div className="mt-1 text-xs leading-5 text-muted">{item.username} | {formatCompactDate(item.fecha_guardado)}</div>
-              </button>
-            ))}
-            {!workspaces.length ? <EmptyState title="Sin workspaces" copy="Aun no hay analisis guardados para mostrar aqui." icon={FolderOpen} /> : null}
-          </div>
-        </ModuleSection>
-      </section>
     </div>
   );
 }
+

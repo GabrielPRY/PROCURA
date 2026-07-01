@@ -117,6 +117,7 @@ function itemSearchTerm(item?: CostRow | null) {
 export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
   const [manualSearch, setManualSearch] = useState("");
   const [historicoRows, setHistoricoRows] = useState<HistoricoRow[]>([]);
   const [itemHistoryMap, setItemHistoryMap] = useState<Record<number, ItemHistoryMatch>>({});
@@ -129,11 +130,24 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     const saved = loadLastRfq(user.username);
     setRfq(saved);
     setSelectedIndex(0);
+    setSelectedIndexes(saved?.items?.length ? [0] : []);
   }, [user.username]);
 
   const items = useMemo(() => (rfq?.items || []) as CostRow[], [rfq]);
   const selectedItem = items[selectedIndex] || null;
   const activeSearch = manualSearch.trim() || itemSearchTerm(selectedItem);
+
+  function toggleSelectedIndex(index: number) {
+    setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index].sort((a, b) => a - b));
+  }
+
+  function selectAllItems() {
+    setSelectedIndexes(items.map((_, index) => index));
+  }
+
+  function clearSelection() {
+    setSelectedIndexes(selectedItem ? [selectedIndex] : []);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +245,15 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     };
   });
 
+  const selectedItemRows = itemRows.filter((row) => selectedIndexes.includes(row.index));
+  const selectedHistoryRows = selectedItemRows.flatMap((row) => row.historyRows);
+  const selectedHistoryPrices = historyPricesFromRows(selectedHistoryRows);
+  const selectedMinHistory = minPositive(selectedHistoryPrices);
+  const selectedAvgHistory = average(selectedHistoryPrices);
+  const selectedReferenceTotal = selectedItemRows.reduce((sum, row) => sum + row.valueBest, 0);
+  const showSelectedHistory = selectedIndexes.length > 1 && !manualSearch.trim();
+  const displayedHistoryRows = showSelectedHistory ? selectedHistoryRows : historicoRows;
+  const displayedHistoryLabel = showSelectedHistory ? `${selectedIndexes.length} renglones seleccionados` : activeSearch || "N/D";
   const embeddedMatches = itemRows.filter((row) => row.hasHistoricalPrice).length;
   const totalReference = itemRows.reduce((sum, row) => sum + row.valueBest, 0);
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion || rfq?.condiciones_generales?.licitacion, "RFQ activo");
@@ -272,8 +295,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
       <section className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         <StatCard label="Renglones RFQ" value={items.length} hint="Cantidad de partidas detectadas" icon={Database} />
         <StatCard label="Cruce historico" value={loadingBatchHistory ? "..." : `${embeddedMatches}/${items.length}`} hint={batchHistoryReady ? "Matches automaticos del RFQ" : "Consultando historico por renglon"} icon={BarChart3} />
-        <StatCard label="Referencia total" value={money(totalReference)} hint="Suma del mejor historico por renglon" icon={Target} />
-        <StatCard label="Historico consultado" value={historicoRows.length} hint="Registros del renglon activo" icon={Search} />
+        <StatCard label="Referencia seleccionada" value={money(selectedReferenceTotal || totalReference)} hint={selectedIndexes.length ? `${selectedIndexes.length} renglon(es) seleccionados` : "Suma del mejor historico por renglon"} icon={Target} />
+        <StatCard label="Historico consultado" value={displayedHistoryRows.length} hint={showSelectedHistory ? "Registros de la seleccion" : "Registros del renglon activo"} icon={Search} />
       </section>
 
       {loadingBatchHistory ? (
@@ -298,39 +321,97 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
         <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
           <div className="min-w-0 rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="text-sm font-semibold text-slate-900">Renglones del RFQ activo</div>
-            <p className="mt-1 text-sm text-muted">Selecciona una partida para consultar su historico y referencia de precio.</p>
+            <p className="mt-1 text-sm text-muted">Marca varios renglones para ver una referencia conjunta. Haz click en una tarjeta para abrir su historico individual.</p>
+
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wide text-brand">Seleccion</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{selectedIndexes.length || 0} de {items.length} renglones</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={selectAllItems} className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-brand hover:bg-blue-50">Todos</button>
+                  <button type="button" onClick={clearSelection} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Solo activo</button>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-4 max-h-[720px] space-y-2 overflow-y-auto pr-1">
               {itemRows.map((row) => {
                 const active = selectedIndex === row.index;
                 return (
-                  <button
-                    type="button"
+                  <div
                     key={`${row.index}-${cleanValue(row.item.codigo_articulo, "")}`}
-                    onClick={() => {
-                      setSelectedIndex(row.index);
-                      setManualSearch("");
-                    }}
                     className={`w-full rounded-lg border p-3 text-left transition ${
                       active ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100" : "border-line bg-white hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex min-w-0 items-start justify-between gap-3">
-                      <div className="min-w-0">
+                      <label className="mt-0.5 flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedIndexes.includes(row.index)}
+                          onChange={() => toggleSelectedIndex(row.index)}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                        Usar
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedIndex(row.index);
+                          setManualSearch("");
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
                         <div className="text-sm font-semibold leading-5 text-slate-900 line-clamp-2 break-words">{itemLabel(row.item, row.index)}</div>
                         <div className="mt-1 text-xs text-muted">Cant. {row.qty || "N/D"} | Mejor ref. {row.best ? money(row.best) : "Sin cruce"} | Registros {row.historyRows.length}</div>
-                      </div>
+                      </button>
                       <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${row.hasHistoricalPrice ? "bg-emerald-50 text-emerald-700" : loadingBatchHistory ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
                         {row.hasHistoricalPrice ? "Match" : loadingBatchHistory ? "Buscando" : "Sin match"}
                       </span>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           </div>
 
           <div className="min-w-0 space-y-4">
+            <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Resumen de seleccion</div>
+                  <p className="mt-1 text-sm text-muted">Lectura conjunta de los renglones marcados para participar.</p>
+                </div>
+                <StatusBadge tone="info">{selectedIndexes.length || 0} seleccionados</StatusBadge>
+              </div>
+              <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                <div className="min-w-0 rounded-lg border border-line bg-slate-50 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Registros historicos</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{selectedHistoryRows.length}</div>
+                </div>
+                <div className="min-w-0 rounded-lg border border-line bg-slate-50 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Minimo seleccion</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{selectedMinHistory ? money(selectedMinHistory) : "N/D"}</div>
+                </div>
+                <div className="min-w-0 rounded-lg border border-line bg-slate-50 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Promedio seleccion</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{selectedAvgHistory ? money(selectedAvgHistory) : "N/D"}</div>
+                </div>
+                <div className="min-w-0 rounded-lg border border-line bg-slate-50 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Referencia total</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{selectedReferenceTotal ? money(selectedReferenceTotal) : "N/D"}</div>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {selectedItemRows.length ? selectedItemRows.map((row) => (
+                  <button key={`chip-${row.index}`} type="button" onClick={() => { setSelectedIndex(row.index); setManualSearch(""); }} className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-blue-100">
+                    R{cleanValue(row.item.renglon, String(row.index + 1))} | {cleanValue(row.item.codigo_articulo, "S/C")}
+                  </button>
+                )) : <span className="text-sm text-muted">Marca al menos un renglon para ver el resumen conjunto.</span>}
+              </div>
+            </section>
             <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel p-5 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -377,15 +458,15 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Historico relacionado</div>
-                  <p className="mt-1 break-words text-sm text-muted">Resultados encontrados para la busqueda activa: {activeSearch || "N/D"}.</p>
+                  <p className="mt-1 break-words text-sm text-muted">Resultados encontrados para: {displayedHistoryLabel}.</p>
                 </div>
-                <div className="text-sm font-semibold text-slate-700">{historicoRows.length} registros</div>
+                <div className="text-sm font-semibold text-slate-700">{displayedHistoryRows.length} registros</div>
               </div>
 
               <div className="mt-4 rounded-lg border border-line bg-white">
-                {historicoRows.length ? (
+                {displayedHistoryRows.length ? (
                   <div className="divide-y divide-line">
-                    {historicoRows.map((row, index) => {
+                    {displayedHistoryRows.map((row, index) => {
                       const record = row as Record<string, unknown>;
                       const proy = priceFrom(record, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]);
                       const comp = priceFrom(record, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"]);
@@ -440,6 +521,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
 
 
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldAlert, UploadCloud } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { SliLookupPanel } from "@/components/sli-lookup-panel";
 import type { ModuleId } from "@/lib/navigation";
 
 type DetailFlag = {
@@ -136,7 +135,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     const nextFiles = Array.from(event.target.files || []);
     if (!nextFiles.length) return;
     // Confirm before clearing an existing analysis
-    if (result && !window.confirm("Ya hay un analisis cargado. ¿Cargar nuevos documentos y reemplazarlo?")) {
+    if (result && !window.confirm("Ya hay un analisis cargado. Â¿Cargar nuevos documentos y reemplazarlo?")) {
       // Reset the input so the same files can be selected again if needed
       event.target.value = "";
       return;
@@ -233,7 +232,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   const decisionStats = [
     ["Empresa", presenceDecision.company],
-    ["Riesgo", risk],
+    ["Complejidad", risk],
     ["Renglones", String(items.length)],
     ["Prop. tecnica", proposalCount ? `Si (${proposalCount})` : "No detectada"],
     ["Ficha/catalogo", fichaCount ? `Si (${fichaCount})` : "No pedida"],
@@ -316,7 +315,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: presenceDecision.tone
         },
         {
-          label: "Riesgo tecnico",
+          label: "Complejidad tecnica",
           value: risk,
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         }
@@ -326,9 +325,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const criticalAlerts = result
     ? [
         {
-          label: "Riesgo tecnico",
+          label: "Complejidad tecnica",
           value: risk,
-          detail: "Nivel global segun restricciones, entregables y obsolescencia.",
+          detail: "Lectura operativa segun restricciones, entregables y posibles cambios tecnicos.",
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         },
         {
@@ -350,7 +349,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "warn" : "neutral"
         },
         {
-          label: "Ficha/catalogo",
+          label: "Documentos por renglon",
           value: fichaCount ? `${fichaCount} renglon(es)` : "No pedida aparte",
           detail: "Solo cuenta entregables documentales, no simples especificaciones.",
           tone: fichaCount ? "warn" : "neutral"
@@ -362,7 +361,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: presenceDecision.tone
         },
         {
-          label: "Obsolescencia",
+          label: "Partes obsoletas / cartas",
           value: obsolCount ? `${obsolCount} renglon(es) a revisar` : "Sin alerta",
           detail: asBool(cg.permite_carta_obsolescencia) ? "El pliego permite carta de fabricante." : "No se detecto permiso especifico de carta.",
           tone: obsolCount || asBool(cg.permite_carta_obsolescencia) ? "warn" : "neutral"
@@ -397,7 +396,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "ok" : "neutral"
         },
         {
-          label: "Ficha/catalogo",
+          label: "Documentos por renglon",
           value: asBool(selectedItem.requiere_ficha_tecnica) ? "Requerida" : "No pedida aparte",
           tone: asBool(selectedItem.requiere_ficha_tecnica) ? "warn" : "neutral"
         },
@@ -407,7 +406,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: asOptionalBool(selectedItem.acepta_equivalente) === false ? "warn" : "neutral"
         },
         {
-          label: "Obsolescencia",
+          label: "Partes obsoletas / cartas",
           value: asBool(selectedItem.posible_obsolescencia) ? "Revisar actualizacion" : "Sin alerta",
           tone: asBool(selectedItem.posible_obsolescencia) ? "warn" : "neutral"
         }
@@ -457,7 +456,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       ? progressStep === 1 ? "Enviando documentos..."
                         : progressStep === 2 ? "Analizando con IA..."
                         : progressStep === 3 ? "Extrayendo renglones..."
-                        : progressStep === 4 ? "Guardando análisis..."
+                        : progressStep === 4 ? "Guardando anÃ¡lisis..."
                         : "Procesando..."
                       : "Procesar RFQ"}
                   </Button>
@@ -720,14 +719,13 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       </section>
       ) : null}
 
-      {result && activeTab === "resumen" ? <SliLookupPanel initialRfq={rfqNumber} compact /> : null}
 
       {result && activeTab === "resumen" ? (
         <section className="rounded-xl border border-line bg-panel shadow-sm">
           <div className="border-b border-line p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-brand">3. Alertas criticas</div>
-            <div className="mt-1 text-base font-semibold">Lo que puede cambiar la decision</div>
-            <p className="mt-1 text-sm text-muted">Restricciones, entregables obligatorios y riesgos que deben revisarse antes de cotizar.</p>
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand">3. Puntos de control</div>
+            <div className="mt-1 text-base font-semibold">Antes de cotizar</div>
+            <p className="mt-1 text-sm text-muted">Solo aparecen los temas que requieren confirmacion comercial, tecnica o documental.</p>
           </div>
           <div className="divide-y divide-line">
             {visibleAlerts.length ? (
@@ -741,13 +739,13 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       </div>
                       <div className="mt-1 truncate text-sm text-muted">{alert.value}</div>
                     </div>
-                    <span className="shrink-0 text-xs font-semibold text-brand">Ver evidencia</span>
+                    <span className="shrink-0 text-xs font-semibold text-brand">Detalle</span>
                   </summary>
                   <p className="mt-3 rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{alert.detail}</p>
                 </details>
               ))
             ) : (
-              <div className="p-4 text-sm text-muted">No hay alertas criticas. La informacion adicional esta disponible en vista avanzada.</div>
+              <div className="p-4 text-sm text-muted">No hay puntos urgentes. La informacion completa esta disponible en vista avanzada.</div>
             )}
           </div>
         </section>
@@ -860,6 +858,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     </div>
   );
 }
+
 
 
 

@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, Database, FileText, FolderOpen, Gauge, Mail, PackageSearch, Radar, Settings, ShieldCheck, Truck } from "lucide-react";
+﻿import { BarChart3, ClipboardList, Database, FileText, FolderOpen, Gauge, Mail, PackageSearch, Radar, Settings, ShieldCheck, Truck } from "lucide-react";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 
 export type ModuleId =
@@ -33,7 +33,6 @@ export const navigationItems: NavigationItem[] = [
   { id: "evaluacion", label: "Evaluacion", description: "Comparacion de propuesta del proveedor.", icon: ClipboardList, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "rfq_email", label: "Correo RFQ", description: "Emision profesional de solicitudes.", icon: Mail, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "costos", label: "Costos", description: "Analisis historico de precios.", icon: BarChart3, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "fichas", label: "Fichas", description: "Fichas tecnicas por renglon.", icon: FileText, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "radar", label: "Radar SLI", description: "Licitaciones abiertas, filtros y enmiendas.", icon: Radar, permissions: ["Supervisor", "Gerencia"] },
   { id: "seguimiento", label: "Seguimiento", description: "Estados SLI y comentarios de licitaciones.", icon: ClipboardList, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "proveedores", label: "Proveedores", description: "Sourcing global por renglon.", icon: PackageSearch, permissions: ["Analista", "Supervisor", "Gerencia"] },
@@ -65,3 +64,4 @@ export function getDefaultModule(user: AuthUser): ModuleId {
 export function getModuleLabel(moduleId: ModuleId) {
   return navigationItems.find((item) => item.id === moduleId)?.label ?? "Procura AI";
 }
+

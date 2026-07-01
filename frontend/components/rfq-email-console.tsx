@@ -79,6 +79,43 @@ function emailBlocks(body: string) {
     .filter(Boolean);
 }
 
+function yesNo(value: unknown) {
+  return asBool(value) ? "Yes" : "No / not specified";
+}
+
+function buildRequirementsText(items: RfqItem[]) {
+  if (!items.length) return "";
+  const lines = [
+    "TECHNICAL / COMMERCIAL REQUIREMENTS TO CONFIRM",
+    "",
+    "Please confirm the following for each quoted line:",
+    "- Unit price and currency",
+    "- Brand, model and part number offered",
+    "- Stock availability and lead time",
+    "- Warranty",
+    "- Country of origin and Incoterm",
+    "- Packing dimensions, weight and volume",
+    "- Datasheet/catalog or technical support when applicable",
+    "",
+    "LINE ITEMS",
+    "Line | ACP Code | Qty | Description | Technical proposal | Datasheet/catalog | Brand/model restriction",
+    "-----|----------|-----|-------------|--------------------|-------------------|------------------------"
+  ];
+
+  items.forEach((item, index) => {
+    const line = cleanValue(item.renglon, String(index + 1));
+    const code = cleanValue(item.codigo_articulo, "S/C");
+    const qty = `${cleanValue(item.cantidad, "N/A")} ${cleanValue(item.unidad_de_medida || item.unidad, "")}`.trim();
+    const description = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "No description").replace(/\s+/g, " ").slice(0, 110);
+    const proposal = yesNo(item.requiere_propuesta_tecnica);
+    const datasheet = yesNo(item.requiere_ficha_tecnica);
+    const brand = cleanValue(item.marca_modelo_requerido, "No / not specified").replace(/\s+/g, " ").slice(0, 70);
+    lines.push(`${line} | ${code} | ${qty} | ${description} | ${proposal} | ${datasheet} | ${brand}`);
+  });
+
+  return lines.join("\n");
+}
+
 export function RfqEmailConsole({ user }: { user: AuthUser }) {
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
   const [scope, setScope] = useState("all");
@@ -117,6 +154,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
   const fichaCount = selectedItems.filter((item) => asBool(item.requiere_ficha_tecnica)).length;
   const brandCount = selectedItems.filter((item) => cleanValue(item.marca_modelo_requerido, "")).length;
   const blocks = emailBlocks(body);
+  const requirementsText = buildRequirementsText(selectedItems);
 
   async function generate() {
     setError(null);
@@ -152,8 +190,9 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
     window.setTimeout(() => setCopied(null), 1600);
   }
 
-  const copyReadyEmail = subject ? `Subject: ${subject}\n\n${body}` : body;
-  const html = emailHtml(subject || "Request for Quotation", body, [
+  const copyReadyEmail = subject ? `Subject: ${subject}\n\n${body}${requirementsText ? `\n\n${requirementsText}` : ""}` : `${body}${requirementsText ? `\n\n${requirementsText}` : ""}`;
+  const exportBody = `${body}${requirementsText ? `\n\n${requirementsText}` : ""}`;
+  const html = emailHtml(subject || "Request for Quotation", exportBody, [
     ["Bid", licitacion],
     ["Reply by", replyBy || "Pending"],
     ["Lead time", leadTime],
@@ -167,7 +206,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
         <PageHeader
           eyebrow="Correo RFQ premium"
           title="Solicitud profesional para proveedores"
-          copy="Prepara un correo claro, humano y fácil de copiar a Outlook. La estructura pide precio, cumplimiento técnico, lead time, garantía, empaque, Incoterm y pago."
+          copy="Prepara un correo claro y facil de pegar en Outlook. El texto queda humano y la matriz tecnica queda separada para que no se rompa al copiar."
           actions={
             <>
               <StatusBadge tone="info">RFQ: {licitacion}</StatusBadge>
@@ -207,7 +246,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
           <ModuleSection>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Wand2 className="h-4 w-4 text-brand" />
-              1. Preparación
+              1. Alcance y condiciones
             </div>
             <div className="mt-4 grid gap-3">
               <label className="grid gap-2 text-sm font-semibold text-slate-800">
@@ -252,7 +291,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
           <ModuleSection>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <CheckCircle2 className="h-4 w-4 text-brand" />
-              2. Confirmaciones que debe pedir
+              2. Checklist para el proveedor
             </div>
             <div className="mt-4 grid gap-2">
               {checklist.map(([label, active]) => (
@@ -290,7 +329,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-sm font-semibold text-slate-900">3. Revisar y enviar</div>
-                <p className="mt-1 text-sm text-muted">Copia el correo completo para Outlook o descarga una versión HTML/TXT para expediente.</p>
+                <p className="mt-1 text-sm text-muted">Copia el correo completo o solo la matriz tecnica. Ambos formatos estan pensados para pegarse bien en Outlook.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={() => setView("preview")} variant={view === "preview" ? "primary" : "secondary"} size="sm">
@@ -310,7 +349,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
                 <input value={subject} onChange={(event) => setSubject(event.target.value)} className="app-input" />
               </label>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
                 <Button type="button" onClick={() => void copyText("todo", copyReadyEmail)} variant="primary" size="md" className="sm:col-span-2 xl:col-span-2">
                   <Clipboard className="h-4 w-4" /> {copied === "todo" ? "Copiado" : "Copiar completo"}
                 </Button>
@@ -320,10 +359,13 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
                 <Button type="button" onClick={() => void copyText("cuerpo", body)} variant="secondary" size="md">
                   <Clipboard className="h-4 w-4" /> Cuerpo
                 </Button>
+                <Button type="button" onClick={() => void copyText("matriz", requirementsText)} variant="secondary" size="md">
+                  <Clipboard className="h-4 w-4" /> Matriz
+                </Button>
                 <Button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.html`, html, "text/html")} variant="secondary" size="md">
                   <Download className="h-4 w-4" /> HTML
                 </Button>
-                <Button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.txt`, body, "text/plain")} variant="secondary" size="md">
+                <Button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.txt`, exportBody, "text/plain")} variant="secondary" size="md">
                   <Download className="h-4 w-4" /> TXT
                 </Button>
               </div>
@@ -347,6 +389,20 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
                         <div className="whitespace-pre-wrap break-words">{block}</div>
                       </div>
                     ))}
+                    {requirementsText ? (
+                      <div className="rounded-lg border border-blue-200 bg-white p-4 text-sm leading-7 text-slate-800 shadow-sm">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-xs font-black uppercase tracking-wide text-brand">Matriz tecnica para proveedor</div>
+                            <p className="mt-1 text-xs leading-5 text-muted">Texto plano estable para copiar en Outlook sin romper columnas.</p>
+                          </div>
+                          <Button type="button" onClick={() => void copyText("matriz", requirementsText)} variant="secondary" size="sm">
+                            <Clipboard className="h-4 w-4" /> {copied === "matriz" ? "Copiada" : "Copiar matriz"}
+                          </Button>
+                        </div>
+                        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs leading-6 text-slate-800">{requirementsText}</pre>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -363,7 +419,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
                 <Mail className="mx-auto h-10 w-10 text-brand" />
                 <div className="mt-4 text-base font-semibold text-slate-900">Genera el primer borrador</div>
                 <p className="mt-2 max-w-md text-sm leading-6 text-muted">
-                  El correo aparecerá separado por asunto, datos del RFQ, solicitud comercial, requisitos técnicos y cierre profesional.
+                  El correo aparecera separado por asunto, cuerpo editable y matriz tecnica copiable para el proveedor.
                 </p>
               </div>
             </div>
@@ -373,6 +429,9 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
+
 
 
 

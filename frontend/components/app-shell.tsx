@@ -10,14 +10,6 @@ import { cn } from "@/lib/ui/cn";
 import { getAllowedModules, getModuleLabel, type ModuleId } from "@/lib/navigation";
 import { cleanValue, loadLastRfq } from "@/lib/rfq";
 
-function roleDescription(role: string) {
-  if (role === "Admin") return "Usuarios, roles, llaves y salud del sistema.";
-  if (role === "Gerencia") return "Vista gerencial, costos, consumo y decisiones.";
-  if (role === "Supervisor") return "Radar SLI, seguimiento y flujo del analista.";
-  if (role === "Logistica") return "Costos logisticos e historico operacional.";
-  return "RFQ, proveedores, historico y evaluacion tecnica.";
-}
-
 function shellCopy(role: string) {
   if (role === "Admin") return { eyebrow: "Procura AI Control", title: "Admin Console", environment: "Consola administrativa" };
   if (role === "Logistica") return { eyebrow: "Procura AI", title: "Logistics Desk", environment: "Beta interna" };
@@ -44,7 +36,6 @@ export function AppShell({
   const [navOpen, setNavOpen] = useState(true);
   const [activeRfqLabel, setActiveRfqLabel] = useState("");
   const shell = shellCopy(role);
-  const userInitial = String(user.username || "U").slice(0, 1).toUpperCase();
 
   useEffect(() => {
     try {
@@ -129,12 +120,8 @@ export function AppShell({
           </div>
 
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <div className="hidden max-w-[16rem] items-center gap-2 rounded-xl border border-line bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200 md:flex">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-black text-white">{userInitial}</span>
-              <span className="min-w-0">
-                <span className="block truncate font-semibold">{user.username}</span>
-                <span className="block truncate text-[11px] text-muted">{roleDescription(role)}</span>
-              </span>
+            <div className="hidden max-w-[14rem] items-center rounded-full border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-100 md:inline-flex">
+              <span className="truncate">{user.username}</span>
             </div>
             <StatusBadge tone="ok" className="hidden sm:inline-flex">
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -219,5 +206,6 @@ export function AppShell({
     </div>
   );
 }
+
 
 

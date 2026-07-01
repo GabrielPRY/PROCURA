@@ -28,7 +28,7 @@ import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type SearchScope = "renglon" | "todos";
+type SearchScope = "renglon" | "seleccion" | "todos";
 type SourcingStrategy = "por_renglon" | "proveedor_integral";
 type ChatRole = "user" | "assistant";
 type SourcingTab = "buscar" | "ranking" | "validar";
@@ -131,7 +131,7 @@ function smartPromptForItem(item: RfqItem | undefined, scope: SearchScope, total
   if (!item && scope === "renglon") {
     return "Busca 10 proveedores globales utiles para el RFQ. Razona primero los requisitos tecnicos, luego busca candidatos reales y prioriza precio bajo con bajo riesgo comercial.";
   }
-  if (scope === "todos") {
+  if (scope === "todos" || scope === "seleccion") {
     const integral = strategy === "proveedor_integral";
     return [
       `Busca 10 proveedores globales utiles para los ${Math.min(totalItems, 5)} renglones principales del RFQ.`,
@@ -219,6 +219,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const [scope, setScope] = useState<SearchScope>("renglon");
   const [sourcingStrategy, setSourcingStrategy] = useState<SourcingStrategy>("proveedor_integral");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
   const [input, setInput] = useState("");
   const [depth, setDepth] = useState("Profunda");
   const [searching, setSearching] = useState(false);
@@ -250,6 +251,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     if (savedRfq?.items?.length && context?.target_module === "proveedores") {
       const nextIndex = Math.min(Math.max(Number(context.item_index) || 0, 0), savedRfq.items.length - 1);
       setSelectedIndex(nextIndex);
+      setSelectedIndexes([nextIndex]);
       setScope("renglon");
       setInput(
         `Busca 10 proveedores globales para el renglon ${context.renglon || nextIndex + 1}. Prioriza precio bajo, cumplimiento tecnico, proveedor real y bajo riesgo comercial.`
@@ -270,9 +272,11 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
 
   const items = useMemo(() => rfq?.items || [], [rfq]);
   const selectedItem = items[selectedIndex];
+  const selectedItems = scope === "todos" ? items : scope === "seleccion" ? items.filter((_, index) => selectedIndexes.includes(index)) : selectedItem ? [selectedItem] : [];
   const selectedQuery = queryFromItem(selectedItem);
   const allQueries = items.map(queryFromItem).filter(Boolean);
-  const activeQuery = scope === "todos" ? allQueries.slice(0, 5).join(" | ") : selectedQuery;
+  const selectedQueries = selectedItems.map(queryFromItem).filter(Boolean);
+  const activeQuery = scope === "todos" ? allQueries.slice(0, 5).join(" | ") : scope === "seleccion" ? selectedQueries.slice(0, 5).join(" | ") : selectedQuery;
   const richLinks = sourceCards(activeQuery || "industrial supplier");
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion, "Sin RFQ");
   const selectedRenglon = selectedItem ? cleanValue(selectedItem.renglon, String(selectedIndex + 1)) : "N/D";
@@ -280,6 +284,20 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const selectedDescription = selectedItem
     ? cleanValue(selectedItem.termino_de_busqueda_corto || selectedItem.descripcion || selectedItem.ficha_tecnica_completa, "Sin descripcion")
     : "Analiza o abre un RFQ para activar el contexto tecnico.";
+
+  function toggleSelectedIndex(index: number) {
+    setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index].sort((a, b) => a - b));
+  }
+
+  function selectAllItems() {
+    setSelectedIndexes(items.map((_, index) => index));
+    setScope("seleccion");
+  }
+
+  function clearSelection() {
+    setSelectedIndexes(selectedItem ? [selectedIndex] : []);
+    setScope("renglon");
+  }
 
   useEffect(() => {
     if (!providers.length) {
@@ -380,14 +398,14 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     setMessages((current) => [...current, { role: "user", content: cleanPrompt }]);
 
     try {
-      const selectedItems = scope === "todos" ? items : selectedItem ? [selectedItem] : [];
+      const selectedItems = scope === "todos" ? items : scope === "seleccion" ? items.filter((_, index) => selectedIndexes.includes(index)) : selectedItem ? [selectedItem] : [];
       const response = await searchProviders({
         username: user.username,
         items: selectedItems.map(itemPayload),
         custom_prompt: cleanPrompt,
         depth,
         target_count: 10,
-        sourcing_strategy: scope === "todos" ? sourcingStrategy : "por_renglon"
+        sourcing_strategy: scope === "todos" || scope === "seleccion" ? sourcingStrategy : "por_renglon"
       });
 
       setSummary(response.resumen || "");
@@ -397,7 +415,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
 
       const providerCount = response.proveedores?.length || 0;
       const answer = providerCount
-        ? sourcingStrategy === "proveedor_integral" && scope === "todos"
+        ? sourcingStrategy === "proveedor_integral" && (scope === "todos" || scope === "seleccion")
           ? `Encontre ${providerCount} candidatos. Los ordene dando prioridad a proveedores que puedan cubrir varios renglones o todo el RFQ.`
           : `Encontre ${providerCount} candidatos. Los ordene por match tecnico, oportunidad de ahorro y riesgo comercial. Revisa el panel de ranking antes de cotizar.`
         : "Gemini no genero candidatos suficientes con evidencia util. Te deje fuentes abiertas y criterios de validacion para continuar manualmente.";
@@ -414,7 +432,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
 
   async function runSmartSourcing() {
     const prompt = [
-      smartPromptForItem(selectedItem, scope, items.length, sourcingStrategy),
+      smartPromptForItem(selectedItem, scope, selectedItems.length || items.length, sourcingStrategy),
       input.trim() ? `Instruccion adicional del usuario: ${input.trim()}` : ""
     ].filter(Boolean).join("\n\n");
     await runSourcing(prompt);
@@ -424,7 +442,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     {
       id: "buscar" as const,
       label: "Buscar",
-      detail: scope === "todos" ? "Todos los renglones" : selectedItem ? `Renglon ${cleanValue(selectedItem.renglon, String(selectedIndex + 1))}` : "Definir busqueda"
+      detail: scope === "todos" ? "Todos los renglones" : scope === "seleccion" ? `${selectedItems.length} seleccionados` : selectedItem ? `Renglon ${cleanValue(selectedItem.renglon, String(selectedIndex + 1))}` : "Definir busqueda"
     },
     {
       id: "ranking" as const,
@@ -464,11 +482,11 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
           </div>
           <div className="rounded-lg border border-line bg-slate-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon / Codigo</div>
-            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedRenglon} | {selectedCode}</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{scope === "seleccion" ? `${selectedItems.length} seleccionados` : scope === "todos" ? `${items.length} renglones` : `${selectedRenglon} | ${selectedCode}`}</div>
           </div>
           <div className="rounded-lg border border-line bg-slate-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">Producto buscado</div>
-            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{selectedDescription}</div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{scope === "seleccion" ? "Busqueda conjunta de renglones seleccionados" : scope === "todos" ? "Busqueda integral del RFQ completo" : selectedDescription}</div>
           </div>
         </div>
       </ModuleSection>
@@ -559,10 +577,17 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                   Alcance
                   <select
                     value={scope}
-                    onChange={(event) => setScope(event.target.value as SearchScope)}
+                    onChange={(event) => {
+                      const nextScope = event.target.value as SearchScope;
+                      setScope(nextScope);
+                      if (nextScope === "seleccion" && !selectedIndexes.length && selectedItem) {
+                        setSelectedIndexes([selectedIndex]);
+                      }
+                    }}
                     className="app-input"
                   >
                     <option value="renglon">Un renglon</option>
+                    <option value="seleccion">Renglones seleccionados</option>
                     <option value="todos">Todos los renglones</option>
                   </select>
                 </label>
@@ -581,6 +606,48 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                       ))}
                     </select>
                   </label>
+                ) : scope === "seleccion" ? (
+                  <div className="lg:col-span-2 rounded-xl border border-blue-100 bg-white p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">Renglones incluidos</div>
+                        <p className="mt-1 text-xs text-muted">Marca exactamente los renglones que quieres buscar juntos.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={selectAllItems} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-brand">Todos</button>
+                        <button type="button" onClick={clearSelection} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700">Solo activo</button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {items.map((item, index) => (
+                        <label key={`select-${index}`} className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-slate-50 p-2 text-xs text-slate-700 hover:border-blue-200 hover:bg-blue-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedIndexes.includes(index)}
+                            onChange={() => toggleSelectedIndex(index)}
+                            className="mt-0.5 h-4 w-4 accent-blue-600"
+                          />
+                          <span className="min-w-0 leading-5">{itemLabel(item, index)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr]">
+                      <label className="grid gap-2 text-sm font-semibold text-slate-800">
+                        Estrategia
+                        <select
+                          value={sourcingStrategy}
+                          onChange={(event) => setSourcingStrategy(event.target.value as SourcingStrategy)}
+                          className="app-input"
+                        >
+                          <option value="proveedor_integral">Priorizar proveedor integral</option>
+                          <option value="por_renglon">Mejor proveedor por renglon</option>
+                        </select>
+                      </label>
+                      <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm text-slate-700">
+                        {selectedItems.length} renglon(es) seleccionados. Se buscaran proveedores que puedan cubrirlos con el mejor precio posible y bajo riesgo.
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <label className="grid gap-2 text-sm font-semibold text-slate-800">
@@ -934,6 +1001,11 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     </div>
   );
 }
+
+
+
+
+
 
 
 

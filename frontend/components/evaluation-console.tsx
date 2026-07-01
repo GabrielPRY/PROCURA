@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { ClipboardList, Download, FileText, Loader2, Search, UploadCloud } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, FileText, Loader2, Search, UploadCloud, XCircle } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { evaluateSupplierProposal, type EvaluationResultValue, type SupplierEvaluationRow } from "@/lib/evaluation";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
@@ -16,6 +16,12 @@ type EvaluationTab = "preparar" | "resultado";
 
 const resultOptions: EvaluationResultValue[] = ["Cumple", "No cumple", "Cumple parcialmente", "No encontrado"];
 const actionOptions = ["Aceptar", "Pedir aclaracion", "Rechazar", "Revisar manualmente"];
+
+const preparationSteps = [
+  ["1", "Subir propuesta", "Archivo recibido del proveedor."],
+  ["2", "Elegir alcance", "Renglones que se van a comparar."],
+  ["3", "Evaluar", "IA cruza oferta vs requisitos ACP."]
+];
 
 function statusTone(status: string) {
   if (status === "Cumple") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -238,7 +244,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
         <PageHeader
           eyebrow="Modulo Evaluacion"
           title="Propuesta del proveedor vs RFQ"
-          copy="Marca cumplimiento tecnico contra el RFQ, anexos y enmiendas. Si la propuesta no evidencia un dato, se reporta como parcial o no encontrado."
+          copy="Compara la oferta del proveedor contra lo que exige ACP. Si algo no esta evidenciado, queda marcado para pedir aclaracion antes de ofertar."
           actions={
             <>
               <StatusBadge tone={hasGeminiKey ? "ok" : "warn"}>{loadingConfig ? "Validando IA" : hasGeminiKey ? "Gemini lista" : "Gemini pendiente"}</StatusBadge>
@@ -278,8 +284,8 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
           {activeTab === "preparar" ? (
           <section className="grid gap-4 xl:grid-cols-[0.38fr_0.62fr]">
             <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-              <div className="text-base font-semibold">Entrada de proveedor</div>
-              <p className="mt-2 text-sm leading-6 text-muted">PDF, Excel, Word, texto o CSV de la oferta/propuesta recibida.</p>
+              <div className="text-base font-semibold">1. Propuesta del proveedor</div>
+              <p className="mt-2 text-sm leading-6 text-muted">Sube la cotizacion, ficha, catalogo o documento tecnico que envio el proveedor.</p>
 
               <label className="mt-5 grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center transition hover:border-brand hover:bg-blue-50">
                 <UploadCloud className="h-8 w-8 text-brand" />
@@ -300,28 +306,28 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
               ) : null}
 
               <label className="mt-5 block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Proveedor</span>
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Nombre del proveedor evaluado</span>
                 <input
                   value={supplier}
                   onChange={(event) => setSupplier(event.target.value)}
                   className="app-input"
-                  placeholder="Nombre del proveedor"
+                  placeholder="Ej: Rexroth distributor, proveedor local, fabricante..."
                 />
               </label>
 
               <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Anexos, enmiendas o aclaraciones</span>
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Cambios o condiciones especiales del RFQ</span>
                 <textarea
                   value={evaluationNotes}
                   onChange={(event) => setEvaluationNotes(event.target.value)}
                   rows={4}
                   className="w-full resize-none rounded-lg border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                  placeholder="Ej: Enmienda 1 cambia cantidad del renglon 2; proveedor debe adjuntar carta de fabricante; solo aplica para lineas 3 y 4..."
+                  placeholder="Ej: Enmienda 1 cambia cantidad; solo aplica para lineas 3 y 4; requiere carta de fabricante; el proveedor ofrece alternativa tecnica..."
                 />
               </label>
 
               <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Alcance</span>
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Renglones a comparar</span>
                 <select
                   value={scope}
                   onChange={(event) => setScope(event.target.value as Scope)}
@@ -343,8 +349,8 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
             </div>
 
             <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-              <div className="text-base font-semibold">Contexto cargado</div>
-              <p className="mt-2 text-sm text-muted">La evaluacion usara los renglones tecnicos extraidos del ultimo RFQ.</p>
+              <div className="text-base font-semibold">2. Matriz que se va a validar</div>
+              <p className="mt-2 text-sm text-muted">El sistema cruza la propuesta contra los requisitos tecnicos extraidos del ultimo RFQ.</p>
               {activeRfqContext ? (
                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
                   <div className="font-semibold">Renglon recibido desde RFQ</div>
@@ -352,7 +358,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   {activeRfqContext.descripcion || "Sin descripcion"}
                 </div>
               ) : null}
-              <div className="mt-5 grid gap-3 sm:grid-cols-4">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   ["RFQ", licitacion],
                   ["Renglones", String(scopedItems.length)],
@@ -365,11 +371,20 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   </div>
                 ))}
               </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {preparationSteps.map(([number, title, copy]) => (
+                  <div key={title} className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-brand text-xs font-black text-white">{number}</div>
+                    <div className="mt-3 text-sm font-semibold text-slate-950">{title}</div>
+                    <p className="mt-1 text-xs leading-5 text-muted">{copy}</p>
+                  </div>
+                ))}
+              </div>
               <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                Regla: si la propuesta no evidencia un dato, se marca como No encontrado o Cumple parcialmente para pedir aclaracion.
+                Criterio: si la propuesta no muestra evidencia del requisito, se marca como No encontrado o Cumple parcialmente. Esto protege la oferta antes de enviarla.
               </div>
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                Las notas de anexos/enmiendas se tratan como prioridad frente al RFQ original. Si no hay cambios, dejalo en blanco.
+                Anexos y enmiendas tienen prioridad sobre el RFQ original. Usa la caja de notas solo cuando exista un cambio o aclaracion relevante.
               </div>
             </div>
           </section>
@@ -472,60 +487,64 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   </label>
                 </div>
               </div>
-
-              <div className="overflow-hidden">
-                <table className="w-full table-fixed border-collapse text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600">
-                    <tr>
-                      {["Renglon", "Articulo", "Resultado", "Riesgo principal", "Accion", "Detalle"].map((heading) => (
-                        <th key={heading} className="border-b border-line px-4 py-3 font-semibold">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRows.map(({ row, index }) => (
-                      <tr key={`${row.renglon}-${index}`} className="border-b border-line last:border-0 align-top">
-                        <td className="px-4 py-3 font-semibold">{cleanValue(row.renglon, "-")}</td>
-                        <td className="max-w-[330px] px-4 py-3">
-                          <div className="font-semibold text-slate-900">{shortText(row.descripcion, "Sin descripcion", 95)}</div>
-                          <div className="mt-1 text-xs font-semibold text-brand">{cleanValue(row.codigo_articulo, "S/C")}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={row.resultado}
-                            onChange={(event) => updateRow(index, { resultado: event.target.value as EvaluationResultValue })}
-                            className={`rounded-lg border px-2 py-1.5 text-sm font-semibold ${statusTone(row.resultado)}`}
-                          >
-                            {resultOptions.map((option) => <option key={option}>{option}</option>)}
-                          </select>
-                        </td>
-                        <td className="max-w-[300px] px-4 py-3">
-                          <div>{shortText(row.faltante_o_riesgo, "Sin riesgo identificado.", 120)}</div>
-                          <div className={`mt-1 text-xs font-semibold ${confidenceTone(row.confianza)}`}>Confianza: {cleanValue(row.confianza, "Media")}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={row.accion_sugerida || "Revisar manualmente"}
-                            onChange={(event) => updateRow(index, { accion_sugerida: event.target.value })}
-                            className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm"
-                          >
-                            {actionOptions.map((option) => <option key={option}>{option}</option>)}
-                          </select>
-                        </td>
-                        <td className="max-w-[300px] px-4 py-3">
-                          <details>
-                            <summary className="cursor-pointer text-sm font-semibold text-brand">Abrir evidencia</summary>
-                            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
-                              <p><b>Requisito ACP:</b> {cleanValue(row.requisito_acp)}</p>
-                              <p><b>Oferta proveedor:</b> {cleanValue(row.oferta_proveedor)}</p>
-                              <p><b>Evidencia:</b> {cleanValue(row.evidencia)}</p>
+              <div className="grid gap-3 p-4">
+                {visibleRows.map(({ row, index }) => {
+                  const isOk = row.resultado === "Cumple";
+                  const isBad = row.resultado === "No cumple" || row.resultado === "No encontrado";
+                  const ResultIcon = isOk ? CheckCircle2 : isBad ? XCircle : AlertTriangle;
+                  return (
+                    <article key={`${row.renglon}-${index}`} className="rounded-xl border border-line bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-brand">
+                              Renglon {cleanValue(row.renglon, "-")}
+                            </span>
+                            <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                              {cleanValue(row.codigo_articulo, "S/C")}
+                            </span>
+                          </div>
+                          <h3 className="mt-3 text-base font-semibold leading-6 text-slate-950">{shortText(row.descripcion, "Sin descripcion", 140)}</h3>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">{shortText(row.faltante_o_riesgo, "Sin riesgo identificado.", 220)}</p>
+                          <div className={`mt-2 text-xs font-semibold ${confidenceTone(row.confianza)}`}>Confianza: {cleanValue(row.confianza, "Media")}</div>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:w-[420px]">
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Resultado</span>
+                            <div className="relative">
+                              <ResultIcon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+                              <select
+                                value={row.resultado}
+                                onChange={(event) => updateRow(index, { resultado: event.target.value as EvaluationResultValue })}
+                                className={`w-full rounded-lg border py-2 pl-8 pr-2 text-sm font-semibold ${statusTone(row.resultado)}`}
+                              >
+                                {resultOptions.map((option) => <option key={option}>{option}</option>)}
+                              </select>
                             </div>
-                          </details>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Accion</span>
+                            <select
+                              value={row.accion_sugerida || "Revisar manualmente"}
+                              onChange={(event) => updateRow(index, { accion_sugerida: event.target.value })}
+                              className="h-10 w-full rounded-lg border border-line bg-white px-2 text-sm font-semibold text-slate-800"
+                            >
+                              {actionOptions.map((option) => <option key={option}>{option}</option>)}
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                      <details className="mt-4 rounded-lg border border-line bg-slate-50 p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-brand">Ver requisito ACP, oferta y evidencia</summary>
+                        <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-700 lg:grid-cols-3">
+                          <div><b>Requisito ACP:</b><br />{cleanValue(row.requisito_acp)}</div>
+                          <div><b>Oferta proveedor:</b><br />{cleanValue(row.oferta_proveedor)}</div>
+                          <div><b>Evidencia:</b><br />{cleanValue(row.evidencia)}</div>
+                        </div>
+                      </details>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           ) : null}
@@ -540,5 +559,6 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
 
 

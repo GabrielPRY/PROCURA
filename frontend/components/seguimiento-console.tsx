@@ -331,6 +331,34 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     return publication && revision && publication !== revision;
   }).length;
   const myItemsCount = items.filter((item) => (item.owner_username || item.responsable) === user.username).length;
+  const priorityItems = filteredItems
+    .map((item) => {
+      const result = sliResults[item.id];
+      const meta = sliSyncMeta[item.id];
+      const alert = sliOperationalAlert(item, result);
+      const hours = hoursUntil(result?.fecha_cierre);
+      const closeSoon = hours !== null && hours >= 0 && hours <= 72;
+      const changed = Boolean(meta?.changed);
+      const errorText = sliErrors[item.id];
+      const title = closeSoon
+        ? "Cierre cercano"
+        : changed
+          ? "Cambio sugerido por SLI"
+          : errorText
+            ? "SLI requiere revision"
+            : alert
+              ? "Revisar proceso"
+              : "";
+      const tone = closeSoon || errorText ? "rose" : changed || alert ? "amber" : "neutral";
+      const detail = closeSoon
+        ? `Cierra en ${Math.max(1, Math.round(hours || 1))} hora(s).`
+        : changed
+          ? `SLI sugiere: ${meta?.suggested || "revisar estado"}.`
+          : errorText || alert;
+      return title ? { item, title, detail, tone } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 6) as Array<{ item: Seguimiento; title: string; detail?: string; tone: string }>;
   useEffect(() => {
     if (loading || autoSliCheckedRef.current || !filteredItems.length) return;
     autoSliCheckedRef.current = true;
@@ -401,6 +429,45 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
         ))}
       </section>
 
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Prioridades de seguimiento</div>
+            <p className="mt-1 text-sm text-muted">Procesos que requieren accion por cierre, cambio SLI, revision o error de consulta.</p>
+          </div>
+          <StatusBadge tone={priorityItems.length ? "warn" : "ok"}>{priorityItems.length ? `${priorityItems.length} prioridad(es)` : "Sin urgencias"}</StatusBadge>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+          {priorityItems.length ? priorityItems.map(({ item, title, detail, tone }) => (
+            <button
+              key={`priority-${item.id}`}
+              type="button"
+              onClick={() => void openItem(item)}
+              className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                tone === "rose"
+                  ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
+                  : tone === "amber"
+                    ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                    : "border-line bg-white text-slate-800 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-wide opacity-75">{title}</div>
+                  <div className="mt-1 text-sm font-semibold leading-5">{item.numero_licitacion} | {item.objeto || "Sin objeto"}</div>
+                  {detail ? <p className="mt-2 text-xs leading-5 opacity-85">{detail}</p> : null}
+                </div>
+                <BellRing className="h-4 w-4 shrink-0" />
+              </div>
+            </button>
+          )) : (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 lg:col-span-2 2xl:col-span-3">
+              No hay prioridades críticas detectadas en los procesos visibles. Puedes sincronizar SLI para refrescar el estado.
+            </div>
+          )}
+        </div>
+      </section>
+
       <details className="rounded-xl border border-line bg-panel shadow-sm">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5">
           <div>
@@ -427,9 +494,9 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
         <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="text-sm font-semibold text-slate-900">Procesos</div>
+              <div className="text-sm font-semibold text-slate-900">Pipeline operativo</div>
               <p className="mt-1 text-xs text-muted">
-                {filteredItems.length} procesos visibles de {items.length} registrados. El estado se actualiza automaticamente desde SLI cuando es posible.
+                {filteredItems.length} procesos visibles de {items.length} registrados. Atiende primero los procesos marcados por SLI o por cierre cercano.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -682,5 +749,6 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
 
 
