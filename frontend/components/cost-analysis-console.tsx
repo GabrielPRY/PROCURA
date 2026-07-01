@@ -32,9 +32,24 @@ function money(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
+function normalizeColumnName(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .toLowerCase();
+}
+
 function cell(row: Record<string, unknown>, keys: string[], fallback = "N/D") {
   for (const key of keys) {
     const value = cleanValue(row[key], "");
+    if (value) return value;
+  }
+  const normalized = new Map(Object.keys(row).map((key) => [normalizeColumnName(key), key]));
+  for (const key of keys) {
+    const actual = normalized.get(normalizeColumnName(key));
+    if (!actual) continue;
+    const value = cleanValue(row[actual], "");
     if (value) return value;
   }
   return fallback;
@@ -70,6 +85,19 @@ function historyPricesFromRows(rows: HistoricoRow[]) {
 
 function bestHistoryPrice(rows: HistoricoRow[]) {
   return minPositive(historyPricesFromRows(rows));
+}
+function specialistInitials(value: string) {
+  const clean = cleanValue(value, "");
+  if (!clean || clean === "N/D") return "-";
+  const tokens = clean.split(/\s+/).filter(Boolean);
+  return tokens.slice(0, 2).map((token) => token.charAt(0).toUpperCase()).join("") || "-";
+}
+
+function historicalDateLabel(record: Record<string, unknown>) {
+  const mes = cell(record, ["Mes", "mes"], "");
+  const anio = cell(record, ["Año", "Ano", "AÃ±o", "anio"], "");
+  if (mes && anio) return `${mes} ${anio}`;
+  return mes || anio || "N/D";
 }
 
 function itemLabel(item: CostRow, index: number) {
@@ -207,13 +235,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const totalReference = itemRows.reduce((sum, row) => sum + row.valueBest, 0);
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion || rfq?.condiciones_generales?.licitacion, "RFQ activo");
 
-  const historyPrices = historicoRows.flatMap((row) => {
-    const record = row as Record<string, unknown>;
-    return [
-      priceFrom(record, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]),
-      priceFrom(record, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"])
-    ].filter((value) => value > 0);
-  });
+  const historyPrices = historyPricesFromRows(historicoRows);
   const minHistory = minPositive(historyPrices);
   const avgHistory = average(historyPrices);
   const aggressiveReference = minHistory > 0 ? minHistory * 0.97 : 0;
@@ -298,8 +320,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                         <div className="text-sm font-semibold leading-5 text-slate-900 line-clamp-2 break-words">{itemLabel(row.item, row.index)}</div>
                         <div className="mt-1 text-xs text-muted">Cant. {row.qty || "N/D"} | Mejor ref. {row.best ? money(row.best) : "Sin cruce"} | Registros {row.historyRows.length}</div>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${row.hasEmbeddedHistory ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                        {row.hasEmbeddedHistory ? "Match" : "Buscar"}
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${row.hasHistoricalPrice ? "bg-emerald-50 text-emerald-700" : loadingBatchHistory ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                        {row.hasHistoricalPrice ? "Match" : loadingBatchHistory ? "Buscando" : "Sin match"}
                       </span>
                     </div>
                   </button>
@@ -367,23 +389,27 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                       const record = row as Record<string, unknown>;
                       const proy = priceFrom(record, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]);
                       const comp = priceFrom(record, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"]);
-                      const licitacion = cell(record, ["N?? Licitaci??n", "N?? Licitacion", "numero_licitacion"]);
-                      const anio = cell(record, ["A??o", "Ano", "anio"]);
-                      const codigo = cell(record, ["C??digo ACP", "Codigo ACP", "codigo_acp"]);
+                      const licitacion = cell(record, ["N° Licitación", "N Licitacion", "N Licitación", "numero_licitacion"]);
+                      const fechaHistorica = historicalDateLabel(record);
+                      const codigo = cell(record, ["Código ACP", "Codigo ACP", "codigo_acp"]);
                       const cantidad = cell(record, ["Cantidad", "cantidad"]);
                       const ganador = cell(record, ["Adjudicada a Proyelec", "adjudicada_a_proyelec"], "N/D");
-                      const analista = cell(record, ["Analista", "analista"], "N/D");
+                      const analista = cell(record, ["Analista", "analista", "analista_procura"], "N/D");
+                      const inicialEspecialista = specialistInitials(analista);
                       return (
-                        <div key={index} className="grid min-w-0 gap-3 p-3 text-sm hover:bg-slate-50 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.7fr)]">
+                        <div key={index} className="grid min-w-0 gap-3 p-3 text-sm hover:bg-slate-50 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)_minmax(0,0.72fr)]">
                           <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Licitacion</div>
-                            <div className="mt-1 break-words font-semibold text-brand">{licitacion}</div>
-                            <div className="mt-1 text-xs text-muted">Ano {anio} | Cant. {cantidad}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-blue-800">Lic. {licitacion}</span>
+                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">{fechaHistorica}</span>
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-800">Esp. {inicialEspecialista}</span>
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-muted">Especialista: {analista}</div>
                           </div>
                           <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Codigo / responsable</div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Código ACP / cantidad</div>
                             <div className="mt-1 break-words font-semibold text-slate-900">{codigo}</div>
-                            <div className="mt-1 break-words text-xs text-muted">{analista}</div>
+                            <div className="mt-1 break-words text-xs text-muted">Cantidad histórica: {cantidad}</div>
                           </div>
                           <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                             <div className="rounded-lg border border-line bg-slate-50 p-2">
@@ -414,6 +440,10 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
+
+
 
 
 

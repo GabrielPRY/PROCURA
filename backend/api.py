@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks, Header, Depends, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
@@ -334,6 +334,36 @@ def stop_radar_scheduler():
 def radar_scheduler_status(_token: str = Depends(verify_internal_token)):
     return RADAR_SCHEDULER_STATE
 
+@app.get("/api/v1/radar/stats")
+def radar_stats(_token: str = Depends(verify_internal_token)):
+    """Endpoint ligero: 4 contadores para el dashboard sin cargar filas completas."""
+    try:
+        df = db.get_licitaciones_radar(solo_nuevas=False, solo_hoy=False)
+        if df.empty:
+            return {"status": "success", "total": 0, "alertas": 0, "en_seguimiento": 0, "cierre_72h": 0}
+        total = int(len(df))
+        def _bool_safe(v):
+            return str(v or "").strip().lower() in ["true", "1", "yes", "si"]
+        alertas = int(df["enmienda_alerta"].apply(_bool_safe).sum()) if "enmienda_alerta" in df.columns else 0
+        en_seguimiento = int((df["estado_radar"] == "en_seguimiento").sum()) if "estado_radar" in df.columns else 0
+        cierre_72h = 0
+        if "fecha_cierre" in df.columns:
+            now_ts = time.time()
+            limit_ts = now_ts + 72 * 3600
+            def _within_72h(val):
+                try:
+                    from sli_scraper import parse_sli_datetime
+                    dt = parse_sli_datetime(val)
+                    return bool(dt and now_ts <= dt.timestamp() <= limit_ts)
+                except Exception:
+                    return False
+            cierre_72h = int(df["fecha_cierre"].apply(_within_72h).sum())
+        return {"status": "success", "total": total, "alertas": alertas,
+                "en_seguimiento": en_seguimiento, "cierre_72h": cierre_72h}
+    except Exception as exc:
+        logger.warning(f"[RADAR STATS] {exc}")
+        return {"status": "error", "total": 0, "alertas": 0, "en_seguimiento": 0, "cierre_72h": 0}
+
 @app.get("/api/v1/radar/escaneos")
 def radar_escaneos(limit: int = Query(10, ge=1, le=100), _token: str = Depends(verify_internal_token)):
     return {"status": "success", "escaneos": _json_records(db.get_ultimos_escaneos(limite=limit))}
@@ -341,11 +371,6 @@ def radar_escaneos(limit: int = Query(10, ge=1, le=100), _token: str = Depends(v
 @app.post("/api/v1/radar/scan-now")
 def radar_scan_now(_token: str = Depends(verify_internal_token)):
     return run_radar_auto_scan(source="manual_api")
-
-class RadarEstadoRequest(BaseModel):
-    estado: str
-    usuario: str = "frontend"
-    notas: str = ""
 
 def _radar_bool(value):
     if isinstance(value, bool):

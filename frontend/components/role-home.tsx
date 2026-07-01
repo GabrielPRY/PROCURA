@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, FileText, FolderOpen, PackageSearch, Radar, RefreshCw, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +9,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { getAllowedModules, type ModuleId } from "@/lib/navigation";
-import { getRadarLicitaciones, getRadarScheduler, radarFlag, type RadarSchedulerStatus } from "@/lib/radar";
+import { getRadarScheduler, getRadarStats, type RadarSchedulerStatus } from "@/lib/radar";
 import { cleanValue, loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
 import { formatCompactDate } from "@/lib/ui/format";
 import { listWorkspaces, type WorkspaceListItem } from "@/lib/workspaces";
@@ -87,19 +87,14 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
 
     if (allowed.has("radar")) {
       tasks.push(
-        getRadarLicitaciones({ limit: 150 })
+        getRadarStats()
           .then((response) => {
             if (!mounted) return;
-            const items = response.items || [];
-            const now = Date.now();
             setRadarStats({
-              total: response.total || items.length,
-              alertas: items.filter((item) => radarFlag(item.enmienda_alerta)).length,
-              seguimiento: items.filter((item) => item.estado_radar === "en_seguimiento").length,
-              cierre72h: items.filter((item) => {
-                const time = item.fecha_cierre_iso ? new Date(item.fecha_cierre_iso).getTime() : 0;
-                return time >= now && time <= now + 72 * 60 * 60 * 1000;
-              }).length
+              total: response.total ?? 0,
+              alertas: response.alertas ?? 0,
+              seguimiento: response.en_seguimiento ?? 0,
+              cierre72h: response.cierre_72h ?? 0,
             });
           })
           .catch(() => {
@@ -158,10 +153,10 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
       </ModuleSection>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="RFQ activo" value={rfqNumber} hint={`${items.length} renglones cargados`} icon={FileText} />
-        <StatCard label="Workspaces" value={workspaces.length} hint={lastWorkspace ? `Ultimo: ${lastWorkspace.licitacion}` : "Sin guardados"} icon={FolderOpen} />
-        <StatCard label="Radar abierto" value={allowed.has("radar") ? radarStats.total : "N/D"} hint={allowed.has("radar") ? `${radarStats.alertas} alertas de enmienda` : "No aplica al rol"} icon={Radar} />
-        <StatCard label="Scheduler" value={scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`} hint={scheduler?.last_finished ? `Ultimo: ${formatCompactDate(scheduler.last_finished)}` : "Sin escaneo reciente"} icon={CheckCircle2} />
+        <StatCard loading={loading} label="RFQ activo" value={rfqNumber} hint={`${items.length} renglones cargados`} icon={FileText} />
+        <StatCard loading={loading} label="Workspaces" value={workspaces.length} hint={lastWorkspace ? `Ultimo: ${lastWorkspace.licitacion}` : "Sin guardados"} icon={FolderOpen} />
+        <StatCard loading={loading} label="Radar abierto" value={allowed.has("radar") ? radarStats.total : "N/D"} hint={allowed.has("radar") ? `${radarStats.alertas} alertas de enmienda` : "No aplica al rol"} icon={Radar} />
+        <StatCard loading={loading} label="Scheduler" value={scheduler?.enabled === false ? "Apagado" : `${scheduler?.interval_minutes || 25} min`} hint={scheduler?.last_finished ? `Ultimo: ${formatCompactDate(scheduler.last_finished)}` : "Sin escaneo reciente"} icon={CheckCircle2} />
       </section>
 
       {allowed.has("radar") && (radarStats.alertas || radarStats.cierre72h) ? (

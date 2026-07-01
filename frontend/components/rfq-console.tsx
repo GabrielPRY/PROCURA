@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldAlert, UploadCloud } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
@@ -93,6 +93,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const [geminiSource, setGeminiSource] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [progressStep, setProgressStep] = useState(0); // 0=idle,1=enviando,2=analizando,3=extrayendo,4=guardando
   const [error, setError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [result, setResult] = useState<RfqAnalysisResponse | null>(null);
@@ -133,15 +134,25 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const nextFiles = Array.from(event.target.files || []);
+    if (!nextFiles.length) return;
+    // Confirm before clearing an existing analysis
+    if (result && !window.confirm("Ya hay un analisis cargado. ¿Cargar nuevos documentos y reemplazarlo?")) {
+      // Reset the input so the same files can be selected again if needed
+      event.target.value = "";
+      return;
+    }
     setFiles(nextFiles);
     setResult(null);
     setSelectedIndex(0);
     setActiveTab("entrada");
+    setError(null);
+    setSaveNotice(null);
   }
 
   async function handleAnalyze() {
     setError(null);
     setSaveNotice(null);
+    setProgressStep(0);
     if (!files.length) {
       setError("Sube al menos un PDF del pliego o anexo.");
       return;
@@ -152,17 +163,23 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     }
 
     setProcessing(true);
+    setProgressStep(1); // Enviando documentos
     try {
+      // Small delay to let the UI update before the heavy request
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
+      setProgressStep(2); // Analizando con IA
       const response = await analyzeRfq({
         files,
         geminiKey: geminiKey.trim(),
         username: user.username,
         role: normalizeRole(user.role)
       });
+      setProgressStep(3); // Extrayendo renglones
       setResult(response);
       saveLastRfq(user.username, response);
       const responseCg = (response.condiciones_generales || {}) as Record<string, unknown>;
       const licitacion = cleanValue(responseCg.numero_licitacion || responseCg.licitacion, "");
+      setProgressStep(4); // Guardando workspace
       try {
         const saved = await saveWorkspace({
           username: user.username,
@@ -180,6 +197,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       setError(err instanceof Error ? err.message : "No se pudo procesar el RFQ.");
     } finally {
       setProcessing(false);
+      setProgressStep(0);
     }
   }
 
@@ -432,10 +450,41 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                     : "Gemini pendiente"}
               </StatusBadge>
               {activeTab === "entrada" ? (
-                <Button onClick={handleAnalyze} disabled={processing || loadingConfig} variant="primary" size="lg">
-                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  {processing ? "Procesando..." : "Procesar RFQ"}
-                </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <Button onClick={handleAnalyze} disabled={processing || loadingConfig} variant="primary" size="lg">
+                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {processing
+                      ? progressStep === 1 ? "Enviando documentos..."
+                        : progressStep === 2 ? "Analizando con IA..."
+                        : progressStep === 3 ? "Extrayendo renglones..."
+                        : progressStep === 4 ? "Guardando análisis..."
+                        : "Procesando..."
+                      : "Procesar RFQ"}
+                  </Button>
+                  {processing && (
+                    <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+                      {[
+                        { step: 1, label: "Documentos" },
+                        { step: 2, label: "IA Gemini" },
+                        { step: 3, label: "Renglones" },
+                        { step: 4, label: "Guardando" },
+                      ].map(({ step, label }) => (
+                        <span key={step} className="app-progress-step">
+                          <span
+                            className={`app-progress-step-dot ${
+                              step < progressStep
+                                ? "app-progress-step-dot-done"
+                                : step === progressStep
+                                ? "app-progress-step-dot-active"
+                                : "app-progress-step-dot-pending"
+                            }`}
+                          />
+                          <span className={step <= progressStep ? "font-semibold" : "opacity-50"}>{label}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : activeTab === "resumen" && result ? (
                 <Button onClick={() => setActiveTab("renglones")} variant="primary" size="lg">
                   Revisar renglones

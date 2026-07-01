@@ -3,10 +3,8 @@
 Carpeta lista para subir a GitHub y desplegar en Railway.
 
 Cambios recientes incluidos:
-- Correccion del modulo Costos: despues de analizar un RFQ, cruza automaticamente todos los renglones contra el historico de precios.
-- Muestra matches por renglon, referencia total y estado de cruce historico.
-- Mantiene mejoras UX/UI recientes.
-- Correo RFQ premium sin firma manual, pensado para firma digital de Outlook.
-- Calculadora logistica con panel de valores administrables para Logistica/Admin.
+- Comparativa de precios mejorada: cada registro historico muestra numero de licitacion, fecha historica e inicial del especialista.
+- Correccion del modulo Costos: cruza automaticamente todos los renglones del RFQ contra el historico de precios.
+- Mantiene mejoras UX/UI recientes, Correo RFQ premium y Logistica con valores administrables para Logistica/Admin.
 
 No incluye node_modules, .next, .env, logs locales ni caches.
