@@ -1,4 +1,4 @@
-﻿import { apiRequest } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 export function generateRfqEmail(payload: {
   username: string;
@@ -18,35 +18,31 @@ export function generateRfqEmail(payload: {
   });
 }
 
-function escapeHtml(value: string) {
-  return String(value || "")
+export function emailHtml(subject: string, body: string, meta: Array<[string, string]>) {
+  const escapedSubject = subject.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const escapedBody = body
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-export function emailHtml(subject: string, body: string, meta: Array<[string, string]>) {
-  const escapedSubject = escapeHtml(subject);
-  const escapedBody = escapeHtml(body);
+    .replaceAll("\n", "<br />");
   const metaHtml = meta
-    .map(([key, value]) => `<span><b>${escapeHtml(key)}</b><em>${escapeHtml(value)}</em></span>`)
+    .map(([key, value]) => {
+      const safeKey = key.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      const safeValue = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      return `<span><b>${safeKey}</b>${safeValue}</span>`;
+    })
     .join("");
-
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;background:#eef3f8;color:#111827;font-family:Arial,Helvetica,sans-serif}
-.wrap{max-width:900px;margin:30px auto;padding:0 18px}
-.card{overflow:hidden;border:1px solid #dbe3ef;border-radius:14px;background:#fff;box-shadow:0 14px 32px rgba(15,23,42,.08)}
-.head{background:#123b73;color:white;padding:24px 26px}
-.head small{display:block;color:#bfdbfe;font-weight:700;text-transform:uppercase;letter-spacing:.09em;font-size:11px}
+body{margin:0;background:#f3f6fb;color:#111827;font-family:Arial,Helvetica,sans-serif}
+.wrap{max-width:860px;margin:32px auto;padding:0 18px}
+.card{overflow:hidden;border:1px solid #dbe3ef;border-radius:14px;background:#fff;box-shadow:0 14px 30px rgba(15,23,42,.08)}
+.head{background:#0f172a;color:white;padding:22px 24px}
+.head small{display:block;color:#93c5fd;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
 h1{margin:8px 0 0;font-size:22px;line-height:1.3}
-.meta{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:18px 24px;border-bottom:1px solid #e5e7eb;background:#f8fafc}
-.meta span{border:1px solid #e5e7eb;border-radius:9px;background:white;padding:9px 10px;font-size:12px;color:#475569}
-.meta b{display:block;color:#0f172a;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
-.meta em{font-style:normal;font-weight:700;color:#1f2937}
-.body{padding:26px}.body pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:Arial,Helvetica,sans-serif;line-height:1.68;font-size:14px;color:#111827}
-.footer{padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;color:#64748b;font-size:12px}
-@media(max-width:760px){.meta{grid-template-columns:1fr 1fr}.wrap{margin:12px auto}.head,.body{padding:20px}}
-@media(max-width:480px){.meta{grid-template-columns:1fr}}
-</style></head><body><main class="wrap"><section class="card"><div class="head"><small>Proyelec International RFQ</small><h1>${escapedSubject}</h1></div><div class="meta">${metaHtml}</div><div class="body"><pre>${escapedBody}</pre></div><div class="footer">Generated from Procura AI. Review technical requirements and attachments before sending.</div></section></main></body></html>`;
+.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:18px 24px;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+.meta span{border:1px solid #e5e7eb;border-radius:8px;background:white;padding:8px 10px;font-size:12px;color:#475569}
+.meta b{display:block;color:#0f172a;margin-bottom:3px}
+.body{padding:24px;font-size:14px}.body pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:Arial,Helvetica,sans-serif;line-height:1.65;color:#111827}
+@media(max-width:640px){.meta{grid-template-columns:1fr}.wrap{margin:12px auto}}
+</style></head><body><main class="wrap"><section class="card"><div class="head"><small>Proyelec International RFQ</small><h1>${escapedSubject}</h1></div><div class="meta">${metaHtml}</div><div class="body"><pre>${escapedBody.replaceAll("<br />", "\n")}</pre></div></section></main></body></html>`;
 }

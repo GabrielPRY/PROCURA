@@ -1,0 +1,69 @@
+﻿PROCURA AI - BETA FINAL
+Fecha: 2026-06-25 08:48
+
+CARPETAS PARA SUBIR A GITHUB / RAILWAY
+- backend/: servicio FastAPI para Railway backend.
+- frontend/: servicio Next.js para Railway frontend.
+
+IMPORTANTE
+- No se incluyen archivos .env ni secretos.
+- Configurar variables de entorno directamente en Railway.
+- Backend recomendado: puerto 8080 si Railway pide puerto manual.
+- Frontend recomendado: puerto 3000 si Railway pide puerto manual.
+
+VALIDADO ANTES DE EMPAQUETAR
+- Backend: api.py y database.py compilan correctamente.
+- Frontend: npm run build paso correctamente en PROCURA_FRONTEND_DEV.
+- Seguimiento: corregida migracion owner_username y startup ejecuta db.init_db().
+- SLI: consulta real validada localmente.
+- Correo RFQ: mejorado para copiar asunto + cuerpo.
+- IA: modelo base optimizado a gemini-2.5-flash-lite con fallback gemini-2.5-flash.
+
+ARCHIVOS PRINCIPALES MODIFICADOS EN ESTA BETA
+Backend:
+- backend/api.py
+- backend/database.py
+Frontend:
+- frontend/components/seguimiento-console.tsx
+- frontend/components/rfq-email-console.tsx
+- frontend/components/app-shell.tsx
+- frontend/lib/sli.ts
+- frontend/lib/rfq-email.ts
+- frontend/app/globals.css
+
+VARIABLES CLAVE EN RAILWAY
+Backend:
+- DATABASE_URL
+- ENCRYPTION_KEY
+- INTERNAL_API_TOKEN
+- FRONTEND_ORIGIN=https://procurapry.up.railway.app
+- GEMINI_MODEL=gemini-2.5-flash-lite
+- GEMINI_FALLBACK_MODELS=gemini-2.5-flash
+- RADAR_AUTO_SCAN_ENABLED=false
+- RADAR_AUTO_SCAN_INTERVAL_MINUTES=25
+- RADAR_AUTO_SCAN_ON_STARTUP=false
+
+Frontend:
+- NEXT_PUBLIC_API_BASE_URL=https://procura-production-a50e.up.railway.app/api/v1
+- NEXT_PUBLIC_INTERNAL_API_TOKEN=mismo valor que INTERNAL_API_TOKEN del backend
+- NIXPACKS_NODE_VERSION=20
+
+HOTFIX 2026-06-25:
+- Corregido error al crear seguimiento: psycopg2 interpretaba %% literales en LIKE dentro del INSERT ON CONFLICT.
+- Archivo afectado: backend/database.py
+- Validado contra Supabase: db.crear_seguimiento(...) devolvio True.
+
+HOTFIX 2026-06-25 #2:
+- Seguimiento ahora filtra usuario/responsable sin sensibilidad a mayusculas/minusculas.
+- Al crear seguimiento, el frontend limpia busqueda y vuelve a Todos para que la licitacion quede visible.
+- Validado: usuario gabrielrrp ve licitacion guardada como Gabrielrrp.
+Archivos afectados:
+- backend/database.py
+- frontend/components/seguimiento-console.tsx
+
+AUDITORIA FINAL 2026-06-25:
+- Frontend: build de produccion aprobado en PROCURA_FRONTEND_DEV.
+- Backend: endpoints clave validados localmente: seguimiento, radar scheduler, historico, logistica, admin, metricas y pricing API.
+- Visual: limpiados textos mojibake visibles en navegacion y placeholders.
+- Responsive: se mantienen reglas para sidebar compacta, pantallas bajas y tablas con overflow controlado.
+- Paquete: verificado sin .env, .env.local, node_modules, .next, __pycache__ ni tsconfig.tsbuildinfo.

@@ -1,33 +1,25 @@
-﻿"use client";
+"use client";
 
 import {
-  CalendarClock,
   CheckCircle2,
   Clipboard,
   Download,
   FileText,
   Loader2,
   Mail,
-  PackageCheck,
   PencilLine,
   Send,
-  ShieldCheck,
   Wand2
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type AuthUser } from "@/lib/auth";
 import { asBool, cleanValue, loadActiveRfqContext, loadLastRfq, type ActiveRfqItemContext, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { emailHtml, generateRfqEmail } from "@/lib/rfq-email";
-import { Button } from "@/components/ui/button";
-import { ModuleSection } from "@/components/ui/module-section";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/ui/stat-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 
 function itemLabel(item: RfqItem, index: number) {
-  return `Renglón ${cleanValue(item.renglon, String(index + 1))} | ${cleanValue(item.codigo_articulo, "S/C")} | ${cleanValue(
+  return `Renglon ${cleanValue(item.renglon, String(index + 1))} | ${cleanValue(item.codigo_articulo, "S/C")} | ${cleanValue(
     item.termino_de_busqueda_corto || item.descripcion,
-    "Sin descripción"
+    "Sin descripcion"
   ).slice(0, 78)}`;
 }
 
@@ -59,11 +51,10 @@ function buildSupplierChecklist(items: RfqItem[], leadTime: string, payment: str
   const hasBrand = items.some((item) => cleanValue(item.marca_modelo_requerido, ""));
   return [
     ["Unit price and currency", true],
-    ["Best project price / discount", true],
-    ["Stock availability", true],
-    [`Lead time confirmation: ${leadTime}`, true],
+    ["Stock availability and lead time", true],
+    [`Compliance with required lead time: ${leadTime}`, true],
     [`Payment terms requested: ${payment}`, true],
-    ["Incoterm EXW/FOB and country of origin", true],
+    ["Incoterm EXW or FOB, country of origin", true],
     ["Packing dimensions, weight and volume", true],
     ["Warranty confirmation", true],
     ["Datasheet / catalog required", hasFicha],
@@ -72,17 +63,12 @@ function buildSupplierChecklist(items: RfqItem[], leadTime: string, payment: str
   ] as Array<[string, boolean]>;
 }
 
-function emailBlocks(body: string) {
-  return body
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-}
-
 export function RfqEmailConsole({ user }: { user: AuthUser }) {
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
   const [scope, setScope] = useState("all");
   const [language, setLanguage] = useState("English");
+  const [contact, setContact] = useState("Gabriel Rodriguez");
+  const [company, setCompany] = useState("Proyelec International");
   const [payment, setPayment] = useState("Net 30 o superior");
   const [replyBy, setReplyBy] = useState("");
   const [subject, setSubject] = useState("");
@@ -116,7 +102,6 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
   const proposalCount = selectedItems.filter((item) => asBool(item.requiere_propuesta_tecnica)).length;
   const fichaCount = selectedItems.filter((item) => asBool(item.requiere_ficha_tecnica)).length;
   const brandCount = selectedItems.filter((item) => cleanValue(item.marca_modelo_requerido, "")).length;
-  const blocks = emailBlocks(body);
 
   async function generate() {
     setError(null);
@@ -128,8 +113,8 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
         cg,
         items: selectedItems as Array<Record<string, unknown>>,
         language,
-        contact_name: "",
-        company: "",
+        contact_name: contact,
+        company,
         scope_label: scope === "all" ? "Todos los renglones" : itemLabel(items[Number(scope)], Number(scope)),
         payment_terms: payment,
         reply_by: replyBy,
@@ -152,7 +137,10 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
     window.setTimeout(() => setCopied(null), 1600);
   }
 
-  const copyReadyEmail = subject ? `Subject: ${subject}\n\n${body}` : body;
+  const copyReadyEmail = subject ? `Subject: ${subject}
+
+${body}` : body;
+
   const html = emailHtml(subject || "Request for Quotation", body, [
     ["Bid", licitacion],
     ["Reply by", replyBy || "Pending"],
@@ -163,56 +151,68 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
-        <PageHeader
-          eyebrow="Correo RFQ premium"
-          title="Solicitud profesional para proveedores"
-          copy="Prepara un correo claro, humano y fácil de copiar a Outlook. La estructura pide precio, cumplimiento técnico, lead time, garantía, empaque, Incoterm y pago."
-          actions={
-            <>
-              <StatusBadge tone="info">RFQ: {licitacion}</StatusBadge>
-              <Button type="button" onClick={generate} disabled={!items.length || loading} variant="primary" size="lg">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Generar correo
-              </Button>
-            </>
-          }
-        />
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Items" value={selectedItems.length} hint="Renglones incluidos" icon={FileText} />
-          <StatCard label="Fichas" value={fichaCount} hint="Datasheet/catálogo" icon={CheckCircle2} />
-          <StatCard label="Propuesta" value={proposalCount} hint="Soporte técnico" icon={ShieldCheck} />
-          <StatCard label="Marca" value={brandCount} hint="Restricciones/modelos" icon={Mail} />
+      <section className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm">
+        <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="p-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand">
+              <Mail className="h-3.5 w-3.5" />
+              Correo RFQ premium
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Solicitud profesional para proveedores</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              Genera un correo claro, editable y listo para enviar. El proveedor debe confirmar precio, cumplimiento tecnico, lead time, garantia,
+              dimensiones, Incoterm y condiciones de pago.
+            </p>
+          </div>
+          <div className="border-t border-line bg-slate-50 p-5 xl:border-l xl:border-t-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">RFQ activo</div>
+            <div className="mt-2 text-xl font-semibold text-slate-900">{licitacion}</div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-xs text-muted">Items</div>
+                <div className="mt-1 text-lg font-semibold">{selectedItems.length}</div>
+              </div>
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-xs text-muted">Fichas</div>
+                <div className="mt-1 text-lg font-semibold">{fichaCount}</div>
+              </div>
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <div className="text-xs text-muted">Marca</div>
+                <div className="mt-1 text-lg font-semibold">{brandCount}</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </ModuleSection>
+      </section>
 
-      {!items.length ? (
+      {!items.length && (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Analiza primero un RFQ o abre un workspace guardado para que el correo salga con contexto real.
         </section>
-      ) : null}
-      {error ? <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section> : null}
+      )}
+      {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
 
       {activeRfqContext ? (
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          <div className="font-semibold">Renglón recibido desde RFQ</div>
+          <div className="font-semibold">Renglon recibido desde RFQ</div>
           <p className="mt-1 leading-6">
-            Renglón {activeRfqContext.renglon || activeRfqContext.item_index + 1} | {activeRfqContext.codigo_acp || "S/C"} | {activeRfqContext.descripcion || "Sin descripción"}
+            Renglon {activeRfqContext.renglon || activeRfqContext.item_index + 1} | {activeRfqContext.codigo_acp || "S/C"} |{" "}
+            {activeRfqContext.descripcion || "Sin descripcion"}
           </p>
         </section>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <section className="grid gap-4 xl:grid-cols-[0.42fr_0.58fr]">
         <div className="space-y-4">
-          <ModuleSection>
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Wand2 className="h-4 w-4 text-brand" />
-              1. Preparación
+              Configuracion del correo
             </div>
             <div className="mt-4 grid gap-3">
               <label className="grid gap-2 text-sm font-semibold text-slate-800">
                 Alcance
-                <select value={scope} onChange={(event) => setScope(event.target.value)} className="app-input">
+                <select value={scope} onChange={(event) => setScope(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
                   <option value="all">Todos los renglones</option>
                   {items.map((item, index) => (
                     <option key={index} value={index}>
@@ -221,84 +221,94 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
                   ))}
                 </select>
               </label>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+              <div className="grid gap-3 md:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold text-slate-800">
                   Idioma
-                  <select value={language} onChange={(event) => setLanguage(event.target.value)} className="app-input">
+                  <select value={language} onChange={(event) => setLanguage(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
                     <option value="English">English</option>
-                    <option value="Spanish">Español</option>
+                    <option value="Spanish">Espanol</option>
                   </select>
                 </label>
                 <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                  Fecha límite proveedor
-                  <input type="date" value={replyBy} onChange={(event) => setReplyBy(event.target.value)} className="app-input" />
+                  Fecha limite proveedor
+                  <input type="date" value={replyBy} onChange={(event) => setReplyBy(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none" />
                 </label>
               </div>
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
-                El correo no agrega nombre, cargo ni empresa. Copia el contenido en Outlook y deja que la firma digital corporativa se inserte automáticamente.
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold text-slate-800">
+                  Contacto
+                  <input value={contact} onChange={(event) => setContact(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none" />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-slate-800">
+                  Empresa
+                  <input value={company} onChange={(event) => setCompany(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none" />
+                </label>
               </div>
               <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                Condición de pago solicitada
-                <select value={payment} onChange={(event) => setPayment(event.target.value)} className="app-input">
+                Condicion de pago solicitada
+                <select value={payment} onChange={(event) => setPayment(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
                   <option>Net 30 o superior</option>
                   <option>Net 45 si aplica</option>
                   <option>Net 60 si es posible</option>
                   <option>Contra entrega</option>
                 </select>
               </label>
+              <button
+                type="button"
+                onClick={generate}
+                disabled={!items.length || loading}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Generar correo
+              </button>
             </div>
-          </ModuleSection>
+          </div>
 
-          <ModuleSection>
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <CheckCircle2 className="h-4 w-4 text-brand" />
-              2. Confirmaciones que debe pedir
+              Lo que debe confirmar el proveedor
             </div>
-            <div className="mt-4 grid gap-2">
+            <div className="mt-4 space-y-2">
               {checklist.map(([label, active]) => (
-                <div key={label} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${metricTone(active)}`}>
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span className="leading-5">{label}</span>
+                <div key={label} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${metricTone(active)}`}>
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{label}</span>
                 </div>
               ))}
             </div>
-          </ModuleSection>
-
-          <ModuleSection>
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <CalendarClock className="h-4 w-4 text-brand" />
-              Datos del pliego
-            </div>
-            <div className="mt-4 grid gap-2 text-sm">
-              {[
-                ["Entrega ACP", leadTime],
-                ["Garantía", warranty],
-                ["Validez", validity],
-                ["Lugar de entrega", delivery]
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-1 font-semibold leading-5 text-slate-900">{value}</div>
-                </div>
-              ))}
-            </div>
-          </ModuleSection>
+          </div>
         </div>
 
-        <ModuleSection className="overflow-hidden p-0">
-          <div className="border-b border-line bg-white p-5">
+        <div className="rounded-xl border border-line bg-panel shadow-sm">
+          <div className="border-b border-line p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-900">3. Revisar y enviar</div>
-                <p className="mt-1 text-sm text-muted">Copia el correo completo para Outlook o descarga una versión HTML/TXT para expediente.</p>
+                <div className="text-sm font-semibold text-slate-900">Vista previa del correo</div>
+                <p className="mt-1 text-sm text-muted">Primero revisa el email como lo vera el proveedor; edita solo cuando haga falta.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={() => setView("preview")} variant={view === "preview" ? "primary" : "secondary"} size="sm">
-                  <FileText className="h-4 w-4" /> Preview
-                </Button>
-                <Button type="button" onClick={() => setView("edit")} variant={view === "edit" ? "primary" : "secondary"} size="sm">
-                  <PencilLine className="h-4 w-4" /> Editar
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => setView("preview")}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
+                    view === "preview" ? "border-blue-200 bg-blue-50 text-brand" : "border-line bg-white text-slate-700"
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("edit")}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
+                    view === "edit" ? "border-blue-200 bg-blue-50 text-brand" : "border-line bg-white text-slate-700"
+                  }`}
+                >
+                  <PencilLine className="h-4 w-4" />
+                  Editar
+                </button>
               </div>
             </div>
           </div>
@@ -307,75 +317,80 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
             <div className="p-5">
               <label className="grid gap-2 text-sm font-semibold text-slate-800">
                 Asunto
-                <input value={subject} onChange={(event) => setSubject(event.target.value)} className="app-input" />
+                <input value={subject} onChange={(event) => setSubject(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none" />
               </label>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                <Button type="button" onClick={() => void copyText("todo", copyReadyEmail)} variant="primary" size="md" className="sm:col-span-2 xl:col-span-2">
-                  <Clipboard className="h-4 w-4" /> {copied === "todo" ? "Copiado" : "Copiar completo"}
-                </Button>
-                <Button type="button" onClick={() => void copyText("asunto", subject)} variant="secondary" size="md">
-                  <Clipboard className="h-4 w-4" /> Asunto
-                </Button>
-                <Button type="button" onClick={() => void copyText("cuerpo", body)} variant="secondary" size="md">
-                  <Clipboard className="h-4 w-4" /> Cuerpo
-                </Button>
-                <Button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.html`, html, "text/html")} variant="secondary" size="md">
-                  <Download className="h-4 w-4" /> HTML
-                </Button>
-                <Button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.txt`, body, "text/plain")} variant="secondary" size="md">
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void copyText("asunto", subject)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold">
+                  <Clipboard className="h-4 w-4" /> {copied === "asunto" ? "Asunto copiado" : "Copiar asunto"}
+                </button>
+                <button type="button" onClick={() => void copyText("todo", copyReadyEmail)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700">
+                  <Clipboard className="h-4 w-4" /> {copied === "todo" ? "Todo copiado" : "Copiar asunto + cuerpo"}
+                </button>
+                <button type="button" onClick={() => void copyText("cuerpo", body)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold">
+                  <Clipboard className="h-4 w-4" /> {copied === "cuerpo" ? "Cuerpo copiado" : "Solo cuerpo"}
+                </button>
+                <button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.txt`, body, "text/plain")} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold">
                   <Download className="h-4 w-4" /> TXT
-                </Button>
+                </button>
+                <button type="button" onClick={() => downloadFile(`RFQ_${licitacion}.html`, html, "text/html")} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold">
+                  <Download className="h-4 w-4" /> HTML
+                </button>
               </div>
 
               {view === "preview" ? (
-                <div className="mt-5 overflow-hidden rounded-xl border border-line bg-white">
+                <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
                   <div className="border-b border-line bg-slate-50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted">Subject</div>
-                    <div className="mt-1 text-base font-semibold leading-6 text-slate-950">{subject}</div>
-                    <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="mt-1 text-base font-semibold text-slate-900">{subject}</div>
+                    <div className="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-2 xl:grid-cols-4">
                       <span className="rounded-md border border-line bg-white px-2 py-1">Bid: {licitacion}</span>
                       <span className="rounded-md border border-line bg-white px-2 py-1">Reply: {replyBy || "Pending"}</span>
                       <span className="rounded-md border border-line bg-white px-2 py-1">Lead time: {leadTime}</span>
                       <span className="rounded-md border border-line bg-white px-2 py-1">Payment: {payment}</span>
-                      <span className="rounded-md border border-line bg-white px-2 py-1">Warranty: {warranty}</span>
                     </div>
                   </div>
-                  <div className="max-h-[68vh] space-y-3 overflow-auto bg-slate-50 p-4 sm:p-5">
-                    {blocks.map((block, index) => (
-                      <div key={`${index}-${block.slice(0, 18)}`} className="rounded-lg border border-line bg-white p-4 text-sm leading-7 text-slate-800 shadow-sm">
-                        <div className="whitespace-pre-wrap break-words">{block}</div>
-                      </div>
-                    ))}
+                  <div className="max-h-[62vh] overflow-auto p-4 sm:p-5">
+                    <div className="mx-auto max-w-3xl whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800 shadow-sm sm:p-5">
+                      {body}
+                    </div>
                   </div>
                 </div>
               ) : (
                 <textarea
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
-                  className="mt-5 min-h-[64vh] w-full rounded-lg border border-line bg-white px-3 py-3 font-mono text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                  className="mt-4 min-h-[52vh] w-full rounded-lg border border-line bg-white px-3 py-3 font-mono text-sm leading-6 outline-none"
                 />
               )}
             </div>
           ) : (
-            <div className="grid min-h-[620px] place-items-center p-8 text-center">
+            <div className="grid min-h-[560px] place-items-center p-8 text-center">
               <div>
                 <Mail className="mx-auto h-10 w-10 text-brand" />
                 <div className="mt-4 text-base font-semibold text-slate-900">Genera el primer borrador</div>
                 <p className="mt-2 max-w-md text-sm leading-6 text-muted">
-                  El correo aparecerá separado por asunto, datos del RFQ, solicitud comercial, requisitos técnicos y cierre profesional.
+                  El correo aparecera con asunto, resumen de licitacion, tabla de requerimientos y solicitud comercial/logistica al proveedor.
                 </p>
               </div>
             </div>
           )}
-        </ModuleSection>
+        </div>
+      </section>
+
+      <section className="grid gap-3 rounded-xl border border-line bg-panel p-5 shadow-sm md:grid-cols-4">
+        {[
+          ["Entrega ACP", leadTime],
+          ["Garantia", warranty],
+          ["Validez", validity],
+          ["Lugar entrega", delivery]
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
+            <div className="mt-2 text-sm font-semibold leading-5 text-slate-900">{value}</div>
+          </div>
+        ))}
       </section>
     </div>
   );
 }
-
-
-
-
-
-

@@ -159,7 +159,7 @@ def gemini_delete_file(client, uploaded_file):
     except Exception as e:
         logger.warning(f"No se pudo borrar archivo temporal de Gemini: {e}")
 
-# --- 1. LOGGING CON ROTACIÃ“N (max 2MB, 3 backups) ---
+# --- 1. LOGGING CON ROTACIÓN (max 2MB, 3 backups) ---
 log_handler = RotatingFileHandler('backend.log', maxBytes=2*1024*1024, backupCount=3, encoding='utf-8')
 log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger(__name__)
@@ -167,12 +167,12 @@ logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
 
 # --- 2. SEGURIDAD Y CIFRADO ---
-# Se utiliza el mÃ³dulo centralizado `crypto.py`
+# Se utiliza el módulo centralizado `crypto.py`
 INTERNAL_API_TOKEN = os.getenv("INTERNAL_API_TOKEN", "default-dev-token")
 SESSION_TTL_SECONDS = max(3600, int(os.getenv("SESSION_TTL_SECONDS", "86400") or 86400))
-RADAR_AUTO_SCAN_ENABLED = os.getenv("RADAR_AUTO_SCAN_ENABLED", "true").strip().lower() in ["1", "true", "yes", "si", "sÃ­", "on"]
+RADAR_AUTO_SCAN_ENABLED = os.getenv("RADAR_AUTO_SCAN_ENABLED", "true").strip().lower() in ["1", "true", "yes", "si", "sí", "on"]
 RADAR_AUTO_SCAN_INTERVAL_MINUTES = max(5, int(os.getenv("RADAR_AUTO_SCAN_INTERVAL_MINUTES", "25") or 25))
-RADAR_AUTO_SCAN_ON_STARTUP = os.getenv("RADAR_AUTO_SCAN_ON_STARTUP", "false").strip().lower() in ["1", "true", "yes", "si", "sÃ­", "on"]
+RADAR_AUTO_SCAN_ON_STARTUP = os.getenv("RADAR_AUTO_SCAN_ON_STARTUP", "false").strip().lower() in ["1", "true", "yes", "si", "sí", "on"]
 RADAR_SCHEDULER_STATE = {
     "enabled": RADAR_AUTO_SCAN_ENABLED,
     "interval_minutes": RADAR_AUTO_SCAN_INTERVAL_MINUTES,
@@ -237,15 +237,6 @@ def require_admin_session(
         raise HTTPException(status_code=403, detail="Solo un usuario Admin puede acceder a esta herramienta.")
     return session
 
-
-def require_logistics_admin_session(
-    _token: str = Depends(verify_internal_token),
-    session: Dict[str, Any] = Depends(verify_session_token),
-) -> Dict[str, Any]:
-    role = str(session.get("r") or "")
-    if role not in ("Logistica", "Admin"):
-        raise HTTPException(status_code=403, detail="Solo Logistica o Admin puede modificar valores logisticos.")
-    return session
 # --- 3. APP FASTAPI ---
 app = FastAPI(title="Proyelec Core API v6.1")
 
@@ -265,7 +256,7 @@ app.add_middleware(
 )
 
 def run_radar_auto_scan(source="scheduler"):
-    """Ejecuta el escaneo del Radar SLI de forma segura para jobs automÃ¡ticos."""
+    """Ejecuta el escaneo del Radar SLI de forma segura para jobs automáticos."""
     if not _radar_scan_lock.acquire(blocking=False):
         logger.info("[RADAR AUTO] Escaneo omitido: ya hay un escaneo en curso.")
         return {"status": "skipped", "reason": "scan_already_running"}
@@ -334,36 +325,6 @@ def stop_radar_scheduler():
 def radar_scheduler_status(_token: str = Depends(verify_internal_token)):
     return RADAR_SCHEDULER_STATE
 
-@app.get("/api/v1/radar/stats")
-def radar_stats(_token: str = Depends(verify_internal_token)):
-    """Endpoint ligero: 4 contadores para el dashboard sin cargar filas completas."""
-    try:
-        df = db.get_licitaciones_radar(solo_nuevas=False, solo_hoy=False)
-        if df.empty:
-            return {"status": "success", "total": 0, "alertas": 0, "en_seguimiento": 0, "cierre_72h": 0}
-        total = int(len(df))
-        def _bool_safe(v):
-            return str(v or "").strip().lower() in ["true", "1", "yes", "si"]
-        alertas = int(df["enmienda_alerta"].apply(_bool_safe).sum()) if "enmienda_alerta" in df.columns else 0
-        en_seguimiento = int((df["estado_radar"] == "en_seguimiento").sum()) if "estado_radar" in df.columns else 0
-        cierre_72h = 0
-        if "fecha_cierre" in df.columns:
-            now_ts = time.time()
-            limit_ts = now_ts + 72 * 3600
-            def _within_72h(val):
-                try:
-                    from sli_scraper import parse_sli_datetime
-                    dt = parse_sli_datetime(val)
-                    return bool(dt and now_ts <= dt.timestamp() <= limit_ts)
-                except Exception:
-                    return False
-            cierre_72h = int(df["fecha_cierre"].apply(_within_72h).sum())
-        return {"status": "success", "total": total, "alertas": alertas,
-                "en_seguimiento": en_seguimiento, "cierre_72h": cierre_72h}
-    except Exception as exc:
-        logger.warning(f"[RADAR STATS] {exc}")
-        return {"status": "error", "total": 0, "alertas": 0, "en_seguimiento": 0, "cierre_72h": 0}
-
 @app.get("/api/v1/radar/escaneos")
 def radar_escaneos(limit: int = Query(10, ge=1, le=100), _token: str = Depends(verify_internal_token)):
     return {"status": "success", "escaneos": _json_records(db.get_ultimos_escaneos(limite=limit))}
@@ -372,11 +333,16 @@ def radar_escaneos(limit: int = Query(10, ge=1, le=100), _token: str = Depends(v
 def radar_scan_now(_token: str = Depends(verify_internal_token)):
     return run_radar_auto_scan(source="manual_api")
 
+class RadarEstadoRequest(BaseModel):
+    estado: str
+    usuario: str = "frontend"
+    notas: str = ""
+
 def _radar_bool(value):
     if isinstance(value, bool):
         return value
     text = str(value or "").strip().lower()
-    return text in ["true", "1", "yes", "si", "sÃ­"]
+    return text in ["true", "1", "yes", "si", "sí"]
 
 def _radar_datetime_iso(value):
     try:
@@ -575,7 +541,7 @@ def radar_licitaciones(
 def radar_cambiar_estado(licitacion_id: int, req: RadarEstadoRequest, _token: str = Depends(verify_internal_token)):
     estados_validos = {"nueva", "revisada", "descartada", "en_seguimiento"}
     if req.estado not in estados_validos:
-        raise HTTPException(status_code=400, detail="Estado de radar invÃ¡lido.")
+        raise HTTPException(status_code=400, detail="Estado de radar inválido.")
     db.marcar_licitacion_radar(licitacion_id, req.estado, req.usuario, req.notas)
     return {"status": "success", "id": licitacion_id, "estado": req.estado}
 
@@ -597,7 +563,7 @@ def radar_historico_matches(
 
 @app.get("/")
 def estado():
-    return {"status": "Online", "engine": "Proyelec Core v6.1 â€” Token-Optimized"}
+    return {"status": "Online", "engine": "Proyelec Core v6.1 — Token-Optimized"}
 
 @app.get("/api/v1/health")
 def api_health():
@@ -610,64 +576,64 @@ def api_health():
 
 # --- 4. PROMPT ANALISTA DE PLIEGOS (Multi-documento) ---
 PROMPT_ANALISTA_MULTI = """
-Eres un Analista Senior de Procura. Analiza TODO el conjunto de documentos proporcionados (Pliego Principal y Anexos TÃ©cnicos).
-Cruza la informaciÃ³n de todos los documentos para obtener descripciones tÃ©cnicas exactas.
+Eres un Analista Senior de Procura. Analiza TODO el conjunto de documentos proporcionados (Pliego Principal y Anexos Técnicos).
+Cruza la información de todos los documentos para obtener descripciones técnicas exactas.
 
 REGLA DE ORO ESTRICTA:
-Tu anÃ¡lisis debe basarse ÃšNICA Y EXCLUSIVAMENTE en el texto, tablas y datos contenidos en los documentos adjuntos.
-No busques informaciÃ³n en internet, no deduzcas, no asumas y no uses conocimiento externo sobre leyes, fabricantes, estÃ¡ndares o prÃ¡cticas comerciales.
-Si un dato no aparece explÃ­citamente en los documentos, devuelve exactamente: "No especificado en los documentos adjuntos".
+Tu análisis debe basarse ÚNICA Y EXCLUSIVAMENTE en el texto, tablas y datos contenidos en los documentos adjuntos.
+No busques información en internet, no deduzcas, no asumas y no uses conocimiento externo sobre leyes, fabricantes, estándares o prácticas comerciales.
+Si un dato no aparece explícitamente en los documentos, devuelve exactamente: "No especificado en los documentos adjuntos".
 
-IMPORTANTE: El campo 'ficha_tecnica_completa' debe ser redactado como una Checklist tÃ©cnica. Lista todos los requerimientos, materiales, normativas y entregables que exige la ACP para ese renglÃ³n usando el formato '- [ ] Requisito'.
+IMPORTANTE: El campo 'ficha_tecnica_completa' debe ser redactado como una Checklist técnica. Lista todos los requerimientos, materiales, normativas y entregables que exige la ACP para ese renglón usando el formato '- [ ] Requisito'.
 IMPORTANTE: No confundas 'ficha_tecnica_completa' con 'requiere_ficha_tecnica'. 
-- 'ficha_tecnica_completa' resume las especificaciones tÃ©cnicas del producto/renglÃ³n.
-- 'requiere_ficha_tecnica' solo indica si el oferente debe ENTREGAR/ADJUNTAR un documento tÃ©cnico en la oferta.
+- 'ficha_tecnica_completa' resume las especificaciones técnicas del producto/renglón.
+- 'requiere_ficha_tecnica' solo indica si el oferente debe ENTREGAR/ADJUNTAR un documento técnico en la oferta.
 
-Extrae tambiÃ©n controles tÃ©cnicos crÃ­ticos para decidir participaciÃ³n:
-- restriccion_marca_proveedor: Si el pliego exige o restringe explÃ­citamente a una marca, fabricante, suplidor, proponente o distribuidor autorizado que no sea la ACP, descrÃ­belo aquÃ­ (ej. 'Solo se acepta marca X' o 'Solo distribuidor autorizado Y'). Si no hay restricciones, devuelve null.
-- permite_equivalentes: true si el pliego permite marcas/modelos equivalentes, alternativas tÃ©cnicas o "igual o superior"; false si exige una marca/modelo exacto sin alternativas; null si no se puede determinar.
-- permite_carta_obsolescencia: true si el pliego (usualmente en el Inciso 9 o similar) permite entregar actualizaciones de nÃºmeros de parte obsoletos acompaÃ±adas de una carta del fabricante, false si no.
-- evidencia_restricciones: cita corta o referencia de la clÃ¡usula/inciso donde se detectÃ³ restricciÃ³n, equivalentes, carta de fabricante u obsolescencia. Si no aplica, devuelve "".
-- riesgo_tecnico_global: "Bajo", "Medio" o "Alto" segÃºn restricciones de marca/proveedor, falta de equivalentes, fichas tÃ©cnicas obligatorias y riesgo de obsolescencia.
-- propuesta_tecnica_requerida: "Si" si el pliego exige adjuntar propuesta tÃ©cnica; "No" si explÃ­citamente no la exige; "No especificado en los documentos adjuntos" si no se menciona. Si aplica solo a ciertos renglones, devuelve "Si (aplica solo a lÃ­neas X, Y)".
-- propuesta_tecnica_aplica_renglones: lista de renglones/lÃ­neas donde aplica la propuesta tÃ©cnica. Si aplica globalmente, usa ["Todos"]. Si no se especifica, [].
-- evidencia_propuesta_tecnica: cita corta exacta donde se pide la propuesta tÃ©cnica y se indica a quÃ© lÃ­neas aplica.
-- persona_encargada_licitacion: nombre del agente de compras, contacto, responsable o persona encargada de la licitaciÃ³n si aparece en el documento. Si no aparece, devuelve "No especificado en los documentos adjuntos".
-- correo_encargado_licitacion: correo electrÃ³nico del contacto de la licitaciÃ³n si aparece. Si no aparece, devuelve "No especificado en los documentos adjuntos".
-- telefono_encargado_licitacion: telÃ©fono del contacto de la licitaciÃ³n si aparece. Si no aparece, devuelve "No especificado en los documentos adjuntos".
-- requiere_presencia_local: true si el pliego exige explÃ­citamente empresa local, presencia local, oficina local, representante local o condiciÃ³n similar para participar; false si no se detecta ese requisito en los documentos o el pliego permite participar sin esa condiciÃ³n; null si el texto es contradictorio o no se puede determinar.
+Extrae también controles técnicos críticos para decidir participación:
+- restriccion_marca_proveedor: Si el pliego exige o restringe explícitamente a una marca, fabricante, suplidor, proponente o distribuidor autorizado que no sea la ACP, descríbelo aquí (ej. 'Solo se acepta marca X' o 'Solo distribuidor autorizado Y'). Si no hay restricciones, devuelve null.
+- permite_equivalentes: true si el pliego permite marcas/modelos equivalentes, alternativas técnicas o "igual o superior"; false si exige una marca/modelo exacto sin alternativas; null si no se puede determinar.
+- permite_carta_obsolescencia: true si el pliego (usualmente en el Inciso 9 o similar) permite entregar actualizaciones de números de parte obsoletos acompañadas de una carta del fabricante, false si no.
+- evidencia_restricciones: cita corta o referencia de la cláusula/inciso donde se detectó restricción, equivalentes, carta de fabricante u obsolescencia. Si no aplica, devuelve "".
+- riesgo_tecnico_global: "Bajo", "Medio" o "Alto" según restricciones de marca/proveedor, falta de equivalentes, fichas técnicas obligatorias y riesgo de obsolescencia.
+- propuesta_tecnica_requerida: "Si" si el pliego exige adjuntar propuesta técnica; "No" si explícitamente no la exige; "No especificado en los documentos adjuntos" si no se menciona. Si aplica solo a ciertos renglones, devuelve "Si (aplica solo a líneas X, Y)".
+- propuesta_tecnica_aplica_renglones: lista de renglones/líneas donde aplica la propuesta técnica. Si aplica globalmente, usa ["Todos"]. Si no se especifica, [].
+- evidencia_propuesta_tecnica: cita corta exacta donde se pide la propuesta técnica y se indica a qué líneas aplica.
+- persona_encargada_licitacion: nombre del agente de compras, contacto, responsable o persona encargada de la licitación si aparece en el documento. Si no aparece, devuelve "No especificado en los documentos adjuntos".
+- correo_encargado_licitacion: correo electrónico del contacto de la licitación si aparece. Si no aparece, devuelve "No especificado en los documentos adjuntos".
+- telefono_encargado_licitacion: teléfono del contacto de la licitación si aparece. Si no aparece, devuelve "No especificado en los documentos adjuntos".
+- requiere_presencia_local: true si el pliego exige explícitamente empresa local, presencia local, oficina local, representante local o condición similar para participar; false si no se detecta ese requisito en los documentos o el pliego permite participar sin esa condición; null si el texto es contradictorio o no se puede determinar.
 - evidencia_presencia_local: cita corta exacta donde se detecta el requisito de presencia local o la ausencia/permiso relevante. Si no hay evidencia textual clara, devuelve "".
 - empresa_recomendada_participacion: "EP" si requiere_presencia_local es true; "Proyelec" si requiere_presencia_local es false; "Validar" si requiere_presencia_local es null.
 
-Para cada renglÃ³n extrae:
-- codigo_articulo: cÃ³digo ACP del renglÃ³n ÃšNICAMENTE si aparece con formato de 3 letras, guion, 3 letras, guion y 5 nÃºmeros, por ejemplo ABC-DEF-12345. No incluyas descripciones, nÃºmeros de parte, marcas ni texto adicional. Si el cÃ³digo no aparece con ese formato exacto, devuelve "".
-- requiere_propuesta_tecnica: true si la propuesta tÃ©cnica aplica a ese renglÃ³n/lÃ­nea; false si no aplica.
-- requiere_ficha_tecnica: true SOLO si el pliego exige entregar/presentar/adjuntar ficha tÃ©cnica, catÃ¡logo, datasheet, plano, certificado, muestra, manual, ficha de seguridad o submittal tÃ©cnico junto con la oferta/propuesta. false si el texto solo describe especificaciones tÃ©cnicas, marca, modelo, nÃºmero de parte o cumplimiento tÃ©cnico sin pedir un documento entregable.
-- marca_modelo_requerido: marca, fabricante, modelo o nÃºmero de parte exigido para ese renglÃ³n. Si no hay, null.
-- acepta_equivalente: true si ese renglÃ³n acepta equivalente; false si no acepta; null si no se puede determinar.
-- posible_obsolescencia: true si el texto menciona nÃºmero de parte obsoleto, reemplazo, actualizaciÃ³n, discontinued, superseded, obsolete o carta del fabricante para ese renglÃ³n; false si no.
-- evidencia_tecnica: cita corta o inciso relevante para ficha tÃ©cnica, marca/modelo, equivalentes u obsolescencia de ese renglÃ³n.
+Para cada renglón extrae:
+- codigo_articulo: código ACP del renglón ÚNICAMENTE si aparece con formato de 3 letras, guion, 3 letras, guion y 5 números, por ejemplo ABC-DEF-12345. No incluyas descripciones, números de parte, marcas ni texto adicional. Si el código no aparece con ese formato exacto, devuelve "".
+- requiere_propuesta_tecnica: true si la propuesta técnica aplica a ese renglón/línea; false si no aplica.
+- requiere_ficha_tecnica: true SOLO si el pliego exige entregar/presentar/adjuntar ficha técnica, catálogo, datasheet, plano, certificado, muestra, manual, ficha de seguridad o submittal técnico junto con la oferta/propuesta. false si el texto solo describe especificaciones técnicas, marca, modelo, número de parte o cumplimiento técnico sin pedir un documento entregable.
+- marca_modelo_requerido: marca, fabricante, modelo o número de parte exigido para ese renglón. Si no hay, null.
+- acepta_equivalente: true si ese renglón acepta equivalente; false si no acepta; null si no se puede determinar.
+- posible_obsolescencia: true si el texto menciona número de parte obsoleto, reemplazo, actualización, discontinued, superseded, obsolete o carta del fabricante para ese renglón; false si no.
+- evidencia_tecnica: cita corta o inciso relevante para ficha técnica, marca/modelo, equivalentes u obsolescencia de ese renglón.
 
 Regla especial para 'requiere_ficha_tecnica':
 - NO marques true solo porque exista una marca restringida.
-- NO marques true solo porque exista nÃºmero de parte, modelo, material, dimensiÃ³n, norma o especificaciÃ³n tÃ©cnica.
-- Marca true Ãºnicamente si el documento exige un ENTREGABLE DOCUMENTAL como "presentar ficha tÃ©cnica", "adjuntar catÃ¡logo", "entregar datasheet", "certificado", "manual", "carta del fabricante", "plano", "muestra" o frase equivalente.
+- NO marques true solo porque exista número de parte, modelo, material, dimensión, norma o especificación técnica.
+- Marca true únicamente si el documento exige un ENTREGABLE DOCUMENTAL como "presentar ficha técnica", "adjuntar catálogo", "entregar datasheet", "certificado", "manual", "carta del fabricante", "plano", "muestra" o frase equivalente.
 - Si la evidencia no contiene una exigencia documental clara, requiere_ficha_tecnica debe ser false.
 
 Regla especial para 'requiere_propuesta_tecnica':
-- Si el documento dice "Se requiere propuesta tÃ©cnica" y luego limita con frases como "(APLICA SOLO PARA LAS LÃNEAS 3 Y 4)", marca true Ãºnicamente en esos renglones.
-- No confundas "propuesta tÃ©cnica" con "marca restringida". Una licitaciÃ³n puede permitir alternativas tÃ©cnicas y aun asÃ­ exigir propuesta tÃ©cnica para comprobar cumplimiento.
-- Si la propuesta tÃ©cnica debe incluir marca/modelo/dimensiones para lÃ­neas especÃ­ficas, eso es requiere_propuesta_tecnica=true para esas lÃ­neas, no necesariamente requiere_ficha_tecnica=true.
+- Si el documento dice "Se requiere propuesta técnica" y luego limita con frases como "(APLICA SOLO PARA LAS LÍNEAS 3 Y 4)", marca true únicamente en esos renglones.
+- No confundas "propuesta técnica" con "marca restringida". Una licitación puede permitir alternativas técnicas y aun así exigir propuesta técnica para comprobar cumplimiento.
+- Si la propuesta técnica debe incluir marca/modelo/dimensiones para líneas específicas, eso es requiere_propuesta_tecnica=true para esas líneas, no necesariamente requiere_ficha_tecnica=true.
 
-Responde ÃšNICAMENTE con el siguiente JSON estricto, sin texto adicional:
+Responde ÚNICAMENTE con el siguiente JSON estricto, sin texto adicional:
 {"condiciones_generales": {"numero_licitacion": "", "tiempo_de_entrega_global": "", "garantia_exigida": "", "lugar_de_entrega": "", "validez_de_la_oferta": "", "persona_encargada_licitacion": "No especificado en los documentos adjuntos", "correo_encargado_licitacion": "No especificado en los documentos adjuntos", "telefono_encargado_licitacion": "No especificado en los documentos adjuntos", "requiere_presencia_local": null, "evidencia_presencia_local": "", "empresa_recomendada_participacion": "Validar", "propuesta_tecnica_requerida": "Si/No/No especificado en los documentos adjuntos", "propuesta_tecnica_aplica_renglones": [], "evidencia_propuesta_tecnica": "", "restriccion_marca_proveedor": null, "permite_equivalentes": null, "permite_carta_obsolescencia": false, "evidencia_restricciones": "", "riesgo_tecnico_global": "Bajo"},
  "items": [{"renglon": "", "codigo_articulo": "", "cantidad": 0, "unidad_de_medida": "", "ficha_tecnica_completa": "", "termino_de_busqueda_corto": "", "requiere_propuesta_tecnica": false, "requiere_ficha_tecnica": false, "marca_modelo_requerido": null, "acepta_equivalente": null, "posible_obsolescencia": false, "evidencia_tecnica": ""}]}
 """
 
 DOCUMENTAL_KEYWORDS = [
-    "presentar ficha", "adjuntar ficha", "entregar ficha", "ficha tecnica", "ficha tÃ©cnica",
-    "catalogo", "catÃ¡logo", "datasheet", "data sheet", "certificado", "certificacion",
-    "certificaciÃ³n", "manual", "carta del fabricante", "carta de fabricante", "plano",
+    "presentar ficha", "adjuntar ficha", "entregar ficha", "ficha tecnica", "ficha técnica",
+    "catalogo", "catálogo", "datasheet", "data sheet", "certificado", "certificacion",
+    "certificación", "manual", "carta del fabricante", "carta de fabricante", "plano",
     "muestra", "submittal", "hoja de seguridad", "ficha de seguridad", "msds",
 ]
 
@@ -700,7 +666,7 @@ def _parse_rows_from_scope_text(value):
         return rows, True
 
     scoped_matches = re.findall(
-        r"(:l[iÃ­]neas|renglones)\s+([0-9][0-9,\s\-yY]*)",
+        r"(:l[ií]neas|renglones)\s+([0-9][0-9,\s\-yY]*)",
         text,
         flags=re.IGNORECASE,
     )
@@ -714,7 +680,7 @@ def _to_bool(value, default=False):
     if value is None:
         return default
     text = str(value).strip().lower()
-    if text in ["true", "si", "sÃ­", "yes", "1"]:
+    if text in ["true", "si", "sí", "yes", "1"]:
         return True
     if text in ["false", "no", "0", "none", "null", "n/a", ""]:
         return False
@@ -726,14 +692,14 @@ def _to_optional_bool(value):
     if value is None:
         return None
     text = str(value).strip().lower()
-    if text in ["true", "si", "sÃ­", "yes", "1"]:
+    if text in ["true", "si", "sí", "yes", "1"]:
         return True
     if text in ["false", "no", "0"]:
         return False
     return None
 
 def postprocess_technical_analysis(data: dict) -> dict:
-    """Reduce falsos positivos entre especificaciones tÃ©cnicas y entregables documentales."""
+    """Reduce falsos positivos entre especificaciones técnicas y entregables documentales."""
     items = data.get("items", []) if isinstance(data, dict) else []
     proposal_rows = []
     for item in items:
@@ -755,7 +721,7 @@ def postprocess_technical_analysis(data: dict) -> dict:
         if requiere and not has_documental_evidence:
             item["requiere_ficha_tecnica"] = False
             if evidencia:
-                item["evidencia_tecnica"] = f"{item.get('evidencia_tecnica')} | Nota sistema: no se detectÃ³ entregable documental explÃ­cito."
+                item["evidencia_tecnica"] = f"{item.get('evidencia_tecnica')} | Nota sistema: no se detectó entregable documental explícito."
             else:
                 item["evidencia_tecnica"] = "No especificado en los documentos adjuntos"
         else:
@@ -771,7 +737,7 @@ def postprocess_technical_analysis(data: dict) -> dict:
         )
         scope_rows.update(text_scope_rows)
         scope_all = scope_all or text_scope_all
-        proposal_required = str(cg.get("propuesta_tecnica_requerida", "") or "").strip().lower().startswith(("si", "sÃ­")) or bool(scope_rows) or scope_all
+        proposal_required = str(cg.get("propuesta_tecnica_requerida", "") or "").strip().lower().startswith(("si", "sí")) or bool(scope_rows) or scope_all
 
         if proposal_required and (scope_all or scope_rows):
             proposal_rows = []
@@ -792,7 +758,7 @@ def postprocess_technical_analysis(data: dict) -> dict:
                 cg["propuesta_tecnica_aplica_renglones"] = ["Todos"]
         if proposal_rows:
             unique_rows = sorted(set(proposal_rows), key=lambda x: int(x) if x.isdigit() else x)
-            cg["propuesta_tecnica_requerida"] = f"Si (aplica lÃ­neas {', '.join(unique_rows)})"
+            cg["propuesta_tecnica_requerida"] = f"Si (aplica líneas {', '.join(unique_rows)})"
             cg["propuesta_tecnica_aplica_renglones"] = unique_rows
         elif str(cg.get("propuesta_tecnica_requerida", "")).strip().lower() in ["", "n/a", "none", "null"]:
             cg["propuesta_tecnica_requerida"] = "No especificado en los documentos adjuntos"
@@ -867,17 +833,17 @@ def build_supplier_proposal_prompt(items, cg, extracted_texts, supplier_name="",
         })
 
     return f"""
-ActÃºa como Especialista Senior en EvaluaciÃ³n TÃ©cnica de propuestas de proveedores para licitaciones ACP.
+Actúa como Especialista Senior en Evaluación Técnica de propuestas de proveedores para licitaciones ACP.
 
 REGLA DE ORO:
-- EvalÃºa ÃšNICAMENTE con base en los renglones tÃ©cnicos del pliego y la propuesta del proveedor adjunta o extraÃ­da.
+- Evalúa ÚNICAMENTE con base en los renglones técnicos del pliego y la propuesta del proveedor adjunta o extraída.
 - No busques en internet.
 - No asumas cumplimiento. Si la propuesta no evidencia el dato, marca "No encontrado".
-- Si cumple una parte pero falta un dato crÃ­tico, marca "Cumple parcialmente".
-- Si contradice el requisito o no cumple una condiciÃ³n obligatoria, marca "No cumple".
+- Si cumple una parte pero falta un dato crítico, marca "Cumple parcialmente".
+- Si contradice el requisito o no cumple una condición obligatoria, marca "No cumple".
 - Si cumple con evidencia clara, marca "Cumple".
 
-Contexto general de la licitaciÃ³n:
+Contexto general de la licitación:
 INSTRUCCION SOBRE ANEXOS Y ENMIENDAS:
 - Si hay notas de anexos, enmiendas, aclaraciones o cambios posteriores, tratalas como fuente prioritaria frente al RFQ original.
 - Si una enmienda cambia marca, modelo, cantidad, fecha, especificacion, ficha tecnica, carta de fabricante o forma de presentacion, reflejalo en "faltante_o_riesgo".
@@ -890,27 +856,27 @@ Notas de anexos, enmiendas, aclaraciones o contexto adicional:
 
 {json.dumps(cg or {}, ensure_ascii=False, indent=2)[:6000]}
 
-Renglones tÃ©cnicos ACP a evaluar:
+Renglones técnicos ACP a evaluar:
 {json.dumps(compact_items, ensure_ascii=False, indent=2)}
 
-Texto extraÃ­do de archivos no PDF de la propuesta:
+Texto extraído de archivos no PDF de la propuesta:
 {json.dumps(extracted_texts, ensure_ascii=False, indent=2)[:50000]}
 
-Devuelve SOLO JSON vÃ¡lido con esta estructura:
+Devuelve SOLO JSON válido con esta estructura:
 {{
   "resumen": "Resumen ejecutivo breve del nivel de cumplimiento del proveedor",
   "evaluaciones": [
     {{
-      "renglon": "nÃºmero de renglÃ³n",
-      "codigo_articulo": "cÃ³digo ACP si aplica",
-      "descripcion": "descripciÃ³n corta",
+      "renglon": "número de renglón",
+      "codigo_articulo": "código ACP si aplica",
+      "descripcion": "descripción corta",
       "resultado": "Cumple/No cumple/Cumple parcialmente/No encontrado",
       "confianza": "Alta/Media/Baja",
-      "requisito_acp": "requisito tÃ©cnico principal evaluado",
-      "oferta_proveedor": "quÃ© ofrece o declara el proveedor",
+      "requisito_acp": "requisito técnico principal evaluado",
+      "oferta_proveedor": "qué ofrece o declara el proveedor",
       "evidencia": "cita o referencia concreta dentro de la propuesta",
-      "faltante_o_riesgo": "quÃ© falta validar, pedir o corregir",
-      "accion_sugerida": "Aceptar/Pedir aclaraciÃ³n/Rechazar/Revisar manualmente"
+      "faltante_o_riesgo": "qué falta validar, pedir o corregir",
+      "accion_sugerida": "Aceptar/Pedir aclaración/Rechazar/Revisar manualmente"
     }}
   ]
 }}
@@ -977,7 +943,7 @@ async def analizar_pliego(
             uploaded_file = gemini_upload_file(client, tmp_path)
             archivos_subidos.append(uploaded_file)
 
-        # gemini-2.5-flash para anÃ¡lisis complejo de PDFs
+        # gemini-2.5-flash para análisis complejo de PDFs
         response, used_model = gemini_generate_with_fallback(
             client,
             [PROMPT_ANALISTA_MULTI, *archivos_subidos],
@@ -1047,7 +1013,7 @@ async def evaluar_propuesta_proveedor(
         items = json.loads(items_json)
         cg = json.loads(cg_json or "{}")
         if not isinstance(items, list) or not items:
-            raise HTTPException(status_code=400, detail="No hay renglones tÃ©cnicos para evaluar.")
+            raise HTTPException(status_code=400, detail="No hay renglones técnicos para evaluar.")
 
         client = get_gemini_client(api_key_clean)
 
@@ -1067,7 +1033,7 @@ async def evaluar_propuesta_proveedor(
                 extracted = extract_supplier_file_text(filename, content)
                 extracted_texts.append({
                     "archivo": filename,
-                    "texto": extracted or "No se pudo extraer texto Ãºtil del archivo."
+                    "texto": extracted or "No se pudo extraer texto útil del archivo."
                 })
 
         if not uploaded_files and not any(t.get("texto") for t in extracted_texts):
@@ -1167,9 +1133,9 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
 
     try:
         client = get_gemini_client(gemini_key)
-        # gemini-2.5-flash para clasificaciÃ³n simple de correos
+        # gemini-2.5-flash para clasificación simple de correos
 
-        # Reducir contexto enviado: solo los 3 campos clave, NO la ficha tÃ©cnica completa
+        # Reducir contexto enviado: solo los 3 campos clave, NO la ficha técnica completa
         try:
             df_items = pd.read_json(io.StringIO(contexto_items))
             cols_disponibles = [c for c in ['renglon', 'codigo_articulo', 'termino_de_busqueda_corto'] if c in df_items.columns]
@@ -1185,7 +1151,7 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
         if not mensajes[0]:
             return
 
-        # Evaluamos los Ãºltimos 50 correos, pero enviaremos mÃ¡ximo 15 a Gemini
+        # Evaluamos los últimos 50 correos, pero enviaremos máximo 15 a Gemini
         lista_ids = mensajes[0].split()[-50:]
         correos_enviados_a_gemini = 0
 
@@ -1206,7 +1172,7 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
                     # Pre-filtro inteligente y ahorrador de tokens:
                     num_lic_clean = "".join(re.findall(r'\d+', licitacion_activa))
                     
-                    # Evitar procesar correos automÃ¡ticos o spam obvio
+                    # Evitar procesar correos automáticos o spam obvio
                     if "no-reply" in remitente.lower() or "newsletter" in remitente.lower() or "marketing" in remitente.lower():
                         continue
 
@@ -1221,7 +1187,7 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
 
                     cuerpo_limpio = " ".join(cuerpo_crudo.split())
                     
-                    # Chequeo flexible: Si menciona el nÃºmero de licitaciÃ³n o tiene palabras clave de B2B
+                    # Chequeo flexible: Si menciona el número de licitación o tiene palabras clave de B2B
                     # Busca tanto en el Asunto como en los primeros 300 caracteres del correo
                     texto_busqueda = (asunto + " " + cuerpo_limpio[:300]).upper()
                     palabras_clave = ["RFQ", "COTIZA", "QUOTE", "PROCURA", "PRECIO", "OFERTA", "SUMINISTRO", "USD", "$", "ATTACH", "ADJUNT", "REQUIREMENT", "TECH", "ESPECIFICACION", "DELIVERY", "ENTREGA"]
@@ -1243,7 +1209,7 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
                     )
 
                     try:
-                        time.sleep(6)  # 6s entre llamadas â€” respeta 15 RPM de Gemini Free
+                        time.sleep(6)  # 6s entre llamadas — respeta 15 RPM de Gemini Free
                         res_ia, _ = gemini_generate_with_fallback(client, prompt)
                         correos_enviados_a_gemini += 1
                         texto_ia = res_ia.text.strip().replace("```json", "").replace("```", "").strip()
@@ -1256,9 +1222,9 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
                                 datos_ia.get('renglones', ''), cuerpo_limpio,
                                 datos_ia.get('borrador_respuesta', '')
                             )
-                            logger.info(f"Correo guardado: '{asunto}' para licitaciÃ³n {licitacion_activa}")
+                            logger.info(f"Correo guardado: '{asunto}' para licitación {licitacion_activa}")
 
-                            # Guardar cotizaciones extraÃ­das (si las hay) en tabla comparador
+                            # Guardar cotizaciones extraídas (si las hay) en tabla comparador
                             for cot in datos_ia.get('cotizaciones', []):
                                 renglon = str(cot.get('renglon', '')).strip()
                                 proveedor = remitente
@@ -1274,7 +1240,7 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
                                             str(msg.get('Date', '')),
                                             asunto
                                         )
-                                        logger.info(f"Cotizacion guardada: RenglÃ³n {renglon} | {proveedor} | ${precio}")
+                                        logger.info(f"Cotizacion guardada: Renglón {renglon} | {proveedor} | ${precio}")
                     except Exception as parse_error:
                         logger.warning(f"Error procesando correo '{asunto}': {parse_error}")
                         continue
@@ -1283,10 +1249,10 @@ def procesar_correos_background(username: str, servidor_imap: str, licitacion_ac
         logger.info(f"Escaneo de correos finalizado para usuario {username}.")
 
     except Exception as e:
-        logger.error(f"Error crÃ­tico en hilo de correos: {e}")
+        logger.error(f"Error crítico en hilo de correos: {e}")
 
 
-# --- 6. ENDPOINT ASÃNCRONO DE CORREOS ---
+# --- 6. ENDPOINT ASÍNCRONO DE CORREOS ---
 @app.post("/api/v1/organizar-correos")
 def organizar_correos(
     background_tasks: BackgroundTasks,
@@ -1300,7 +1266,7 @@ def organizar_correos(
     email_user, email_pass, _ = get_user_credentials(username)
     if not email_user or not email_pass:
         db.log_usage_event(username=username, module="email", action="organizar_correos", licitacion=licitacion_activa, status="error", error_message="Credenciales de correo faltantes")
-        return {"status": "error", "mensaje": "No has configurado tu correo y contraseÃ±a en el panel lateral."}
+        return {"status": "error", "mensaje": "No has configurado tu correo y contraseña en el panel lateral."}
     
     try:
         import imaplib
@@ -1309,17 +1275,17 @@ def organizar_correos(
         mail.logout()
     except imaplib.IMAP4.error as e:
         db.log_usage_event(username=username, module="email", action="organizar_correos", licitacion=licitacion_activa, status="error", error_message=str(e)[:500])
-        return {"status": "error", "mensaje": f"AutenticaciÃ³n rechazada. Â¿Usas Office365 o Gmail Necesitas una 'App Password'. Error: {e}"}
+        return {"status": "error", "mensaje": f"Autenticación rechazada. ¿Usas Office365 o Gmail Necesitas una 'App Password'. Error: {e}"}
     except Exception as e:
         db.log_usage_event(username=username, module="email", action="organizar_correos", licitacion=licitacion_activa, status="error", error_message=str(e)[:500])
-        return {"status": "error", "mensaje": f"No se pudo conectar al servidor IMAP '{servidor_imap}'. Revisa la direcciÃ³n del servidor. Error: {e}"}
+        return {"status": "error", "mensaje": f"No se pudo conectar al servidor IMAP '{servidor_imap}'. Revisa la dirección del servidor. Error: {e}"}
 
     background_tasks.add_task(procesar_correos_background, username, servidor_imap, licitacion_activa, contexto_items)
     db.log_usage_event(username=username, module="email", action="organizar_correos", licitacion=licitacion_activa, metadata={"servidor_imap": servidor_imap})
-    return {"status": "success", "mensaje": "âœ… ConexiÃ³n exitosa. Gemini estÃ¡ escaneando los correos en segundo plano..."}
+    return {"status": "success", "mensaje": "✅ Conexión exitosa. Gemini está escaneando los correos en segundo plano..."}
 
 
-# --- 7. GENERADOR DE FICHAS TÃ‰CNICAS (CON CACHE) ---
+# --- 7. GENERADOR DE FICHAS TÉCNICAS (CON CACHE) ---
 @app.post("/api/v1/generar-ficha")
 def generar_ficha(
     username: str = Form(...),
@@ -1330,7 +1296,7 @@ def generar_ficha(
     gemini_key: str = Form(""),
     _token: str = Depends(verify_internal_token)
 ):
-    # Verificar cache primero â€” si ya se generÃ³, devolver sin gastar tokens
+    # Verificar cache primero — si ya se generó, devolver sin gastar tokens
     cached = db.get_ficha_cache(username, licitacion, codigo_renglon)
     if cached:
         logger.info(f"Ficha para {codigo_renglon} servida desde cache.")
@@ -1346,15 +1312,15 @@ def generar_ficha(
         return {"status": "success", "datasheet_md": cached, "from_cache": True}
 
     try:
-        prompt = f"""Eres un Ingeniero de Compras especializado. Genera una ficha tÃ©cnica en formato Markdown para el artÃ­culo: {codigo_renglon}.
+        prompt = f"""Eres un Ingeniero de Compras especializado. Genera una ficha técnica en formato Markdown para el artículo: {codigo_renglon}.
 Condiciones del Pliego: {pliego_context}
-Detalle del Ãtem: {items_context}
+Detalle del Ítem: {items_context}
 
 La ficha debe contener:
-- **TÃ­tulo y DescripciÃ³n breve**
-- **Tabla de Especificaciones TÃ©cnicas**
+- **Título y Descripción breve**
+- **Tabla de Especificaciones Técnicas**
 - **Requisitos de Calidad / Certificaciones**
-- **Condiciones especiales de la licitaciÃ³n**
+- **Condiciones especiales de la licitación**
 Formato profesional y estructurado."""
 
         response = gemini_generate_content(gemini_key, prompt)
@@ -1370,7 +1336,7 @@ Formato profesional y estructurado."""
             usage_metadata=response.usage_metadata,
             metadata={"codigo_renglon": codigo_renglon}
         )
-        logger.info(f"Ficha tÃ©cnica generada y cacheada para {codigo_renglon}.")
+        logger.info(f"Ficha técnica generada y cacheada para {codigo_renglon}.")
         return {"status": "success", "datasheet_md": datasheet, "from_cache": False}
 
     except Exception as e:
@@ -1434,31 +1400,6 @@ class LogisticsCalculationRequest(BaseModel):
     ancho: float = 0
     alto: float = 0
     unidad_dimensional: str = "in"
-class LogisticsFreightRateRequest(BaseModel):
-    agente: str
-    tipo_servicio: str = "USA-Panama"
-    tipo_flete: str = "Aereo"
-    tarifa_por_libra: float = 0
-    tiempo_transito_dias: int = 0
-    minimo_envio: float = 0
-    dia_corte: str = ""
-    salidas: str = ""
-    activo: bool = True
-
-class LogisticsLocalRateRequest(BaseModel):
-    agente: str
-    destino: str = "Panama"
-    tipo_flete: str = "Terrestre"
-    hasta_400kg: float = 0
-    kg_500_1000: float = 0
-    mayor_1000kg: float = 0
-    activo: bool = True
-
-class LogisticsForwarderRequest(BaseModel):
-    nombre: str
-    direccion: str = ""
-    observacion: str = ""
-    activo: bool = True
 
 class SourcingItem(BaseModel):
     renglon: Optional[str] = ""
@@ -1514,8 +1455,8 @@ class RfqEmailRequest(BaseModel):
     cg: Dict[str, Any] = {}
     items: List[Dict[str, Any]] = []
     language: str = "English"
-    contact_name: str = ""
-    company: str = ""
+    contact_name: str = "Gabriel Rodriguez"
+    company: str = "Proyelec International"
     scope_label: str = "Todos los renglones"
     payment_terms: str = "Net 30 o superior"
     reply_by: str = ""
@@ -2502,7 +2443,7 @@ def admin_create_user(req: AdminCreateUserRequest, _admin: Dict[str, Any] = Depe
     password = str(req.password or "").strip()
     role = str(req.role or "Analista").strip()
     if not username or not password:
-        raise HTTPException(status_code=400, detail="Usuario y contraseÃ±a son obligatorios.")
+        raise HTTPException(status_code=400, detail="Usuario y contraseña son obligatorios.")
     created = db.create_user(username, password, role)
     if not created:
         raise HTTPException(status_code=409, detail="El usuario ya existe.")
@@ -2518,7 +2459,7 @@ def admin_update_role(username: str, req: AdminUpdateRoleRequest, _admin: Dict[s
 @app.post("/api/v1/admin/users/{username}/password")
 def admin_reset_password(username: str, req: AdminResetPasswordRequest, _admin: Dict[str, Any] = Depends(require_admin_session)):
     if not str(req.password or "").strip():
-        raise HTTPException(status_code=400, detail="La contraseÃ±a nueva es obligatoria.")
+        raise HTTPException(status_code=400, detail="La contraseña nueva es obligatoria.")
     db.reset_user_password(username, req.password)
     return {"status": "success"}
 
@@ -2550,51 +2491,6 @@ def logistics_settings(_token: str = Depends(verify_internal_token)):
         "incoterms": _json_records(db.get_logistics_incoterms()),
     }
 
-@app.post("/api/v1/logistics/freight-rates")
-def logistics_upsert_freight_rate(req: LogisticsFreightRateRequest, _session: Dict[str, Any] = Depends(require_logistics_admin_session)):
-    if not str(req.agente or "").strip():
-        raise HTTPException(status_code=400, detail="El agente/forwarder es obligatorio.")
-    db.upsert_logistics_freight_rate(
-        agente=req.agente.strip(),
-        tipo_servicio=req.tipo_servicio.strip() or "USA-Panama",
-        tipo_flete=req.tipo_flete.strip() or "Aereo",
-        tarifa_por_libra=req.tarifa_por_libra,
-        tiempo_transito_dias=req.tiempo_transito_dias,
-        minimo_envio=req.minimo_envio,
-        dia_corte=req.dia_corte.strip(),
-        salidas=req.salidas.strip(),
-        activo=req.activo,
-    )
-    return {"status": "success", "settings": logistics_settings()}
-
-@app.post("/api/v1/logistics/local-rates")
-def logistics_upsert_local_rate(req: LogisticsLocalRateRequest, _session: Dict[str, Any] = Depends(require_logistics_admin_session)):
-    if not str(req.agente or "").strip():
-        raise HTTPException(status_code=400, detail="El agente local es obligatorio.")
-    if not str(req.destino or "").strip():
-        raise HTTPException(status_code=400, detail="El destino es obligatorio.")
-    db.upsert_logistics_local_rate(
-        agente=req.agente.strip(),
-        destino=req.destino.strip(),
-        tipo_flete=req.tipo_flete.strip() or "Terrestre",
-        hasta_400kg=req.hasta_400kg,
-        kg_500_1000=req.kg_500_1000,
-        mayor_1000kg=req.mayor_1000kg,
-        activo=req.activo,
-    )
-    return {"status": "success", "settings": logistics_settings()}
-
-@app.post("/api/v1/logistics/forwarders")
-def logistics_upsert_forwarder(req: LogisticsForwarderRequest, _session: Dict[str, Any] = Depends(require_logistics_admin_session)):
-    if not str(req.nombre or "").strip():
-        raise HTTPException(status_code=400, detail="El nombre del forwarder es obligatorio.")
-    db.upsert_logistics_forwarder(
-        nombre=req.nombre.strip(),
-        direccion=req.direccion.strip(),
-        observacion=req.observacion.strip(),
-        activo=req.activo,
-    )
-    return {"status": "success", "settings": logistics_settings()}
 @app.get("/api/v1/logistics/calculations")
 def logistics_calculations(limit: int = Query(100, ge=1, le=500), _token: str = Depends(verify_internal_token)):
     return {"status": "success", "calculations": _json_records(db.get_logistics_calculations(limit=limit))}
@@ -3014,7 +2910,7 @@ def rfq_email_generate(req: RfqEmailRequest, _token: str = Depends(verify_intern
     cg = req.cg or {}
     items_ctx = _items_context_text(req.items)
     lead_time = req.lead_time or str(cg.get("tiempo_de_entrega_global", "N/A"))
-    prompt = f"""You are a professional procurement specialist writing a formal Request for Quotation (RFQ).
+    prompt = f"""You are a professional procurement specialist writing a formal Request for Quotation (RFQ) for Proyelec International.
 
 LANGUAGE: Write the entire RFQ in {req.language}.
 STYLE: Polished, concise, human and supplier-friendly. Make it easy to copy/paste into Outlook. Use short sections, clear labels and compact plain-text tables. Avoid long paragraphs.
@@ -3028,62 +2924,42 @@ ACP BID CONTEXT:
 - Warranty Required: {cg.get('garantia_exigida','N/A')}
 - Technical Proposal Required: {cg.get('propuesta_tecnica_requerida','N/A')}
 
+CONTACT:
+- Name: {req.contact_name}
+- Company: {req.company}
 
 ITEMS TO QUOTE:
 {items_ctx}
 
 INSTRUCTIONS:
-Generate only the email body, no subject line. Make it ready to paste into Outlook.
+Generate only the email body, no subject line. Follow this structure:
 
-Use this exact plain-text structure with clear section headers:
+1. Professional greeting.
+2. Short context: Proyelec is preparing a quotation for ACP bid {cg.get('numero_licitacion','N/A')} and requests supplier's best commercial and technical offer.
+3. "Items to Quote" section:
+   - For each item, show Item/Renglon, description, ACP code if available, quantity and any stated brand/model restriction.
+   - Add a compact compliance table with columns: Requirement | Supplier confirmation | Comments / model reference.
+   - Include rows for technical compliance, datasheet/catalog, NEW product condition, lead time, warranty and offer validity when applicable.
+4. "Commercial Information Required" section asking for:
+   - Unit price and currency.
+   - Best available discount / project price / volume price.
+   - Stock availability.
+   - Country of origin.
+   - Incoterm EXW or FOB preferred.
+   - Packing dimensions, weight and volume per package.
+   - Warranty.
+   - Lead time.
+   - Payment terms requested: {req.payment_terms}.
+5. If the bid lead time is known, ask them to confirm whether they can meet it: {lead_time}.
+6. Mention that alternatives are acceptable only if technically equivalent or superior and fully documented.
+7. Ask the supplier to attach datasheets, catalog pages, manufacturer letters or compliance evidence when required by the item context.
+8. Professional closing signed by {req.contact_name} / {req.company}.
 
-Dear Supplier,
-
-RFQ CONTEXT
-- State that we are preparing a quotation for ACP bid {cg.get('numero_licitacion','N/A')}.
-- Ask for the supplier's best technical and commercial offer.
-- Mention reply deadline if provided: {req.reply_by or 'Not specified'}.
-
-ITEMS TO QUOTE
-For each item, use a compact block:
-Item/Renglon: ...
-ACP Code: ...
-Description: ...
-Quantity: ...
-Brand/Model restriction: ...
-Technical documentation required: ...
-
-SUPPLIER CONFIRMATION TABLE
-Use a simple plain-text table with these columns:
-Requirement | Supplier confirmation | Comments / model reference
-Rows must include: technical compliance, datasheet/catalog, new product condition, lead time, warranty, offer validity, packing data and country of origin when applicable.
-
-COMMERCIAL INFORMATION REQUIRED
-Ask clearly for:
-- Unit price and currency.
-- Best project discount / volume price.
-- Stock availability.
-- Country of origin.
-- Incoterm, preferably EXW or FOB.
-- Packing dimensions, weight and volume per package.
-- Warranty.
-- Lead time.
-- Payment terms requested: {req.payment_terms}.
-
-IMPORTANT NOTES
-- Ask them to confirm whether they can meet the ACP lead time: {lead_time}.
-- Alternatives are acceptable only if technically equivalent or superior and fully documented.
-- Request datasheets, catalog pages, manufacturer letters or compliance evidence when required by the item context.
-- Do not mention requirements that are not present in the provided context.
-
-CLOSING
-Use only a short professional closing line such as "Best regards,". Do not include sender name, position, phone number, company name or signature block because the Outlook digital signature will be inserted automatically.
-
-Keep it concise, polished and human. Use no Markdown code fences and no decorative symbols."""
+Keep it email-ready, with no Markdown code fences. Use ASCII separators only and keep the total email concise."""
     try:
         response = gemini_generate_content(gemini_key, prompt)
         body = response.text
-        subject = f"[ACP-{cg.get('numero_licitacion','')}] Request for Quotation - {req.scope_label}"
+        subject = f"[PROY-ACP-{cg.get('numero_licitacion','')}] Request for Quotation - {req.scope_label}"
         db.log_ai_usage(
             username=req.username,
             role="",
@@ -3234,8 +3110,8 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
 
         palabras_clave = [
             "no cumple", "incumple", "fallo", "falla", "deficiencia",
-            "observacion", "observaciÃ³n", "subsan", "tecnico", "tÃ©cnico",
-            "rechaz", "descalific", "no acept", "aclaracion", "aclaraciÃ³n"
+            "observacion", "observación", "subsan", "tecnico", "técnico",
+            "rechaz", "descalific", "no acept", "aclaracion", "aclaración"
         ]
 
         partes = re.split(r"(<=[.!])\s+|\n+", texto_acta)
@@ -3490,21 +3366,21 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
             "rfq_id": rfq_id,
             "url": SLI_URL,
             "estatus": buscar_valor(["Estatus", "Estado"]),
-            "descripcion": buscar_valor(["DescripciÃ³n", "Descripcion"]),
+            "descripcion": buscar_valor(["Descripción", "Descripcion"]),
             "fecha_cierre": buscar_valor([
                 "Fecha y hora de cierre",
                 "Fecha de cierre",
                 "Cierre"
             ]),
             "fecha_publicacion": buscar_valor([
-                "Fecha de publicaciÃ³n",
-                "PublicaciÃ³n",
+                "Fecha de publicación",
+                "Publicación",
                 "Publicacion"
             ]),
             "ultima_revision": buscar_valor([
-                "Ãšltima revisiÃ³n",
+                "Última revisión",
                 "Ultima Revision",
-                "Ãšltima RevisiÃ³n"
+                "Última Revisión"
             ]),
             "agente_compras": buscar_valor([
                 "Agente de compras",
@@ -3525,18 +3401,18 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
         }
 
         ESTADOS_SLI = [
-            "EVALUACIÃ“N",
+            "EVALUACIÓN",
             "EVALUACION",
-            "ADJUDICACIÃ“N",
+            "ADJUDICACIÓN",
             "ADJUDICACION",
-            "CANCELACIÃ“N",
+            "CANCELACIÓN",
             "CANCELACION",
             "ACTO DESIERTO",
             "DESIERTA",
             "ENMENDADA",
             "ANUNCIO VENCIDO",
             "ABIERTA",
-            "PRECALIFICACIÃ“N"
+            "PRECALIFICACIÓN"
         ]
 
         if not resultado["estatus"]:
@@ -3552,8 +3428,8 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
         if not resultado["estatus"] and not resultado["descripcion"]:
 
             resultado["error"] = (
-                "No se encontrÃ³ informaciÃ³n. "
-                "Verifica el nÃºmero de licitaciÃ³n o intenta mÃ¡s tarde."
+                "No se encontró información. "
+                "Verifica el número de licitación o intenta más tarde."
             )
 
         logger.info(
@@ -3596,9 +3472,3 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
                 "technical": str(e)[:500]
             }
         )
-
-
-
-
-
-

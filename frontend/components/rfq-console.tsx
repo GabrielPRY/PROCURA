@@ -5,10 +5,6 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { analyzeRfq, asBool, asOptionalBool, cleanValue, getUserConfig, loadLastRfq, saveActiveRfqContext, saveLastRfq, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { saveWorkspace } from "@/lib/workspaces";
-import { Button } from "@/components/ui/button";
-import { ModuleSection } from "@/components/ui/module-section";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { SliLookupPanel } from "@/components/sli-lookup-panel";
 import type { ModuleId } from "@/lib/navigation";
 
@@ -93,7 +89,6 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const [geminiSource, setGeminiSource] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [progressStep, setProgressStep] = useState(0); // 0=idle,1=enviando,2=analizando,3=extrayendo,4=guardando
   const [error, setError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [result, setResult] = useState<RfqAnalysisResponse | null>(null);
@@ -134,25 +129,15 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const nextFiles = Array.from(event.target.files || []);
-    if (!nextFiles.length) return;
-    // Confirm before clearing an existing analysis
-    if (result && !window.confirm("Ya hay un analisis cargado. ¿Cargar nuevos documentos y reemplazarlo?")) {
-      // Reset the input so the same files can be selected again if needed
-      event.target.value = "";
-      return;
-    }
     setFiles(nextFiles);
     setResult(null);
     setSelectedIndex(0);
     setActiveTab("entrada");
-    setError(null);
-    setSaveNotice(null);
   }
 
   async function handleAnalyze() {
     setError(null);
     setSaveNotice(null);
-    setProgressStep(0);
     if (!files.length) {
       setError("Sube al menos un PDF del pliego o anexo.");
       return;
@@ -163,23 +148,17 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     }
 
     setProcessing(true);
-    setProgressStep(1); // Enviando documentos
     try {
-      // Small delay to let the UI update before the heavy request
-      await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
-      setProgressStep(2); // Analizando con IA
       const response = await analyzeRfq({
         files,
         geminiKey: geminiKey.trim(),
         username: user.username,
         role: normalizeRole(user.role)
       });
-      setProgressStep(3); // Extrayendo renglones
       setResult(response);
       saveLastRfq(user.username, response);
       const responseCg = (response.condiciones_generales || {}) as Record<string, unknown>;
       const licitacion = cleanValue(responseCg.numero_licitacion || responseCg.licitacion, "");
-      setProgressStep(4); // Guardando workspace
       try {
         const saved = await saveWorkspace({
           username: user.username,
@@ -197,7 +176,6 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       setError(err instanceof Error ? err.message : "No se pudo procesar el RFQ.");
     } finally {
       setProcessing(false);
-      setProgressStep(0);
     }
   }
 
@@ -224,41 +202,41 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   const metrics = [
     ["Renglones", String(items.length)],
-    ["Propuesta tecnica", String(proposalCount)],
+    ["Propuesta técnica", String(proposalCount)],
     ["Ficha/catalogo", String(fichaCount)],
     ["Marca/modelo", String(marcaCount)],
-    ["Codigos ACP", `${validCodeCount}/${items.length}`],
-    ["Riesgo tecnico", risk]
+    ["Códigos ACP", `${validCodeCount}/${items.length}`],
+    ["Riesgo técnico", risk]
   ];
 
   const decisionStats = [
     ["Empresa", presenceDecision.company],
     ["Riesgo", risk],
     ["Renglones", String(items.length)],
-    ["Prop. tecnica", proposalCount ? `Si (${proposalCount})` : "No detectada"],
-    ["Ficha/catalogo", fichaCount ? `Si (${fichaCount})` : "No pedida"],
+    ["Prop. técnica", proposalCount ? `Sí (${proposalCount})` : "No detectada"],
+    ["Ficha/catálogo", fichaCount ? `Sí (${fichaCount})` : "No pedida"],
     ["Contacto ACP", contactCount >= 2 ? "Detectado" : "Incompleto"]
   ];
 
   const generalCards = [
-    ["No. licitacion", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
-    ["Garantia", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
+    ["No. licitación", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
+    ["Garantía", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
     ["Lugar entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
     ["Tiempo entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
-    ["Req. prop. tecnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
+    ["Req. prop. técnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
     ["Validez oferta", getCg(cg, ["validez_de_la_oferta", "validez_oferta", "validez"])],
     ["Encargado ACP", getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "contacto_acp", "encargado_acp", "encargado"])],
     ["Correo", getCg(cg, ["correo_encargado_licitacion", "correo_acp", "email_acp", "correo"])],
-    ["Telefono", getCg(cg, ["telefono_encargado_licitacion", "telefono_acp", "telefono"])],
+    ["Teléfono", getCg(cg, ["telefono_encargado_licitacion", "telefono_acp", "telefono"])],
     ["Presencia local", presenceDecision.label],
     ["Empresa sugerida", presenceDecision.company]
   ];
 
   const simpleGeneralCards = [
-    ["No. licitacion", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
-    ["Garantia", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
+    ["No. licitación", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
+    ["Garantía", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
     ["Tiempo entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
-    ["Req. prop. tecnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
+    ["Req. prop. técnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
     ["Encargado ACP", getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "contacto_acp", "encargado_acp", "encargado"])],
     ["Correo", getCg(cg, ["correo_encargado_licitacion", "correo_acp", "email_acp", "correo"])]
   ];
@@ -291,17 +269,17 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const analysisState: DetailFlag[] = result
     ? [
         {
-          label: "Pliego leido",
-          value: getCg(cg, ["numero_licitacion"], "Numero no especificado"),
+          label: "Pliego leído",
+          value: getCg(cg, ["numero_licitacion"], "Número no especificado"),
           tone: getCg(cg, ["numero_licitacion"], "") ? "ok" : "warn"
         },
         {
-          label: "Codigos ACP",
+          label: "Códigos ACP",
           value: items.length ? `${validCodeCount}/${items.length} validados` : "Sin renglones",
           tone: items.length && validCodeCount === items.length ? "ok" : "warn"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: proposalGlobal,
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "ok" : "neutral"
         },
@@ -316,7 +294,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: presenceDecision.tone
         },
         {
-          label: "Riesgo tecnico",
+          label: "Riesgo técnico",
           value: risk,
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         }
@@ -326,32 +304,32 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const criticalAlerts = result
     ? [
         {
-          label: "Riesgo tecnico",
+          label: "Riesgo técnico",
           value: risk,
-          detail: "Nivel global segun restricciones, entregables y obsolescencia.",
+          detail: "Nivel global según restricciones, entregables y obsolescencia.",
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         },
         {
           label: "Marca / proveedor",
-          value: getCg(cg, ["restriccion_marca_proveedor"], "Sin restriccion detectada"),
+          value: getCg(cg, ["restriccion_marca_proveedor"], "Sin restricción detectada"),
           detail: cleanValue(cg.evidencia_restricciones, "Sin evidencia adicional."),
           tone: cleanValue(cg.restriccion_marca_proveedor, "") ? "warn" : "ok"
         },
         {
           label: "Equivalentes",
           value: boolLabel(cg.permite_equivalentes),
-          detail: "Indica si el pliego permite alternativas tecnicas o igual/superior.",
+          detail: "Indica si el pliego permite alternativas técnicas o igual/superior.",
           tone: asOptionalBool(cg.permite_equivalentes) === false ? "warn" : "neutral"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal,
           detail: cleanValue(cg.evidencia_propuesta_tecnica, "Sin evidencia textual capturada."),
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "warn" : "neutral"
         },
         {
-          label: "Ficha/catalogo",
-          value: fichaCount ? `${fichaCount} renglon(es)` : "No pedida aparte",
+          label: "Ficha/catálogo",
+          value: fichaCount ? `${fichaCount} renglón(es)` : "No pedida aparte",
           detail: "Solo cuenta entregables documentales, no simples especificaciones.",
           tone: fichaCount ? "warn" : "neutral"
         },
@@ -363,8 +341,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         },
         {
           label: "Obsolescencia",
-          value: obsolCount ? `${obsolCount} renglon(es) a revisar` : "Sin alerta",
-          detail: asBool(cg.permite_carta_obsolescencia) ? "El pliego permite carta de fabricante." : "No se detecto permiso especifico de carta.",
+          value: obsolCount ? `${obsolCount} renglón(es) a revisar` : "Sin alerta",
+          detail: asBool(cg.permite_carta_obsolescencia) ? "El pliego permite carta de fabricante." : "No se detectó permiso específico de carta.",
           tone: obsolCount || asBool(cg.permite_carta_obsolescencia) ? "warn" : "neutral"
         }
       ]
@@ -392,12 +370,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: "neutral"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: asBool(selectedItem.requiere_propuesta_tecnica) ? "Requerida" : "No requerida",
           tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "ok" : "neutral"
         },
         {
-          label: "Ficha/catalogo",
+          label: "Ficha/catálogo",
           value: asBool(selectedItem.requiere_ficha_tecnica) ? "Requerida" : "No pedida aparte",
           tone: asBool(selectedItem.requiere_ficha_tecnica) ? "warn" : "neutral"
         },
@@ -408,7 +386,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         },
         {
           label: "Obsolescencia",
-          value: asBool(selectedItem.posible_obsolescencia) ? "Revisar actualizacion" : "Sin alerta",
+          value: asBool(selectedItem.posible_obsolescencia) ? "Revisar actualización" : "Sin alerta",
           tone: asBool(selectedItem.posible_obsolescencia) ? "warn" : "neutral"
         }
       ]
@@ -434,66 +412,26 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
-        <PageHeader
-          eyebrow="RFQ operativo"
-          copy={result ? `RFQ ${rfqNumber || "sin numero"} | ${items.length} renglon(es) detectados` : "Sube el pliego, anexos o enmiendas para iniciar el analisis."}
-          actions={
-            <>
-              <StatusBadge tone={loadingConfig ? "warn" : hasStoredKey ? "ok" : "warn"}>
-                {loadingConfig
-                  ? "Validando Gemini"
-                  : hasStoredKey
-                    ? geminiSource === "admin_global"
-                      ? "Gemini Admin"
-                      : "Gemini lista"
-                    : "Gemini pendiente"}
-              </StatusBadge>
-              {activeTab === "entrada" ? (
-                <div className="flex flex-col items-end gap-2">
-                  <Button onClick={handleAnalyze} disabled={processing || loadingConfig} variant="primary" size="lg">
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {processing
-                      ? progressStep === 1 ? "Enviando documentos..."
-                        : progressStep === 2 ? "Analizando con IA..."
-                        : progressStep === 3 ? "Extrayendo renglones..."
-                        : progressStep === 4 ? "Guardando análisis..."
-                        : "Procesando..."
-                      : "Procesar RFQ"}
-                  </Button>
-                  {processing && (
-                    <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                      {[
-                        { step: 1, label: "Documentos" },
-                        { step: 2, label: "IA Gemini" },
-                        { step: 3, label: "Renglones" },
-                        { step: 4, label: "Guardando" },
-                      ].map(({ step, label }) => (
-                        <span key={step} className="app-progress-step">
-                          <span
-                            className={`app-progress-step-dot ${
-                              step < progressStep
-                                ? "app-progress-step-dot-done"
-                                : step === progressStep
-                                ? "app-progress-step-dot-active"
-                                : "app-progress-step-dot-pending"
-                            }`}
-                          />
-                          <span className={step <= progressStep ? "font-semibold" : "opacity-50"}>{label}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : activeTab === "resumen" && result ? (
-                <Button onClick={() => setActiveTab("renglones")} variant="primary" size="lg">
-                  Revisar renglones
-                </Button>
-              ) : null}
-            </>
-          }
-        />
-      </ModuleSection>
+      <section className="app-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-brand">Modulo RFQ</div>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Expediente de analisis RFQ</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              Primero decide si conviene participar, luego revisa riesgos, renglones y acciones operativas.
+            </p>
+          </div>
+          <div className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            {loadingConfig
+              ? "Buscando llave..."
+              : hasStoredKey
+                ? geminiSource === "admin_global"
+                  ? "Gemini administrada por Admin"
+                  : "Gemini guardada detectada"
+                : "Gemini pendiente"}
+          </div>
+        </div>
+      </section>
 
       <section className="app-card p-2 shadow-sm">
         <div className="grid gap-2 md:grid-cols-3">
@@ -506,12 +444,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 type="button"
                 onClick={() => !disabled && setActiveTab(tab.id)}
                 disabled={disabled}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
+                className={`app-tab-button transition ${
                   active
-                    ? "border-blue-200 bg-blue-50 text-brand"
+                    ? "app-tab-button-active"
                     : disabled
-                      ? "border-transparent bg-white text-slate-400"
-                      : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"
+                      ? "border-transparent text-slate-400"
+                      : "app-tab-button"
                 }`}
               >
                 <span className="block text-sm font-semibold">{tab.label}</span>
@@ -523,25 +461,25 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       </section>
 
       {result && activeTab === "resumen" ? (
-        <ModuleSection className="border-l-4 border-l-blue-500">
+        <section className="app-decision-panel p-5 shadow-sm">
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr] xl:items-center">
             <div>
-              <div className="text-sm font-semibold text-brand">Decision inicial</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{presenceDecision.company}</div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{presenceDecision.note}</p>
+              <div className="text-sm font-semibold text-blue-200">Decision inicial</div>
+              <div className="mt-2 text-3xl font-semibold tracking-tight">{presenceDecision.company}</div>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{presenceDecision.note}</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               {decisionStats.map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
+                <div key={label} className="rounded-lg border border-white/10 bg-white/8 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+                  <div className="mt-1 text-sm font-semibold text-white">{value}</div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <div className="text-xs text-muted">Vista simple para operar rapido. Usa avanzado solo cuando necesites evidencia completa.</div>
-            <div className="inline-flex rounded-lg border border-line bg-slate-50 p-1">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-xs text-slate-400">Vista simple para operar rápido. Usa avanzado solo cuando necesites evidencia completa.</div>
+            <div className="inline-flex rounded-lg border border-white/10 bg-white/8 p-1">
               {[
                 ["simple", "Vista simple"],
                 ["advanced", "Vista avanzada"]
@@ -550,7 +488,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   key={mode}
                   onClick={() => setViewMode(mode as "simple" | "advanced")}
                   className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                    viewMode === mode ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-950"
+                    viewMode === mode ? "rfq-mode-toggle-active bg-white text-slate-950" : "text-slate-300 hover:text-white"
                   }`}
                 >
                   {label}
@@ -558,7 +496,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               ))}
             </div>
           </div>
-        </ModuleSection>
+        </section>
       ) : null}
 
       {activeTab === "entrada" || activeTab === "resumen" ? (
@@ -567,11 +505,11 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         <div className="app-card p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-brand">1. Entrada</div>
           <div className="mt-1 text-base font-semibold">Documentos del RFQ</div>
-          <p className="mt-2 text-sm leading-6 text-muted">PDF del pliego, anexos tecnicos y enmiendas disponibles.</p>
+          <p className="mt-2 text-sm leading-6 text-muted">PDF del pliego, anexos técnicos y enmiendas disponibles.</p>
 
-          <label className="mt-5 grid min-h-52 cursor-pointer place-items-center rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center transition hover:border-brand hover:bg-blue-50">
-            <UploadCloud className="h-9 w-9 text-brand" />
-            <span className="mt-3 text-sm font-semibold text-slate-950">Arrastra o selecciona el pliego PDF</span>
+          <label className="app-file-drop mt-5">
+            <UploadCloud className="h-8 w-8 text-brand" />
+            <span className="mt-3 text-sm font-semibold text-slate-800">Seleccionar PDFs</span>
             <span className="mt-1 text-xs text-muted">Puedes subir varios documentos</span>
             <input className="hidden" type="file" accept="application/pdf,.pdf" multiple onChange={handleFiles} />
           </label>
@@ -593,8 +531,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               <div className="font-semibold">API lista</div>
               <p className="mt-1 leading-6">
                 {geminiSource === "admin_global"
-                  ? "Se usara la llave Gemini administrada por Admin. No necesitas pegar ninguna API key."
-                  : "Se usara la llave Gemini guardada para este usuario."}
+                  ? "Se usará la llave Gemini administrada por Admin. No necesitas pegar ninguna API key."
+                  : "Se usará la llave Gemini guardada para este usuario."}
               </p>
             </div>
           ) : (
@@ -608,7 +546,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   setGeminiSource("temporal");
                 }}
                 className="app-input"
-                placeholder="Solo si Admin aun no configuro Gemini"
+                placeholder="Solo si Admin aún no configuró Gemini"
                 type="password"
               />
             </label>
@@ -623,6 +561,15 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               {saveNotice}
             </div>
           ) : null}
+
+          <button
+            onClick={handleAnalyze}
+            disabled={processing || loadingConfig}
+            className="app-btn app-btn-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            {processing ? "Procesando RFQ..." : "Procesar RFQ"}
+          </button>
         </div>
         ) : null}
 
@@ -630,8 +577,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-brand">2. Resumen ejecutivo</div>
-              <div className="mt-1 text-base font-semibold">Informacion de la licitacion</div>
-              <p className="mt-1 text-sm text-muted">Datos criticos extraidos para decidir y cotizar.</p>
+              <div className="mt-1 text-base font-semibold">Información de la licitación</div>
+              <p className="mt-1 text-sm text-muted">Datos críticos extraídos para decidir y cotizar.</p>
             </div>
             {result ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Analizado</span> : null}
           </div>
@@ -655,12 +602,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   <p className="mt-1 text-xs leading-5">{presenceDecision.note}</p>
                 </div>
                 <div className="app-data-card">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Restriccion / equivalentes</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Restricción / equivalentes</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">
                     {getCg(cg, ["restriccion_marca_proveedor"], "Sin restriccion detectada")}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-muted">
-                    Equivalentes: {boolLabel(cg.permite_equivalentes)} | Carta obsolescencia: {asBool(cg.permite_carta_obsolescencia) ? "Si" : "No"}
+                    Equivalentes: {boolLabel(cg.permite_equivalentes)} | Carta obsolescencia: {asBool(cg.permite_carta_obsolescencia) ? "Sí" : "No"}
                   </p>
                 </div>
               </div>
@@ -681,7 +628,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               <div className="mt-5 rounded-xl border border-line bg-white p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
                   <ShieldAlert className="h-4 w-4 text-brand" />
-                  Estado del analisis
+                  Estado del análisis
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
                   {analysisState.map((flag) => (
@@ -698,13 +645,13 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
                   {cleanValue(cg.evidencia_propuesta_tecnica, "") ? (
                     <div className="rounded-lg border border-line bg-slate-50 p-4">
-                      <div className="text-sm font-semibold">Evidencia propuesta tecnica</div>
+                      <div className="text-sm font-semibold">Evidencia propuesta técnica</div>
                       <p className="mt-2 text-sm leading-6 text-slate-700">{cleanValue(cg.evidencia_propuesta_tecnica)}</p>
                     </div>
                   ) : null}
                   {cleanValue(cg.evidencia_restricciones, "") ? (
                     <div className="rounded-lg border border-line bg-slate-50 p-4">
-                      <div className="text-sm font-semibold">Evidencia tecnica general</div>
+                      <div className="text-sm font-semibold">Evidencia técnica general</div>
                       <p className="mt-2 text-sm leading-6 text-slate-700">{cleanValue(cg.evidencia_restricciones)}</p>
                     </div>
                   ) : null}
@@ -713,7 +660,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
             </>
           ) : (
             <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-muted">
-              Cuando proceses el RFQ, aqui apareceran numero de licitacion, garantia, entrega, contacto ACP, presencia local y empresa sugerida.
+              Cuando proceses el RFQ, aquí aparecerán número de licitación, garantía, entrega, contacto ACP, presencia local y empresa sugerida.
             </div>
           )}
         </div>
@@ -725,7 +672,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       {result && activeTab === "resumen" ? (
         <section className="rounded-xl border border-line bg-panel shadow-sm">
           <div className="border-b border-line p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-brand">3. Alertas criticas</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand">3. Alertas críticas</div>
             <div className="mt-1 text-base font-semibold">Lo que puede cambiar la decision</div>
             <p className="mt-1 text-sm text-muted">Restricciones, entregables obligatorios y riesgos que deben revisarse antes de cotizar.</p>
           </div>
@@ -747,7 +694,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 </details>
               ))
             ) : (
-              <div className="p-4 text-sm text-muted">No hay alertas criticas. La informacion adicional esta disponible en vista avanzada.</div>
+              <div className="p-4 text-sm text-muted">No hay alertas críticas. La información adicional está disponible en vista avanzada.</div>
             )}
           </div>
         </section>
@@ -757,8 +704,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         <section className="rounded-xl border border-line bg-panel shadow-sm">
           <div className="border-b border-line p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-brand">4. Matriz de renglones</div>
-            <div className="mt-1 text-base font-semibold">Vista tecnica compacta</div>
-            <p className="mt-1 text-sm text-muted">Vista compacta para revisar cumplimiento tecnico antes de pedir cotizaciones.</p>
+            <div className="mt-1 text-base font-semibold">Vista técnica compacta</div>
+            <p className="mt-1 text-sm text-muted">Vista compacta para revisar cumplimiento técnico antes de pedir cotizaciones.</p>
           </div>
 
           <div className="overflow-hidden">
@@ -766,8 +713,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <thead>
                 <tr>
                   {(viewMode === "advanced"
-                    ? ["Renglon", "Codigo ACP", "Descripcion", "Cantidad", "Unidad", "Prop. tecnica", "Ficha", "Marca / restriccion", "Equiv.", "Obsol."]
-                    : ["Renglon", "Codigo ACP", "Descripcion", "Cantidad", "Estado"]
+                    ? ["Renglón", "Código ACP", "Descripción", "Cantidad", "Unidad", "Prop. técnica", "Ficha", "Marca / restricción", "Equiv.", "Obsol."]
+                    : ["Renglón", "Código ACP", "Descripción", "Cantidad", "Estado"]
                   ).map((heading) => (
                     <th key={heading} className="border-b border-line px-4 py-3 font-semibold">
                       {heading}
@@ -826,7 +773,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <details className="rounded-lg border border-line bg-slate-50 p-4">
-                  <summary className="cursor-pointer text-sm font-semibold">Ver especificacion tecnica</summary>
+                  <summary className="cursor-pointer text-sm font-semibold">Ver especificación técnica</summary>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                     {cleanValue(selectedItem.ficha_tecnica_completa || selectedItem.descripcion)}
                   </p>
@@ -841,11 +788,22 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   </p>
                 </details>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button onClick={() => openModuleFromItem("proveedores")} variant="primary">Buscar proveedores</Button>
-                <Button onClick={() => openModuleFromItem("evaluacion")} variant="secondary">Evaluar propuesta</Button>
-                <Button onClick={() => openModuleFromItem("logistica")} variant="secondary">Calcular logistica</Button>
-                <Button onClick={() => openModuleFromItem("rfq_email")} variant="secondary">Generar correo RFQ</Button>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                {[
+                  ["Buscar proveedores", "proveedores"],
+                  ["Evaluar propuesta", "evaluacion"],
+                  ["Calcular logística", "logistica"],
+                  ["Generar correo RFQ", "rfq_email"]
+                ].map(([action, moduleId]) => (
+                  <button
+                    key={action}
+                    type="button"
+                    onClick={() => openModuleFromItem(moduleId as ModuleId)}
+                    className="app-btn app-btn-secondary w-full"
+                  >
+                    {action}
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}
@@ -860,12 +818,3 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

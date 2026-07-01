@@ -131,19 +131,6 @@ export function getRadarScheduler() {
   return apiRequest<RadarSchedulerStatus>("/radar/scheduler");
 }
 
-export type RadarStats = {
-  status: string;
-  total: number;
-  alertas: number;
-  en_seguimiento: number;
-  cierre_72h: number;
-};
-
-/** Endpoint ligero — solo 4 números, sin cargar licitaciones completas */
-export function getRadarStats() {
-  return apiRequest<RadarStats>("/radar/stats");
-}
-
 export function getRadarEscaneos(limit = 8) {
   return apiRequest<{ status: string; escaneos: RadarScanLog[] }>(`/radar/escaneos?limit=${limit}`);
 }

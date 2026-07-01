@@ -1,4 +1,4 @@
-﻿import { apiRequest } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 export type FreightRate = {
   id: number;
@@ -84,55 +84,5 @@ export function saveLogisticsCalculation(payload: Record<string, unknown>) {
 export function deleteLogisticsCalculation(id: number) {
   return apiRequest<{ status: string }>(`/logistics/calculations/${id}`, {
     method: "DELETE"
-  });
-}
-
-export type FreightRatePayload = {
-  agente: string;
-  tipo_servicio?: string;
-  tipo_flete?: string;
-  tarifa_por_libra?: number;
-  tiempo_transito_dias?: number;
-  minimo_envio?: number;
-  dia_corte?: string;
-  salidas?: string;
-  activo?: boolean;
-};
-
-export type LocalRatePayload = {
-  agente: string;
-  destino: string;
-  tipo_flete?: string;
-  hasta_400kg?: number;
-  kg_500_1000?: number;
-  mayor_1000kg?: number;
-  activo?: boolean;
-};
-
-export type ForwarderPayload = {
-  nombre: string;
-  direccion?: string;
-  observacion?: string;
-  activo?: boolean;
-};
-
-export function saveLogisticsFreightRate(payload: FreightRatePayload) {
-  return apiRequest<{ status: string; settings?: LogisticsSettingsResponse }>("/logistics/freight-rates", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
-export function saveLogisticsLocalRate(payload: LocalRatePayload) {
-  return apiRequest<{ status: string; settings?: LogisticsSettingsResponse }>("/logistics/local-rates", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
-export function saveLogisticsForwarder(payload: ForwarderPayload) {
-  return apiRequest<{ status: string; settings?: LogisticsSettingsResponse }>("/logistics/forwarders", {
-    method: "POST",
-    body: JSON.stringify(payload)
   });
 }

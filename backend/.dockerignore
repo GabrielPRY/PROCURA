@@ -1,0 +1,10 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.log
+*.err
+*.out
+.runtime_uploads/
+ACP DATA LIC PASADAS*.xlsx
+PRY-FRPCL-003 Evaluación de Cumplimiento del Proveedor.xlsx

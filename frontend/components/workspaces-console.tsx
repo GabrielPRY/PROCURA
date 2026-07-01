@@ -161,7 +161,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
 
   return (
     <div className="space-y-5">
-      <section className="app-card p-5 shadow-sm">
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-sm font-semibold text-brand">Workspaces</div>
@@ -189,7 +189,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
           ["Mostrando", String(filtered.length)],
           ["Ultimo", latest ? formatDate(latest.fecha_guardado) : "Sin datos"]
         ].map(([label, value]) => (
-          <div key={label} className="app-card p-4 shadow-sm">
+          <div key={label} className="rounded-xl border border-line bg-panel p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
             <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
           </div>
@@ -200,7 +200,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
       {notice && <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section>}
 
       <section className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm font-semibold text-slate-900">Expedientes guardados</div>
             {opening && <Loader2 className="h-4 w-4 animate-spin text-brand" />}
@@ -256,7 +256,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
           </div>
         </div>
 
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-sm font-semibold text-slate-900">{selected?.title || "Detalle del workspace"}</div>
@@ -278,7 +278,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
             <div className="mt-4 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {selectedStats.map(([label, value]) => (
-                  <div key={label} className="app-data-card">
+                  <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
                     <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
                   </div>
@@ -287,7 +287,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
 
               <div className="grid gap-3 md:grid-cols-3">
                 {generalCards.map(([label, value]) => (
-                  <div key={label} className="app-data-card bg-white">
+                  <div key={label} className="rounded-lg border border-line bg-white p-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
                     <div className="mt-2 text-sm font-semibold leading-5 text-slate-900">{value}</div>
                   </div>

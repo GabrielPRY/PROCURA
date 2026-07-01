@@ -1,13 +1,9 @@
-﻿"use client";
+"use client";
 
 import { BarChart3, Database, Loader2, Search, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHistorico, type HistoricoRow } from "@/lib/historico";
 import { type AuthUser } from "@/lib/auth";
-import { ModuleSection } from "@/components/ui/module-section";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/ui/stat-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 
 const columns = [
   "N° Licitación",
@@ -23,7 +19,7 @@ const columns = [
 ];
 
 const aliases: Record<string, string[]> = {
-  "N° Licitación": ["N° Licitación", "N° Licitacion", "N° Licitación", "numero_licitacion"],
+  "N° Licitación": ["N° Licitación", "N° Licitacion", "Nº Licitación", "numero_licitacion"],
   "Año": ["Año", "Ano", "anio"],
   "Mes": ["Mes", "mes"],
   "Código ACP": ["Código ACP", "Codigo ACP", "codigo_acp"],
@@ -109,22 +105,40 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
-        <PageHeader
-          eyebrow="Historico Supabase"
-          title="Precios y participaciones anteriores"
-          copy="Consulta el historico corporativo para comparar precios, detectar participaciones anteriores y alimentar decisiones del Radar."
-          actions={<StatusBadge tone="info"><Database className="h-3.5 w-3.5" /> {count.toLocaleString()} registros</StatusBadge>}
-        />
-      </ModuleSection>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-brand">Historico Supabase</div>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Precios y participaciones anteriores</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              Consulta el historico corporativo para comparar precios, detectar participaciones anteriores y alimentar decisiones del Radar.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            <Database className="h-4 w-4 text-brand" />
+            {count.toLocaleString()} registros
+          </div>
+        </div>
+      </section>
 
       {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
 
       <section className="grid gap-3 md:grid-cols-4">
-        <StatCard label="Mostrando" value={summary.shown} hint="Registros del filtro actual" icon={Database} />
-        <StatCard label="Ganadas" value={summary.won} hint="Adjudicadas a Proyelec/EP" icon={Trophy} />
-        <StatCard label="Precio min." value={moneyCell(summary.min)} hint="Referencia Proyelec" icon={BarChart3} />
-        <StatCard label="Promedio" value={moneyCell(summary.avg)} hint="Solo registros con precio" icon={BarChart3} />
+        {[
+          ["Mostrando", String(summary.shown), "Registros del filtro actual", Database],
+          ["Ganadas", String(summary.won), "Adjudicadas a Proyelec/EP", Trophy],
+          ["Precio min.", moneyCell(summary.min), "Referencia Proyelec", BarChart3],
+          ["Promedio", moneyCell(summary.avg), "Solo registros con precio", BarChart3]
+        ].map(([label, value, hint, Icon]) => (
+          <div key={String(label)} className="rounded-xl border border-line bg-panel p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted">{String(label)}</div>
+              <Icon className="h-4 w-4 text-brand" />
+            </div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">{String(value)}</div>
+            <div className="mt-1 text-xs text-muted">{String(hint)}</div>
+          </div>
+        ))}
       </section>
 
       <section className="grid gap-3 rounded-xl border border-line bg-panel p-5 shadow-sm lg:grid-cols-[1fr_0.35fr]">
@@ -142,7 +156,7 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-800">
           Ano
-          <select value={anio} onChange={(event) => setAnio(event.target.value)} className="app-input">
+          <select value={anio} onChange={(event) => setAnio(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
             <option value="Todos">Todos</option>
             {years.map((year) => (
               <option key={year} value={year}>
@@ -195,4 +209,3 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
-

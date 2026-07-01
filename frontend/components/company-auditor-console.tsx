@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, SearchCheck, ShieldAlert, ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
@@ -12,10 +12,6 @@ import {
 } from "@/lib/company-audit";
 import { type AuthUser } from "@/lib/auth";
 import { cleanValue, getUserConfig } from "@/lib/rfq";
-import { Button } from "@/components/ui/button";
-import { ModuleSection } from "@/components/ui/module-section";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
 
 function riskTone(value?: string) {
   const normalized = String(value || "").toLowerCase();
@@ -156,14 +152,26 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
-        <PageHeader
-          eyebrow="Auditor IA"
-          title="Auditoria de empresas y proveedores"
-          copy="Evalua si un proveedor parece real, trazable y seguro antes de pedir cotizacion, negociar o comprar."
-          actions={<StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "warn"}>{loadingConfig ? "Verificando API" : hasGeminiKey ? geminiSource === "admin_global" ? "Gemini Admin" : "Gemini usuario" : "Falta Gemini"}</StatusBadge>}
-        />
-      </ModuleSection>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-brand">Auditor IA</div>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Auditoria de empresas y proveedores</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              Evalua si un proveedor parece real, trazable y seguro antes de pedir cotizacion, negociar o comprar.
+            </p>
+          </div>
+          <div className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+            hasGeminiKey ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}>
+            {loadingConfig
+              ? "Verificando API..."
+              : hasGeminiKey
+                ? geminiSource === "admin_global" ? "Gemini Admin activo" : "Gemini usuario activo"
+                : "Falta Gemini"}
+          </div>
+        </div>
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.42fr_0.58fr]">
         <form onSubmit={submitAudit} className="rounded-xl border border-line bg-panel p-5 shadow-sm">
@@ -185,7 +193,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             <input
               value={companyName}
               onChange={(event) => setCompanyName(event.target.value)}
-              className="app-input"
+              className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
               placeholder="Ej: Rexroth distributor, ABC Industrial Supply..."
             />
           </label>
@@ -195,7 +203,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             <input
               value={website}
               onChange={(event) => setWebsite(event.target.value)}
-              className="app-input"
+              className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
               placeholder="https://..."
             />
           </label>
@@ -205,7 +213,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             <input
               value={country}
               onChange={(event) => setCountry(event.target.value)}
-              className="app-input"
+              className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
               placeholder="Ej: China, USA, Europa, no confirmado..."
             />
           </label>
@@ -232,10 +240,14 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             />
           </label>
 
-          <Button type="submit" disabled={loading || loadingConfig} variant="primary" size="lg" className="mt-5 w-full">
+          <button
+            type="submit"
+            disabled={loading || loadingConfig}
+            className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+          >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
             {loading ? "Auditando..." : "Auditar empresa"}
-          </Button>
+          </button>
 
           {error ? (
             <div className="mt-4 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800">
@@ -279,7 +291,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                     ["Web", cleanValue(result.website, website || "No confirmado")],
                     ["Pais/region", cleanValue(result.pais_region, country || "No confirmado")]
                   ].map(([label, value]) => (
-                    <div key={label} className="app-data-card">
+                    <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
                       <div className="mt-2 break-words text-sm font-semibold text-slate-900">{value}</div>
                     </div>
@@ -309,22 +321,22 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">Dominio</div>
                       <div className="mt-2 break-words text-sm font-semibold text-slate-900">{technical.domain || "No confirmado"}</div>
                       <div className="mt-1 text-xs text-muted">Edad: {daysLabel(rdap?.domain_age_days)}</div>
                     </div>
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">RDAP/WHOIS</div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">{rdap?.available ? "Disponible" : "No disponible"}</div>
                       <div className="mt-1 text-xs text-muted">Registrador: {cleanValue(rdap?.registrar, "N/D")}</div>
                     </div>
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">SSL/TLS</div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">{sslInfo?.valid ? "Valido" : "No confirmado"}</div>
                       <div className="mt-1 text-xs text-muted">Expira: {daysLabel(sslInfo?.expires_in_days)}</div>
                     </div>
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">Web/contacto</div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">{web?.available ? "Accesible" : "No accesible"}</div>
                       <div className="mt-1 text-xs text-muted">Contacto: {yesNo(web?.has_contact_page)} | HTTPS: {yesNo(web?.https)}</div>
@@ -332,7 +344,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                   </div>
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">Correos detectados</div>
                       <div className="mt-2 text-sm leading-6 text-slate-700">
                         {(web?.emails || []).length ? (web?.emails || []).join(", ") : "No confirmado"}
@@ -343,7 +355,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                         </div>
                       ) : null}
                     </div>
-                    <div className="app-data-card">
+                    <div className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">Nameservers</div>
                       <div className="mt-2 text-sm leading-6 text-slate-700">
                         {(rdap?.nameservers || []).length ? (rdap?.nameservers || []).join(", ") : "No confirmado"}
@@ -408,7 +420,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                 </div>
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   {(result.evidencia || []).map((item, index) => (
-                    <div key={`${item.titulo}-${index}`} className="app-data-card">
+                    <div key={`${item.titulo}-${index}`} className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-sm font-semibold text-slate-900">{cleanValue(item.titulo, `Evidencia ${index + 1}`)}</div>
                       <p className="mt-1 text-sm leading-6 text-slate-700">{cleanValue(item.detalle, "Sin detalle.")}</p>
                       {item.url ? (
@@ -451,7 +463,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             <button
               type="button"
               onClick={() => loadAuditHistory(historySearch)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               {loadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refrescar
@@ -505,4 +517,3 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
-
