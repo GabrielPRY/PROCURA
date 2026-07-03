@@ -926,15 +926,19 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     active: false
                   },
                   {
-                    label: "2. Consultar RFQ",
-                    value: selectedSliRfq === String(selectedRow.numero_licitacion || "") ? "Detalle consultado/abierto" : "Pendiente",
-                    done: selectedSliRfq === String(selectedRow.numero_licitacion || ""),
-                    active: !selectedSliRfq
+                    label: "2. Detalle SLI/RFQ",
+                    value: historicoMatch?.summary?.sli_consultado ? "Consultado automaticamente" : "Sin consulta automatica",
+                    done: Boolean(historicoMatch?.summary?.sli_consultado),
+                    active: loadingHistorico
                   },
                   {
-                    label: "3. Codigos ACP",
-                    value: historicoMatch?.summary?.requiere_revision_rfq ? "Requiere pliego" : "Detectados",
-                    done: Boolean(historicoMatch && !historicoMatch.summary.requiere_revision_rfq),
+                    label: "3. Codigos / renglones",
+                    value: historicoMatch?.codigo_matches?.length
+                      ? `${historicoMatch.codigo_matches.length} codigo(s)`
+                      : historicoMatch?.summary?.renglones_detectados_count
+                        ? `${historicoMatch.summary.renglones_detectados_count} renglon(es)`
+                        : "Requiere pliego",
+                    done: Boolean(historicoMatch?.codigo_matches?.length),
                     active: Boolean(historicoMatch?.summary?.requiere_revision_rfq)
                   },
                   {
@@ -951,10 +955,11 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 {[
                   ["Coincidencias", String(historicoMatch?.summary?.total || 0)],
                   ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
+                  ["Renglones SLI", String(historicoMatch?.summary?.renglones_detectados_count || 0)],
                   ["Precio min.", moneyValue(historicoMatch?.summary?.precio_min)],
                   ["Promedio", moneyValue(historicoMatch?.summary?.precio_promedio)]
                 ].map(([label, value]) => (
@@ -972,6 +977,28 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     : "border-emerald-200 bg-emerald-50 text-emerald-900"
                 }`}>
                   {historicoMatch.summary.nota}
+                </div>
+              ) : null}
+              {historicoMatch?.summary?.sli_error ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  No se pudo leer automaticamente el detalle SLI. La comparacion queda preliminar: {historicoMatch.summary.sli_error}
+                </div>
+              ) : null}
+
+              {historicoMatch?.sli_detail?.renglones_detectados?.length ? (
+                <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglones detectados en SLI/RFQ visible</div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {historicoMatch.sli_detail.renglones_detectados.slice(0, 6).map((item, index) => (
+                      <div key={`${item.renglon}-${item.codigo_articulo}-${index}`} className="rounded-lg border border-blue-100 bg-white p-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-brand">
+                          <span>{item.renglon || `Renglon ${index + 1}`}</span>
+                          {item.codigo_articulo || item.codigo_acp ? <span className="rounded-full bg-blue-50 px-2 py-0.5">{item.codigo_articulo || item.codigo_acp}</span> : null}
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-700">{item.descripcion || "Descripcion no especificada en SLI."}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
@@ -1087,5 +1114,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
 
 

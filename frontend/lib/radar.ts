@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api";
+﻿import { apiRequest } from "@/lib/api";
 
 export type RadarEstado = "nueva" | "revisada" | "descartada" | "en_seguimiento";
 
@@ -72,6 +72,14 @@ export type RadarHistoricoMatch = {
   match_reason?: string | null;
 };
 
+export type RadarSliItem = {
+  renglon?: string | null;
+  codigo_acp?: string | null;
+  codigo_articulo?: string | null;
+  descripcion?: string | null;
+  cantidad?: string | number | null;
+};
+
 export type RadarHistoricoResponse = {
   status: string;
   radar: {
@@ -81,6 +89,12 @@ export type RadarHistoricoResponse = {
   };
   keywords: string[];
   codigo_matches: string[];
+  sli_detail?: {
+    consultado?: boolean;
+    error?: string | null;
+    renglones_detectados?: RadarSliItem[];
+    pdfs_consultados?: string[];
+  };
   matches: RadarHistoricoMatch[];
   summary: {
     total: number;
@@ -89,6 +103,10 @@ export type RadarHistoricoResponse = {
     precio_promedio?: number | string | null;
     mejor_match: number;
     requiere_revision_rfq?: boolean;
+    sli_consultado?: boolean;
+    sli_error?: string | null;
+    renglones_detectados_count?: number | string | null;
+    pdfs_consultados_count?: number | string | null;
     nota?: string;
     recomendacion_supervisor?: {
       decision?: string;
@@ -139,7 +157,7 @@ export type RadarStats = {
   cierre_72h: number;
 };
 
-/** Endpoint ligero — solo 4 números, sin cargar licitaciones completas */
+/** Endpoint ligero â€” solo 4 nÃºmeros, sin cargar licitaciones completas */
 export function getRadarStats() {
   return apiRequest<RadarStats>("/radar/stats");
 }
@@ -161,8 +179,8 @@ export function ackRadarEnmienda(id: number) {
   });
 }
 
-export function getRadarHistorico(id: number, limit = 12) {
-  return apiRequest<RadarHistoricoResponse>(`/radar/${id}/historico?limit=${limit}`);
+export function getRadarHistorico(id: number, limit = 12, scanSli = true) {
+  return apiRequest<RadarHistoricoResponse>(`/radar/${id}/historico?limit=${limit}&scan_sli=${scanSli ? "true" : "false"}`);
 }
 
 export function radarFlag(value: unknown) {
@@ -170,3 +188,5 @@ export function radarFlag(value: unknown) {
   const text = String(value ?? "").trim().toLowerCase();
   return ["true", "1", "yes", "si"].includes(text);
 }
+
+

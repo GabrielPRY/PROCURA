@@ -1,4 +1,4 @@
-import psycopg2
+﻿import psycopg2
 from psycopg2.extras import execute_values
 import pandas as pd
 from datetime import datetime, timedelta
@@ -40,7 +40,7 @@ def init_db():
         email_pass_enc TEXT
     )''')
 
-    # Historial de análisis
+    # Historial de anÃ¡lisis
     c.execute('''CREATE TABLE IF NOT EXISTS system_settings (
         key TEXT PRIMARY KEY,
         value_enc TEXT,
@@ -69,7 +69,7 @@ def init_db():
         borrador_respuesta TEXT
     )''')
 
-    # Cache de fichas técnicas (ahorra tokens Gemini)
+    # Cache de fichas tÃ©cnicas (ahorra tokens Gemini)
     c.execute('''CREATE TABLE IF NOT EXISTS fichas_cache (
         id SERIAL PRIMARY KEY,
         username TEXT,
@@ -80,7 +80,7 @@ def init_db():
         UNIQUE(username, licitacion, codigo_renglon)
     )''')
 
-    # Tabla de cotizaciones extraídas de correos (para uso futuro)
+    # Tabla de cotizaciones extraÃ­das de correos (para uso futuro)
     c.execute('''CREATE TABLE IF NOT EXISTS cotizaciones (
         id SERIAL PRIMARY KEY,
         licitacion TEXT,
@@ -94,7 +94,7 @@ def init_db():
         email_asunto TEXT
     )''')
 
-    # === MÚLTIPLES WORKSPACES POR USUARIO ===
+    # === MÃšLTIPLES WORKSPACES POR USUARIO ===
     c.execute('''CREATE TABLE IF NOT EXISTS workspaces (
         id SERIAL PRIMARY KEY,
         username TEXT NOT NULL,
@@ -167,7 +167,7 @@ def init_db():
         FOREIGN KEY(licitacion_id) REFERENCES seguimiento_licitaciones(id)
     )''')
 
-    # Protección contra fuerza bruta en login
+    # ProtecciÃ³n contra fuerza bruta en login
     c.execute('''CREATE TABLE IF NOT EXISTS login_attempts (
         username TEXT PRIMARY KEY,
         intentos INTEGER DEFAULT 0,
@@ -184,7 +184,7 @@ def init_db():
                          VALUES (%s, %s, %s, %s, %s) ON CONFLICT (username, licitacion) DO NOTHING""",
                       (uname, lic, data, cg, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # Usuario admin por defecto (contraseña: admin)
+    # Usuario admin por defecto (contraseÃ±a: admin)
     c.execute("SELECT * FROM users WHERE username='admin'")
     if not c.fetchone():
         salt = bcrypt.gensalt()
@@ -428,7 +428,7 @@ def init_db():
     conn.close()
 
 # =============================================
-# WORKSPACES (MÚLTIPLES POR USUARIO)
+# WORKSPACES (MÃšLTIPLES POR USUARIO)
 # =============================================
 
 # =============================================
@@ -466,13 +466,13 @@ def _to_int_or_none(value):
 def normalize_historico_excel_df(df):
     df = df.rename(columns=lambda x: str(x).strip())
     rename_map = {
-        "N° DE LIC": "numero_licitacion",
         "NÂ° DE LIC": "numero_licitacion",
-        "Nº DE LIC": "numero_licitacion",
+        "NÃ‚Â° DE LIC": "numero_licitacion",
+        "NÂº DE LIC": "numero_licitacion",
         "CODIGO ACP": "codigo_acp",
         "MES": "mes",
-        "AÑO": "anio",
         "AÃ‘O": "anio",
+        "AÃƒâ€˜O": "anio",
         "CANT": "cantidad",
         "PRECIO PROYELEC": "precio_proyelec",
         "PRECIO COMPETENCIA": "precio_competencia",
@@ -561,10 +561,10 @@ def get_historico_licitaciones_df(limit=5000, search=None, anio=None):
     where_clause = ("WHERE " + " AND ".join(filters)) if filters else ""
     params.append(int(limit))
     df = pd.read_sql_query(f"""
-        SELECT numero_licitacion AS "N° Licitación",
-               anio AS "Año",
+        SELECT numero_licitacion AS "NÂ° LicitaciÃ³n",
+               anio AS "AÃ±o",
                mes AS "Mes",
-               codigo_acp AS "Código ACP",
+               codigo_acp AS "CÃ³digo ACP",
                cantidad AS "Cantidad",
                precio_proyelec AS "Precio Proyelec",
                precio_competencia AS "Precio Competencia",
@@ -695,7 +695,7 @@ def get_latest_company_audit(company_name="", domain=""):
 def _history_keywords(text):
     stop = {
         "para", "por", "con", "del", "los", "las", "una", "uno", "the", "and", "de", "la", "el",
-        "suministro", "servicio", "adquisicion", "adquisición", "compra", "materiales", "repuestos"
+        "suministro", "servicio", "adquisicion", "adquisiciÃ³n", "compra", "materiales", "repuestos"
     }
     words = []
     for raw in str(text or "").lower().replace("/", " ").replace("-", " ").split():
@@ -737,7 +737,7 @@ def _radar_supervisor_recommendation(total=0, ganadas=0, mejor_match=0, has_code
         "motivo": "No hay historial fuerte por codigo o participacion anterior."
     }
 
-def get_radar_historico_matches(radar_id, limit=12):
+def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
     conn = get_connection()
     try:
         c = conn.cursor()
@@ -747,13 +747,39 @@ def get_radar_historico_matches(radar_id, limit=12):
             return None
 
         numero, objeto, categoria = radar
-        text_blob = f"{numero or ''} {objeto or ''} {categoria or ''}"
+        sli_detail = sli_detail or {}
+        sli_codes = sli_detail.get("codigos_acp_detectados") or []
+        sli_items = sli_detail.get("renglones_detectados") or []
+        sli_text_parts = [sli_detail.get("texto_visible") or ""]
+        for item in sli_items if isinstance(sli_items, list) else []:
+            if isinstance(item, dict):
+                sli_text_parts.extend([
+                    item.get("renglon") or "",
+                    item.get("codigo_acp") or "",
+                    item.get("codigo_articulo") or "",
+                    item.get("descripcion") or "",
+                    item.get("cantidad") or "",
+                ])
+            else:
+                sli_text_parts.append(str(item))
+
+        text_blob = " ".join([
+            str(numero or ""),
+            str(objeto or ""),
+            str(categoria or ""),
+            " ".join(str(code or "") for code in sli_codes),
+            " ".join(str(part or "") for part in sli_text_parts),
+        ])
         codigo_matches = [
             _clean_codigo_match(match)
             for match in re.findall(r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b|\b[A-Z]{6}\d{5}\b", str(text_blob).upper())
         ]
-        codigo_matches = list(dict.fromkeys(codigo_matches))[:8]
+        codigo_matches = [code for code in list(dict.fromkeys(codigo_matches)) if code][:12]
         keywords = _history_keywords(text_blob)
+        sli_consultado = bool(sli_detail.get("consultado"))
+        sli_error = sli_detail.get("error") or ""
+        renglones_count = len(sli_items) if isinstance(sli_items, list) else 0
+        pdfs_consultados = sli_detail.get("pdfs_consultados") or []
 
         params = []
         filters = []
@@ -764,25 +790,43 @@ def get_radar_historico_matches(radar_id, limit=12):
             filters.append("codigo_match = ANY(%s)")
             params.append(codigo_matches)
         if keywords:
-            filters.append("(" + " OR ".join(["observaciones ILIKE %s"] * len(keywords)) + ")")
-            params.extend([f"%{kw}%" for kw in keywords])
+            keyword_filter = "(" + " OR ".join(["observaciones ILIKE %s OR codigo_acp ILIKE %s"] * len(keywords)) + ")"
+            filters.append(keyword_filter)
+            for kw in keywords:
+                params.extend([f"%{kw}%", f"%{kw}%"])
+
+        empty_summary = {
+            "total": 0,
+            "ganadas": 0,
+            "precio_min": None,
+            "precio_promedio": None,
+            "mejor_match": 0,
+            "requiere_revision_rfq": not bool(codigo_matches),
+            "sli_consultado": sli_consultado,
+            "sli_error": sli_error,
+            "renglones_detectados_count": renglones_count,
+            "pdfs_consultados_count": len(pdfs_consultados) if isinstance(pdfs_consultados, list) else 0,
+            "nota": (
+                "No se detectaron codigos ACP en el listado ni en el detalle SLI. Hay que abrir/leer el RFQ o pliego adjunto para comparar por producto."
+                if sli_consultado and not codigo_matches
+                else "No se detectaron codigos ACP en el listado del Radar. La comparacion requiere consultar el detalle/RFQ."
+            ),
+            "recomendacion_supervisor": _radar_supervisor_recommendation(has_codes=False)
+        }
 
         if not filters:
             return {
                 "radar": {"numero_licitacion": numero, "objeto": objeto, "categoria": categoria},
                 "keywords": [],
                 "codigo_matches": [],
-                "matches": [],
-                "summary": {
-                    "total": 0,
-                    "ganadas": 0,
-                    "precio_min": None,
-                    "precio_promedio": None,
-                    "mejor_match": 0,
-                    "requiere_revision_rfq": True,
-                    "nota": "No se detectaron codigos ACP en el listado del Radar. Para comparar por producto hay que consultar el detalle/RFQ.",
-                    "recomendacion_supervisor": _radar_supervisor_recommendation(has_codes=False)
+                "sli_detail": {
+                    "consultado": sli_consultado,
+                    "error": sli_error,
+                    "renglones_detectados": sli_items[:12] if isinstance(sli_items, list) else [],
+                    "pdfs_consultados": pdfs_consultados[:3] if isinstance(pdfs_consultados, list) else [],
                 },
+                "matches": [],
+                "summary": empty_summary,
             }
 
         query = f"""
@@ -794,7 +838,7 @@ def get_radar_historico_matches(radar_id, limit=12):
             ORDER BY anio DESC NULLS LAST, imported_at DESC
             LIMIT %s
         """
-        params.append(int(limit) * 3)
+        params.append(int(limit) * 4)
         df = pd.read_sql_query(query, conn, params=tuple(params))
         rows = []
         for row in df.to_dict("records") if not df.empty else []:
@@ -804,13 +848,17 @@ def get_radar_historico_matches(radar_id, limit=12):
                 score += 70
                 reasons.append("Mismo numero de licitacion")
             if row.get("codigo_match") and row.get("codigo_match") in codigo_matches:
-                score += 55
-                reasons.append("Codigo ACP coincidente")
+                score += 65 if sli_consultado else 55
+                reasons.append("Codigo ACP coincidente desde detalle SLI/RFQ" if sli_consultado else "Codigo ACP coincidente")
             obs = str(row.get("observaciones") or "").lower()
-            matched_words = [kw for kw in keywords if kw in obs]
+            code_text = str(row.get("codigo_acp") or "").lower()
+            matched_words = [kw for kw in keywords if kw in obs or kw in code_text]
             if matched_words:
                 score += min(35, len(matched_words) * 9)
                 reasons.append("Coincidencia por palabras: " + ", ".join(matched_words[:4]))
+            if renglones_count and not row.get("codigo_match"):
+                score += 5
+                reasons.append("Detalle SLI trajo renglones para revision")
             if not reasons:
                 reasons.append("Coincidencia amplia")
             row["match_score"] = min(100, score)
@@ -831,10 +879,24 @@ def get_radar_historico_matches(radar_id, limit=12):
         ]
         best_match = max([row.get("match_score") or 0 for row in rows], default=0)
         has_codes = bool(codigo_matches)
+        if has_codes and sli_consultado:
+            nota = "Comparacion enriquecida: se consulto el detalle SLI/RFQ visible, se detectaron codigos ACP y se cruzaron contra el historico."
+        elif has_codes:
+            nota = "Comparacion incluye codigo ACP detectado en el listado del Radar."
+        elif sli_consultado and renglones_count:
+            nota = "El detalle SLI trajo renglones, pero sin codigo ACP claro. La comparacion queda por palabras y requiere revisar el RFQ/pliego."
+        else:
+            nota = "Comparacion por palabras del objeto. Para mayor precision, consulta el RFQ y extrae codigos ACP/renglones."
         return {
             "radar": {"numero_licitacion": numero, "objeto": objeto, "categoria": categoria},
             "keywords": keywords,
             "codigo_matches": codigo_matches,
+            "sli_detail": {
+                "consultado": sli_consultado,
+                "error": sli_error,
+                "renglones_detectados": sli_items[:12] if isinstance(sli_items, list) else [],
+                "pdfs_consultados": pdfs_consultados[:3] if isinstance(pdfs_consultados, list) else [],
+            },
             "matches": rows,
             "summary": {
                 "total": len(rows),
@@ -843,11 +905,11 @@ def get_radar_historico_matches(radar_id, limit=12):
                 "precio_promedio": (sum(prices) / len(prices)) if prices else None,
                 "mejor_match": best_match,
                 "requiere_revision_rfq": not has_codes,
-                "nota": (
-                    "Comparacion por palabras del objeto. Para mayor precision, consulta el RFQ y extrae codigos ACP/renglones."
-                    if not has_codes
-                    else "Comparacion incluye codigo ACP detectado."
-                ),
+                "sli_consultado": sli_consultado,
+                "sli_error": sli_error,
+                "renglones_detectados_count": renglones_count,
+                "pdfs_consultados_count": len(pdfs_consultados) if isinstance(pdfs_consultados, list) else 0,
+                "nota": nota,
                 "recomendacion_supervisor": _radar_supervisor_recommendation(
                     total=len(rows),
                     ganadas=len(ganadas),
@@ -858,7 +920,6 @@ def get_radar_historico_matches(radar_id, limit=12):
         }
     finally:
         conn.close()
-
 
 # =============================================
 # LOGISTICA
@@ -1103,7 +1164,7 @@ def get_historico_count():
     return int(count or 0)
 
 def save_workspace(username, licitacion, data_json, cg_json):
-    """Guarda o actualiza el workspace de una licitación específica."""
+    """Guarda o actualiza el workspace de una licitaciÃ³n especÃ­fica."""
     conn = get_connection()
     c = conn.cursor()
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1130,7 +1191,7 @@ def get_all_workspaces(username, all_users=False):
     return df
 
 def load_workspace(username, licitacion):
-    """Carga un workspace específico por licitación."""
+    """Carga un workspace especÃ­fico por licitaciÃ³n."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT data_json, cg_json FROM workspaces WHERE username=%s AND licitacion=%s",
@@ -1147,12 +1208,12 @@ def delete_workspace(username, licitacion):
     conn.commit()
     conn.close()
 
-# Legacy — mantener compatibilidad con código existente
+# Legacy â€” mantener compatibilidad con cÃ³digo existente
 def save_workspace_state(username, licitacion, data_json, cg_json):
     save_workspace(username, licitacion, data_json, cg_json)
 
 def load_workspace_state(username):
-    """Carga el workspace más reciente del usuario (compatibilidad legacy)."""
+    """Carga el workspace mÃ¡s reciente del usuario (compatibilidad legacy)."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT data_json, cg_json FROM workspaces WHERE username=%s ORDER BY fecha_guardado DESC LIMIT 1",
@@ -1162,11 +1223,11 @@ def load_workspace_state(username):
     return row
 
 # =============================================
-# GESTIÓN DE USUARIOS (ADMIN)
+# GESTIÃ“N DE USUARIOS (ADMIN)
 # =============================================
 
 def get_all_users():
-    """Retorna todos los usuarios del sistema para el panel de administración."""
+    """Retorna todos los usuarios del sistema para el panel de administraciÃ³n."""
     conn = get_connection()
     df = pd.read_sql_query(
         'SELECT username as "Usuario", role as "Nivel", email_user as "Correo", gemini_key as "Clave_Gemini", tavily_key as "Clave_Tavily" FROM users ORDER BY role, username', conn)
@@ -1222,7 +1283,7 @@ def update_user_role(username, new_role):
     conn.close()
 
 def reset_user_password(username, new_password_plain):
-    """Resetea la contraseña de un usuario."""
+    """Resetea la contraseÃ±a de un usuario."""
     conn = get_connection()
     c = conn.cursor()
     salt = bcrypt.gensalt()
@@ -1232,7 +1293,7 @@ def reset_user_password(username, new_password_plain):
     conn.close()
 
 # =============================================
-# PROTECCIÓN CONTRA FUERZA BRUTA
+# PROTECCIÃ“N CONTRA FUERZA BRUTA
 # =============================================
 
 def esta_bloqueado(username: str) -> tuple:
@@ -1251,7 +1312,7 @@ def esta_bloqueado(username: str) -> tuple:
     return False, 0
 
 def registrar_intento_fallido(username: str):
-    """Incrementa el contador de intentos fallidos; bloquea si supera el máximo."""
+    """Incrementa el contador de intentos fallidos; bloquea si supera el mÃ¡ximo."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("INSERT INTO login_attempts (username, intentos) VALUES (%s, 0) ON CONFLICT (username) DO NOTHING", (username,))
@@ -1296,7 +1357,7 @@ def get_user(username, password_plain):
     return None
 
 def update_user_profile(username, gemini, tavily, email, enc_pass):
-    """Guarda el perfil del usuario. gemini y tavily se cifran aquí antes de guardar."""
+    """Guarda el perfil del usuario. gemini y tavily se cifran aquÃ­ antes de guardar."""
     conn = get_connection()
     c = conn.cursor()
     enc_gemini = crypto.encrypt_data(gemini) if gemini else ""
@@ -1374,7 +1435,7 @@ def save_history(username, licitacion, items_count):
 def get_user_history_df(username):
     conn = get_connection()
     df = pd.read_sql_query(
-        'SELECT licitacion as "Nº Licitación", fecha as "Fecha Proceso", items as "Renglones" FROM history WHERE username=%s ORDER BY id DESC',
+        'SELECT licitacion as "NÂº LicitaciÃ³n", fecha as "Fecha Proceso", items as "Renglones" FROM history WHERE username=%s ORDER BY id DESC',
         conn, params=(username,))
     conn.close()
     return df
@@ -1411,7 +1472,7 @@ def get_user_credentials(username):
     row = c.fetchone()
     conn.close()
     if row:
-        # Descifrar gemini_key (índice 2) y tavily_key (índice 3) antes de devolver
+        # Descifrar gemini_key (Ã­ndice 2) y tavily_key (Ã­ndice 3) antes de devolver
         return (row[0], row[1], crypto.decrypt_data(row[2]) if row[2] else "", crypto.decrypt_data(row[3]) if row[3] else "")
     return None
 
@@ -2001,7 +2062,7 @@ def _registrar_alerta_enmienda_si_aplica(cursor, numero_licitacion, enmienda_nue
 def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimado,
                               moneda, fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
                               numero_enmienda=""):
-    """Guarda una licitación descubierta por el radar. Retorna True si es nueva, False si ya existía."""
+    """Guarda una licitaciÃ³n descubierta por el radar. Retorna True si es nueva, False si ya existÃ­a."""
     conn = get_connection()
     c = conn.cursor()
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2036,7 +2097,7 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
         conn.commit()
         conn.close()
 
-        # Verificar si realmente es nueva (no existía antes)
+        # Verificar si realmente es nueva (no existÃ­a antes)
         conn2 = get_connection()
         c2 = conn2.cursor()
         c2.execute("SELECT fecha_descubierta FROM radar_licitaciones WHERE numero_licitacion=%s", (numero_licitacion,))
@@ -2044,7 +2105,7 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
         conn2.close()
         if row and row[0] == fecha:
             return True  # Es nueva
-        return False  # Ya existía
+        return False  # Ya existÃ­a
     except Exception as e:
         print(f"[RADAR DB] Error guardando {numero_licitacion}: {e}")
         conn.close()
@@ -2164,7 +2225,7 @@ def get_licitaciones_radar(solo_nuevas=False, solo_hoy=False):
 
 
 def marcar_licitacion_radar(licitacion_id, estado, usuario, notas=""):
-    """Marca una licitación del radar como revisada/descartada/en_seguimiento."""
+    """Marca una licitaciÃ³n del radar como revisada/descartada/en_seguimiento."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE radar_licitaciones SET estado_radar=%s, revisada_por=%s, notas=%s WHERE id=%s",
@@ -2174,7 +2235,7 @@ def marcar_licitacion_radar(licitacion_id, estado, usuario, notas=""):
 
 
 def marcar_alerta_enmienda_revisada(licitacion_id):
-    """Limpia la alerta de enmienda de una licitación del radar."""
+    """Limpia la alerta de enmienda de una licitaciÃ³n del radar."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -2233,9 +2294,12 @@ def registrar_escaneo_radar(total, nuevas, errores="", paginas_recorridas=0,
 
 
 def get_ultimos_escaneos(limite=10):
-    """Retorna los últimos escaneos del radar."""
+    """Retorna los Ãºltimos escaneos del radar."""
     conn = get_connection()
     df = pd.read_sql_query(
         f"SELECT * FROM radar_escaneos ORDER BY id DESC LIMIT {limite}", conn)
     conn.close()
     return df
+
+
+
