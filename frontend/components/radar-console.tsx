@@ -805,6 +805,53 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     </div>
                   ))}
                 </div>
+                <div className={`mt-4 rounded-xl border p-4 ${
+                  historicoMatch?.summary?.total
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : historicoMatch?.summary?.requiere_revision_rfq
+                      ? "border-amber-200 bg-amber-50/70"
+                      : "border-blue-100 bg-blue-50/60"
+                }`}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-brand">Cruce historico ACP</div>
+                      <div className="mt-1 text-base font-semibold text-slate-900">
+                        {loadingHistorico
+                          ? "Leyendo SLI/RFQ y comparando..."
+                          : historicoMatch?.summary?.total
+                            ? `${historicoMatch.summary.total} antecedente(s) encontrado(s)`
+                            : "Sin antecedente historico claro"}
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-slate-700">
+                        {historicoMatch?.summary?.nota || "Al seleccionar una licitacion, el Radar intenta leer SLI/RFQ y cruzar codigos ACP contra el historico."}
+                      </p>
+                    </div>
+                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ring-1 ${scoreTone(historicoMatch?.summary?.mejor_match)}`}>
+                      Match {numberValue(historicoMatch?.summary?.mejor_match).toFixed(0)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    {[
+                      ["Codigos", String(historicoMatch?.codigo_matches?.length || 0)],
+                      ["Renglones", String(historicoMatch?.summary?.renglones_detectados_count || 0)],
+                      ["PDFs leidos", String(historicoMatch?.summary?.pdfs_consultados_count || 0)],
+                      ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
+                      ["Precio min.", moneyValue(historicoMatch?.summary?.precio_min)]
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-white/80 bg-white/80 p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {historicoMatch?.codigo_matches?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {historicoMatch.codigo_matches.slice(0, 6).map((code) => (
+                        <span key={code} className="rounded-full border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">{code}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 {radarFlag(selectedRow.enmienda_alerta) ? (
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="font-semibold">Revisar por enmienda nueva</div>
@@ -1114,6 +1161,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
 
 
 
