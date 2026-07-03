@@ -1,10 +1,14 @@
-"use client";
+﻿"use client";
 
 import { AlertTriangle, CheckCircle2, FolderOpen, Loader2, RefreshCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { asBool, cleanValue, saveLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
 import { deleteWorkspace, listWorkspaces, loadWorkspace, type WorkspaceListItem } from "@/lib/workspaces";
+import { Button } from "@/components/ui/button";
+import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type WorkspaceDetail = {
   data: Array<Record<string, unknown>>;
@@ -161,26 +165,19 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
 
   return (
     <div className="space-y-5">
-      <section className="app-card p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-brand">Workspaces</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Analisis RFQ guardados</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-              Recupera expedientes guardados en Supabase, revisa su matriz tecnica y restaura un analisis en el modulo RFQ sin reprocesar documentos.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <RefreshCcw className="h-4 w-4 text-brand" />}
-            Actualizar
-          </button>
-        </div>
-      </section>
+      <ModuleSection>
+        <PageHeader
+          eyebrow="Workspaces"
+          title="Expedientes RFQ guardados"
+          copy="Recupera analisis guardados, revisa su contexto y restaura el RFQ activo sin reprocesar documentos."
+          actions={
+            <Button type="button" onClick={refresh} disabled={loading} variant="secondary">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              Actualizar
+            </Button>
+          }
+        />
+      </ModuleSection>
 
       <section className="grid gap-3 md:grid-cols-4">
         {[
@@ -189,7 +186,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
           ["Mostrando", String(filtered.length)],
           ["Ultimo", latest ? formatDate(latest.fecha_guardado) : "Sin datos"]
         ].map(([label, value]) => (
-          <div key={label} className="app-card p-4 shadow-sm">
+          <div key={label} className="rounded-xl border border-line bg-panel p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
             <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
           </div>
@@ -200,7 +197,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
       {notice && <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section>}
 
       <section className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm font-semibold text-slate-900">Expedientes guardados</div>
             {opening && <Loader2 className="h-4 w-4 animate-spin text-brand" />}
@@ -215,13 +212,13 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
             />
           </label>
 
-          <div className="mt-4 overflow-hidden rounded-lg border border-line">
+          <div className="mt-4 rounded-xl border border-line bg-slate-50 p-2">
             {filtered.length ? (
-              <div className="max-h-[620px] divide-y divide-line overflow-y-auto">
+              <div className="max-h-[620px] space-y-2 overflow-y-auto">
                 {filtered.map((item) => {
                   const active = selected?.owner === item.username && selected.licitacion === item.licitacion;
                   return (
-                    <div key={`${item.username}-${item.licitacion}`} className={`bg-white p-4 ${active ? "ring-2 ring-inset ring-blue-200" : ""}`}>
+                    <div key={`${item.username}-${item.licitacion}`} className={`rounded-xl border p-4 transition ${active ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100" : "border-line bg-white hover:border-blue-200 hover:bg-slate-50"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="font-semibold text-slate-900">{item.licitacion}</div>
@@ -233,7 +230,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
                         <button
                           type="button"
                           onClick={() => openWorkspace(item)}
-                          className="rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white"
+                          className="inline-flex items-center justify-center rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
                         >
                           Abrir expediente
                         </button>
@@ -243,7 +240,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
                           className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Borrar
+                          Eliminar
                         </button>
                       </div>
                     </div>
@@ -256,7 +253,7 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
           </div>
         </div>
 
-        <div className="app-card p-5 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-sm font-semibold text-slate-900">{selected?.title || "Detalle del workspace"}</div>
@@ -304,35 +301,47 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
                 </p>
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-line">
-                <table className="w-full table-fixed border-collapse text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                    <tr>
-                      {["Renglon", "Codigo ACP", "Descripcion", "Cantidad", "Unidad", "Estado", "Marca / restriccion"].map((key) => (
-                        <th key={key} className="border-b border-line px-3 py-3">{key}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line bg-white">
-                    {selected.data.slice(0, 80).map((row, index) => (
-                      <tr key={index} className="hover:bg-slate-50">
-                        <td className="px-3 py-3 font-semibold">{getRow(row, ["renglon"], String(index + 1))}</td>
-                        <td className="px-3 py-3 font-semibold text-brand">{getRow(row, ["codigo_articulo", "codigo_acp"], "S/C")}</td>
-                        <td className="max-w-[380px] px-3 py-3">
-                          <div className="truncate font-medium text-slate-900">
+              <div className="rounded-xl border border-line bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Matriz tecnica del expediente</div>
+                    <p className="mt-1 text-sm text-muted">Renglones guardados para continuar analisis, costos, correo o proveedores.</p>
+                  </div>
+                  <StatusBadge tone="info">{Math.min(selected.data.length, 80)} visibles</StatusBadge>
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  {selected.data.slice(0, 80).map((row, index) => (
+                    <article key={index} className="rounded-xl border border-line bg-slate-50 p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-800">R{getRow(row, ["renglon"], String(index + 1))}</span>
+                            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{getRow(row, ["codigo_articulo", "codigo_acp"], "S/C")}</span>
+                            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${rowTone(row)}`}>{rowStatus(row)}</span>
+                          </div>
+                          <div className="mt-3 break-words text-sm font-semibold leading-6 text-slate-950">
                             {getRow(row, ["termino_de_busqueda_corto", "descripcion", "ficha_tecnica_completa"])}
                           </div>
-                        </td>
-                        <td className="px-3 py-3">{getRow(row, ["cantidad"], "-")}</td>
-                        <td className="px-3 py-3">{getRow(row, ["unidad_de_medida", "unidad"], "-")}</td>
-                        <td className="px-3 py-3">
-                          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${rowTone(row)}`}>{rowStatus(row)}</span>
-                        </td>
-                        <td className="max-w-[260px] px-3 py-3">{getRow(row, ["marca_modelo_requerido", "restriccion_marca_proveedor"], "No especificado")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div className="grid min-w-[180px] gap-2 sm:grid-cols-2 lg:w-[260px]">
+                          <div className="rounded-lg border border-line bg-white p-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Cantidad</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{getRow(row, ["cantidad"], "-")}</div>
+                          </div>
+                          <div className="rounded-lg border border-line bg-white p-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Unidad</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">{getRow(row, ["unidad_de_medida", "unidad"], "-")}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-lg border border-line bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Marca / restriccion</div>
+                        <div className="mt-1 break-words text-sm leading-6 text-slate-700">{getRow(row, ["marca_modelo_requerido", "restriccion_marca_proveedor"], "No especificado")}</div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
 
               {selected.data.length > 80 ? (
@@ -349,3 +358,9 @@ export function WorkspacesConsole({ user, onOpenRfq }: { user: AuthUser; onOpenR
     </div>
   );
 }
+
+
+
+
+
+

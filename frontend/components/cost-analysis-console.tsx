@@ -138,14 +138,17 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const activeSearch = manualSearch.trim() || itemSearchTerm(selectedItem);
 
   function toggleSelectedIndex(index: number) {
+    setManualSearch("");
     setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index].sort((a, b) => a - b));
   }
 
   function selectAllItems() {
+    setManualSearch("");
     setSelectedIndexes(items.map((_, index) => index));
   }
 
   function clearSelection() {
+    setManualSearch("");
     setSelectedIndexes(selectedItem ? [selectedIndex] : []);
   }
 
@@ -251,9 +254,9 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const selectedMinHistory = minPositive(selectedHistoryPrices);
   const selectedAvgHistory = average(selectedHistoryPrices);
   const selectedReferenceTotal = selectedItemRows.reduce((sum, row) => sum + row.valueBest, 0);
-  const showSelectedHistory = selectedIndexes.length > 1 && !manualSearch.trim();
+  const showSelectedHistory = selectedIndexes.length > 0 && !manualSearch.trim();
   const displayedHistoryRows = showSelectedHistory ? selectedHistoryRows : historicoRows;
-  const displayedHistoryLabel = showSelectedHistory ? `${selectedIndexes.length} renglones seleccionados` : activeSearch || "N/D";
+  const displayedHistoryLabel = showSelectedHistory ? `${selectedIndexes.length} renglon(es) seleccionados` : activeSearch || "N/D";
   const embeddedMatches = itemRows.filter((row) => row.hasHistoricalPrice).length;
   const totalReference = itemRows.reduce((sum, row) => sum + row.valueBest, 0);
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion || rfq?.condiciones_generales?.licitacion, "RFQ activo");
@@ -267,18 +270,16 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const selectedEmbeddedProy = selectedItem ? priceFrom(selectedItem, ["precio_proy_hist", "PRECIO PROYELEC", "Precio Proyelec", "precio_proyelec"]) : 0;
   const selectedAutoBest = selectedIndex >= 0 ? bestHistoryPrice(itemHistoryMap[selectedIndex]?.rows || []) : 0;
   const selectedBest = minPositive([selectedEmbeddedComp, selectedEmbeddedProy, minHistory, selectedAutoBest]);
-
-  const summaryCards = [
-    ["Renglones RFQ", String(items.length), "Cantidad de partidas detectadas."],
-    ["Cruce directo", `${embeddedMatches}/${items.length}`, "Historial ya cruzado durante el RFQ."],
-    ["Referencia total", money(totalReference), "Suma con mejor precio historico disponible por renglon."],
-    ["Historico consultado", String(historicoRows.length), "Registros encontrados para el renglon activo."]
-  ];
+
+  const displayedMinHistory = showSelectedHistory ? selectedMinHistory : minHistory;
+  const displayedAvgHistory = showSelectedHistory ? selectedAvgHistory : avgHistory;
+  const displayedAggressiveReference = displayedMinHistory > 0 ? displayedMinHistory * 0.97 : 0;
+  const displayedValueReference = showSelectedHistory ? selectedReferenceTotal : selectedBest ? selectedBest * selectedQty : 0;
   const insightCards: Array<[string, string, LucideIcon]> = [
-    ["Minimo historico", minHistory ? money(minHistory) : "N/D", TrendingDown],
-    ["Promedio historico", avgHistory ? money(avgHistory) : "N/D", BarChart3],
-    ["Referencia agresiva", aggressiveReference ? money(aggressiveReference) : "N/D", Target],
-    ["Valor x cantidad", selectedBest ? money(selectedBest * selectedQty) : "N/D", Database]
+    [showSelectedHistory ? "Minimo seleccion" : "Minimo historico", displayedMinHistory ? money(displayedMinHistory) : "N/D", TrendingDown],
+    [showSelectedHistory ? "Promedio seleccion" : "Promedio historico", displayedAvgHistory ? money(displayedAvgHistory) : "N/D", BarChart3],
+    ["Referencia agresiva", displayedAggressiveReference ? money(displayedAggressiveReference) : "N/D", Target],
+    [showSelectedHistory ? "Valor seleccion" : "Valor x cantidad", displayedValueReference ? money(displayedValueReference) : "N/D", Database]
   ];
 
   return (
@@ -354,7 +355,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                           onChange={() => toggleSelectedIndex(row.index)}
                           className="h-4 w-4 accent-blue-600"
                         />
-                        Usar
+                        Incluir
                       </label>
                       <button
                         type="button"
@@ -382,7 +383,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Resumen de seleccion</div>
-                  <p className="mt-1 text-sm text-muted">Lectura conjunta de los renglones marcados para participar.</p>
+                  <p className="mt-1 text-sm text-muted">Marca los renglones que quieres participar. La tabla de abajo se actualiza con esa selección.</p>
                 </div>
                 <StatusBadge tone="info">{selectedIndexes.length || 0} seleccionados</StatusBadge>
               </div>
@@ -415,8 +416,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
             <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel p-5 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Renglon seleccionado</div>
-                  <div className="mt-1 max-w-full break-words text-base font-semibold leading-6 text-brand">{selectedItem ? itemLabel(selectedItem, selectedIndex) : "Sin seleccion"}</div>
+                  <div className="text-sm font-semibold text-slate-900">{showSelectedHistory ? "Lectura de seleccion" : "Renglon seleccionado"}</div>
+                  <div className="mt-1 max-w-full break-words text-base font-semibold leading-6 text-brand">{showSelectedHistory ? displayedHistoryLabel : selectedItem ? itemLabel(selectedItem, selectedIndex) : "Sin seleccion"}</div>
                 </div>
                 {loadingHistory ? <Loader2 className="h-5 w-5 animate-spin text-brand" /> : <Database className="h-5 w-5 text-brand" />}
               </div>
@@ -426,7 +427,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                 <input
                   value={manualSearch}
                   onChange={(event) => setManualSearch(event.target.value)}
-                  placeholder={`Busqueda historica: ${itemSearchTerm(selectedItem) || "codigo, descripcion o RFQ"}`}
+                  placeholder={`Busqueda manual: ${itemSearchTerm(selectedItem) || "codigo, descripcion o RFQ"}`}
                   className="h-11 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
                 />
               </label>
@@ -477,10 +478,13 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                       const ganador = cell(record, ["Adjudicada a Proyelec", "adjudicada_a_proyelec"], "N/D");
                       const analista = cell(record, ["Analista", "analista", "analista_procura"], "N/D");
                       const inicialEspecialista = specialistInitials(analista);
+                      const sourceMatch = showSelectedHistory ? selectedItemRows.find((itemRow) => itemRow.historyRows.includes(row)) : null;
+                      const sourceRenglon = sourceMatch ? cleanValue(sourceMatch.item.renglon, String(sourceMatch.index + 1)) : "";
                       return (
                         <div key={index} className="grid min-w-0 gap-3 p-3 text-sm hover:bg-slate-50 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)_minmax(0,0.72fr)]">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
+                              {sourceMatch ? <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-indigo-800">R{sourceRenglon}</span> : null}
                               <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-blue-800">Lic. {licitacion}</span>
                               <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">{fechaHistorica}</span>
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-800">Esp. {inicialEspecialista}</span>
@@ -521,6 +525,9 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
     </div>
   );
 }
+
+
+
 
 
 

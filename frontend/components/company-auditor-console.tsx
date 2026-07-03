@@ -31,6 +31,39 @@ function decisionTone(value?: string) {
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function scoreTone(value?: number) {
+  if (typeof value !== "number") return "border-slate-200 bg-slate-50 text-slate-700";
+  if (value >= 75) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (value < 50) return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function formatAuditDate(value?: string) {
+  if (!value) return "N/D";
+  try {
+    return new Intl.DateTimeFormat("es-PA", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function decisionCopy(decision?: string, risk?: string) {
+  const text = `${decision || ""} ${risk || ""}`.toLowerCase();
+  if (text.includes("descartar") || text.includes("alto")) {
+    return "No avanzar sin validacion documental fuerte, contacto corporativo y condiciones de pago seguras.";
+  }
+  if (text.includes("avanzar") && !text.includes("cautela") && !text.includes("medio")) {
+    return "Puede avanzar a solicitud de cotizacion, manteniendo verificacion de ficha tecnica, pagos y trazabilidad.";
+  }
+  return "Avanzar con cautela: pedir evidencia corporativa, ficha tecnica, referencias y condiciones comerciales antes de comprar.";
+}
+
 function listValue(items?: string[]) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
@@ -153,6 +186,15 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
   const sslInfo = technical?.ssl;
   const web = technical?.website;
   const technicalScore = result?.score_final ?? technical?.scorecard?.score;
+  const operativeDecision = cleanValue(result?.decision, "Pedir validacion");
+  const operativeRisk = cleanValue(result?.riesgo, "Medio");
+  const operativeConfidence = cleanValue(result?.confianza, "Media");
+  const auditChecklist = [
+    ["Identidad", cleanValue(result?.empresa, companyName || "No confirmado")],
+    ["Dominio", technical?.domain || cleanValue(result?.website, website || "No confirmado")],
+    ["Riesgo", operativeRisk],
+    ["Accion", decisionCopy(result?.decision, result?.riesgo)]
+  ];
 
   return (
     <div className="space-y-5">
@@ -248,50 +290,42 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
         <div className="space-y-4">
           {result ? (
             <>
-              <section className={`rounded-xl border p-5 shadow-sm ${decisionTone(result.decision)}`}>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Decision operativa</div>
-                    <div className="mt-1 text-2xl font-semibold">{cleanValue(result.decision, "Pedir validacion")}</div>
-                    <p className="mt-2 max-w-3xl text-sm leading-6">{cleanValue(result.resumen, "Auditoria generada.")}</p>
+              <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase tracking-wide text-brand">Decision operativa</div>
+                    <div className="mt-2 break-words text-2xl font-semibold text-slate-950">{operativeDecision}</div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">{cleanValue(result.resumen, "Auditoria generada.")}</p>
                   </div>
-                    <div className="grid min-w-0 grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-white/70 p-3">
-                        <div className="text-xs font-semibold opacity-70">Score</div>
-                        <div className="mt-1 text-xl font-semibold">{typeof technicalScore === "number" ? `${technicalScore}/100` : "N/D"}</div>
-                      </div>
-                      <div className={`rounded-lg border bg-white/70 p-3 ${riskTone(result.riesgo)}`}>
-                        <div className="text-xs font-semibold opacity-70">Riesgo</div>
-                        <div className="mt-1 text-xl font-semibold">{cleanValue(result.riesgo, "Medio")}</div>
+                  <div className="grid min-w-0 gap-2 sm:grid-cols-3 xl:w-[420px]">
+                    <div className={`rounded-lg border p-3 text-center ${scoreTone(typeof technicalScore === "number" ? technicalScore : undefined)}`}>
+                      <div className="text-xs font-semibold opacity-75">Score</div>
+                      <div className="mt-1 text-xl font-semibold">{typeof technicalScore === "number" ? `${technicalScore}/100` : "N/D"}</div>
                     </div>
-                    <div className="rounded-lg bg-white/70 p-3">
-                      <div className="text-xs font-semibold opacity-70">Confianza</div>
-                      <div className="mt-1 text-xl font-semibold">{cleanValue(result.confianza, "Media")}</div>
+                    <div className={`rounded-lg border p-3 text-center ${riskTone(result.riesgo)}`}>
+                      <div className="text-xs font-semibold opacity-75">Riesgo</div>
+                      <div className="mt-1 text-xl font-semibold">{operativeRisk}</div>
+                    </div>
+                    <div className="rounded-lg border border-line bg-slate-50 p-3 text-center text-slate-800">
+                      <div className="text-xs font-semibold text-muted">Confianza</div>
+                      <div className="mt-1 text-xl font-semibold">{operativeConfidence}</div>
                     </div>
                   </div>
                 </div>
-              </section>
 
-              <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    ["Empresa", cleanValue(result.empresa, companyName)],
-                    ["Web", cleanValue(result.website, website || "No confirmado")],
-                    ["Pais/region", cleanValue(result.pais_region, country || "No confirmado")]
-                  ].map(([label, value]) => (
-                    <div key={label} className="app-data-card">
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {auditChecklist.map(([label, value]) => (
+                    <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                      <div className="mt-2 break-words text-sm font-semibold text-slate-900">{value}</div>
+                      <div className="mt-2 break-words text-sm font-semibold leading-5 text-slate-900">{value}</div>
                     </div>
                   ))}
                 </div>
 
-                {result.recomendacion_operativa ? (
-                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-                    <div className="font-semibold">Siguiente accion</div>
-                    <p className="mt-1">{result.recomendacion_operativa}</p>
-                  </div>
-                ) : null}
+                <div className={`mt-4 rounded-lg border p-4 text-sm leading-6 ${decisionTone(result.decision)}`}>
+                  <div className="font-semibold">Siguiente accion</div>
+                  <p className="mt-1">{cleanValue(result.recomendacion_operativa, decisionCopy(result.decision, result.riesgo))}</p>
+                </div>
               </section>
 
               {technical ? (
@@ -459,50 +493,54 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
           </div>
         </div>
 
-        <div className="mt-4 overflow-hidden">
-          <table className="w-full table-fixed border-collapse text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                {["Proveedor", "Dominio", "Score", "Riesgo", "Decision", "Usuario", "Fecha"].map((heading) => (
-                  <th key={heading} className="border-b border-line px-3 py-3 font-semibold">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {auditHistory.map((audit) => (
-                <tr key={audit.id} className="border-b border-line last:border-0">
-                  <td className="max-w-[240px] px-3 py-3">
-                    <div className="font-semibold text-slate-900">{cleanValue(audit.company_name, "Sin nombre")}</div>
-                    <div className="mt-1 truncate text-xs text-muted">{cleanValue(audit.website, "Sin web")}</div>
-                  </td>
-                  <td className="px-3 py-3 text-brand">{cleanValue(audit.domain, "N/D")}</td>
-                  <td className="px-3 py-3 font-semibold">{typeof audit.score_final === "number" ? `${audit.score_final}/100` : "N/D"}</td>
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${riskTone(audit.riesgo)}`}>
-                      {cleanValue(audit.riesgo, "Medio")}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${decisionTone(audit.decision)}`}>
-                      {cleanValue(audit.decision, "Validar")}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">{cleanValue(audit.username, "N/D")}</td>
-                  <td className="px-3 py-3">{audit.created_at ? new Date(audit.created_at).toLocaleString("es-PA") : "N/D"}</td>
-                </tr>
-              ))}
-              {!auditHistory.length ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted">
-                    Todavia no hay auditorias guardadas o no hay resultados para ese filtro.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {auditHistory.map((audit) => (
+            <div key={audit.id} className="rounded-xl border border-line bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="break-words text-sm font-semibold text-slate-950">{cleanValue(audit.company_name, "Sin nombre")}</div>
+                  <div className="mt-1 break-words text-xs text-muted">{cleanValue(audit.website || audit.domain, "Sin web confirmada")}</div>
+                </div>
+                <div className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${decisionTone(audit.decision)}`}>
+                  {cleanValue(audit.decision, "Validar")}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className={`rounded-lg border p-2 ${scoreTone(typeof audit.score_final === "number" ? audit.score_final : undefined)}`}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide opacity-75">Score</div>
+                  <div className="mt-1 text-sm font-semibold">{typeof audit.score_final === "number" ? `${audit.score_final}/100` : "N/D"}</div>
+                </div>
+                <div className={`rounded-lg border p-2 ${riskTone(audit.riesgo)}`}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide opacity-75">Riesgo</div>
+                  <div className="mt-1 text-sm font-semibold">{cleanValue(audit.riesgo, "Medio")}</div>
+                </div>
+                <div className="rounded-lg border border-line bg-slate-50 p-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Fecha</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{formatAuditDate(audit.created_at)}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span className="rounded-full border border-line bg-slate-50 px-2 py-1">Usuario: {cleanValue(audit.username, "N/D")}</span>
+                <span className="rounded-full border border-line bg-slate-50 px-2 py-1">Dominio: {cleanValue(audit.domain, "N/D")}</span>
+              </div>
+            </div>
+          ))}
+          {!auditHistory.length ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-muted lg:col-span-2">
+              Todavia no hay auditorias guardadas o no hay resultados para ese filtro.
+            </div>
+          ) : null}
         </div>
       </section>
     </div>
   );
 }
+
+
+
+
+
+
 
