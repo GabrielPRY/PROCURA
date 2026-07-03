@@ -534,66 +534,21 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       )}
 
       {settingsSaved ? <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{settingsSaved}</section> : null}
-
-      {canManageLogistics ? (
-        <ModuleSection>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <Settings className="h-4 w-4 text-brand" />
-                Valores logísticos que usan todos
-              </div>
-              <p className="mt-1 text-sm leading-6 text-muted">
-                Esta zona es solo para Logística/Admin. Las tarifas guardadas aquí alimentan la calculadora de analistas, supervisores y gerencia.
-              </p>
+      <ModuleSection>
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            ["1", "Elige renglón y ruta", "Referencia actual: USA a Panamá. Cambia origen/destino si Logística lo indica."],
+            ["2", "Agrega paquetes", "Usa caja, bulto, paquete o pallet con peso y dimensiones reales."],
+            ["3", "Valida el total", "Se cobra el mayor entre peso real y peso volumétrico."]
+          ].map(([step, title, copy]) => (
+            <div key={step} className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="grid h-8 w-8 place-items-center rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-brand">{step}</div>
+              <div className="mt-3 text-sm font-semibold text-slate-950">{title}</div>
+              <p className="mt-1 text-sm leading-6 text-muted">{copy}</p>
             </div>
-            <StatusBadge tone="info">Editable por Logística</StatusBadge>
-          </div>
-
-          <div className="mt-5 grid gap-4 2xl:grid-cols-3">
-            <div className="rounded-xl border border-line bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Tarifa internacional</div>
-              <p className="mt-1 text-xs leading-5 text-muted">Forwarder, modo, costo por libra cobrable y mínimo de envío.</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Forwarder / agente<input value={freightForm.agente} onChange={(event) => setFreightForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" placeholder="Ej: Miami Forwarder" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Servicio<input value={freightForm.tipo_servicio} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_servicio: event.target.value }))} className="app-input" placeholder="USA-Panama" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tipo de flete<input value={freightForm.tipo_flete} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_flete: event.target.value }))} className="app-input" placeholder="Aéreo / Marítimo" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">USD/lb cobrable<input type="number" value={freightForm.tarifa_por_libra} min={0} step={0.01} onChange={(event) => setFreightForm((current) => ({ ...current, tarifa_por_libra: Number(event.target.value) }))} className="app-input" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mínimo USD<input type="number" value={freightForm.minimo_envio} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, minimo_envio: Number(event.target.value) }))} className="app-input" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tránsito días<input type="number" value={freightForm.tiempo_transito_dias} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, tiempo_transito_dias: Number(event.target.value) }))} className="app-input" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Día de corte<input value={freightForm.dia_corte} onChange={(event) => setFreightForm((current) => ({ ...current, dia_corte: event.target.value }))} className="app-input" placeholder="Viernes 12:00" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Salidas<input value={freightForm.salidas} onChange={(event) => setFreightForm((current) => ({ ...current, salidas: event.target.value }))} className="app-input" placeholder="Semanal / diario" /></label>
-              </div>
-              <Button type="button" onClick={saveFreightSettings} disabled={savingSettings === "freight"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "freight" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa internacional</Button>
-            </div>
-
-            <div className="rounded-xl border border-line bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Forwarder y localidad</div>
-              <p className="mt-1 text-xs leading-5 text-muted">Dirección operativa y notas que verán los usuarios al calcular.</p>
-              <div className="mt-4 grid gap-3">
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Nombre<input value={forwarderForm.nombre} onChange={(event) => setForwarderForm((current) => ({ ...current, nombre: event.target.value }))} className="app-input" placeholder="Ej: Bodega Miami" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Dirección / localidad<input value={forwarderForm.direccion} onChange={(event) => setForwarderForm((current) => ({ ...current, direccion: event.target.value }))} className="app-input" placeholder="Miami, FL" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Observación<textarea value={forwarderForm.observacion} onChange={(event) => setForwarderForm((current) => ({ ...current, observacion: event.target.value }))} className="min-h-24 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100" placeholder="Horario, contacto, restricción o nota operativa" /></label>
-              </div>
-              <Button type="button" onClick={saveForwarderSettings} disabled={savingSettings === "forwarder"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "forwarder" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar forwarder</Button>
-            </div>
-
-            <div className="rounded-xl border border-line bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Tarifa local Panamá</div>
-              <p className="mt-1 text-xs leading-5 text-muted">Referencias locales por destino y rango de peso.</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Agente local<input value={localRateForm.agente} onChange={(event) => setLocalRateForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" placeholder="Ej: Transporte local" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Destino<input value={localRateForm.destino} onChange={(event) => setLocalRateForm((current) => ({ ...current, destino: event.target.value }))} className="app-input" placeholder="Panamá / Corozal" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tipo<input value={localRateForm.tipo_flete} onChange={(event) => setLocalRateForm((current) => ({ ...current, tipo_flete: event.target.value }))} className="app-input" placeholder="Terrestre" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Hasta 400kg<input type="number" value={localRateForm.hasta_400kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, hasta_400kg: Number(event.target.value) }))} className="app-input" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">500-1000kg<input type="number" value={localRateForm.kg_500_1000} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, kg_500_1000: Number(event.target.value) }))} className="app-input" /></label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mayor 1000kg<input type="number" value={localRateForm.mayor_1000kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, mayor_1000kg: Number(event.target.value) }))} className="app-input" /></label>
-              </div>
-              <Button type="button" onClick={saveLocalRateSettings} disabled={savingSettings === "local"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "local" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa local</Button>
-            </div>
-          </div>
-        </ModuleSection>
-      ) : null}
+          ))}
+        </div>
+      </ModuleSection>
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5">
           <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
@@ -1004,24 +959,24 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
         </div>
 
         <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-900">Calculos guardados</div>
+          <div className="text-sm font-semibold text-slate-900">Cálculos guardados</div>
           <p className="mt-1 text-sm text-muted">Historial real guardado para reutilizar estimaciones.</p>
-          <div className="mt-4 overflow-hidden rounded-lg border border-line">
+          <div className="mt-4 rounded-xl border border-line bg-slate-50 p-2">
             {calculations.length ? (
-              <div className="max-h-[360px] divide-y divide-line overflow-y-auto">
+              <div className="max-h-[360px] space-y-2 overflow-y-auto">
                 {calculations.map((item) => (
-                  <div key={item.id} className="grid gap-3 bg-white p-4 lg:grid-cols-[1fr_0.55fr_auto] lg:items-center">
-                    <div>
-                      <div className="font-semibold text-slate-900">{item.licitacion || "Sin licitacion"} | Renglon {item.renglon || "N/D"}</div>
-                      <div className="mt-1 text-xs text-muted">
-                        {item.created_at ? new Date(item.created_at).toLocaleString() : "Sin fecha"} | {item.agente || "Manual"} | {item.incoterm || "N/D"}
+                  <div key={item.id} className="rounded-xl border border-line bg-white p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-semibold text-slate-900">{item.licitacion || "Sin licitación"} | Renglón {item.renglon || "N/D"}</div>
+                        <div className="mt-1 text-xs text-muted">{item.created_at ? new Date(item.created_at).toLocaleString() : "Sin fecha"} | {item.agente || "Manual"} | {item.incoterm || "N/D"}</div>
                       </div>
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-slate-950">{money(toNumber(item.costo_total))}</div>
                     </div>
-                    <div className="text-sm font-semibold text-slate-950">{money(toNumber(item.costo_total))}</div>
                     <button
                       type="button"
                       onClick={() => deleteCalculation(item.id)}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Borrar
@@ -1030,7 +985,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-50 p-5 text-sm text-muted">Todavia no hay calculos guardados.</div>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-muted">Todavía no hay cálculos guardados.</div>
             )}
           </div>
         </div>
@@ -1076,13 +1031,65 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
           </div>
         </div>
       </section>
+      {canManageLogistics ? (
+        <ModuleSection>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Settings className="h-4 w-4 text-brand" />
+                Configuración logística del equipo
+              </div>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                Estos valores alimentan la calculadora de analistas, supervisores y gerencia. Mantén aquí tarifas y forwarders oficiales.
+              </p>
+            </div>
+            <StatusBadge tone="info">Solo Logística/Admin</StatusBadge>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-3">
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Tarifa internacional</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Forwarder, ruta, tipo de flete, USD/lb y mínimo de envío.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Forwarder<input value={freightForm.agente} onChange={(event) => setFreightForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" placeholder="Ej: Miami Forwarder" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Servicio<input value={freightForm.tipo_servicio} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_servicio: event.target.value }))} className="app-input" placeholder="USA-Panama" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tipo de flete<input value={freightForm.tipo_flete} onChange={(event) => setFreightForm((current) => ({ ...current, tipo_flete: event.target.value }))} className="app-input" placeholder="Aereo / Maritimo" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">USD/lb cobrable<input type="number" value={freightForm.tarifa_por_libra} min={0} step={0.01} onChange={(event) => setFreightForm((current) => ({ ...current, tarifa_por_libra: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mínimo USD<input type="number" value={freightForm.minimo_envio} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, minimo_envio: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Tránsito días<input type="number" value={freightForm.tiempo_transito_dias} min={0} step={1} onChange={(event) => setFreightForm((current) => ({ ...current, tiempo_transito_dias: Number(event.target.value) }))} className="app-input" /></label>
+              </div>
+              <Button type="button" onClick={saveFreightSettings} disabled={savingSettings === "freight"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "freight" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa</Button>
+            </div>
+
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Forwarder / localidad</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Dirección operativa visible para todos los usuarios.</p>
+              <div className="mt-4 grid gap-3">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Nombre<input value={forwarderForm.nombre} onChange={(event) => setForwarderForm((current) => ({ ...current, nombre: event.target.value }))} className="app-input" placeholder="Ej: Bodega Miami" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Dirección / localidad<input value={forwarderForm.direccion} onChange={(event) => setForwarderForm((current) => ({ ...current, direccion: event.target.value }))} className="app-input" placeholder="Miami, FL" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Observación<textarea value={forwarderForm.observacion} onChange={(event) => setForwarderForm((current) => ({ ...current, observacion: event.target.value }))} className="min-h-24 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100" placeholder="Horario, contacto, restricción o nota operativa" /></label>
+              </div>
+              <Button type="button" onClick={saveForwarderSettings} disabled={savingSettings === "forwarder"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "forwarder" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar forwarder</Button>
+            </div>
+
+            <div className="rounded-xl border border-line bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Tarifa local Panamá</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Costos locales por destino y rango de peso.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Agente<input value={localRateForm.agente} onChange={(event) => setLocalRateForm((current) => ({ ...current, agente: event.target.value }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Destino<input value={localRateForm.destino} onChange={(event) => setLocalRateForm((current) => ({ ...current, destino: event.target.value }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Hasta 400kg<input type="number" value={localRateForm.hasta_400kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, hasta_400kg: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">500-1000kg<input type="number" value={localRateForm.kg_500_1000} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, kg_500_1000: Number(event.target.value) }))} className="app-input" /></label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-700">Mayor 1000kg<input type="number" value={localRateForm.mayor_1000kg} min={0} step={1} onChange={(event) => setLocalRateForm((current) => ({ ...current, mayor_1000kg: Number(event.target.value) }))} className="app-input" /></label>
+              </div>
+              <Button type="button" onClick={saveLocalRateSettings} disabled={savingSettings === "local"} variant="primary" size="md" className="mt-4 w-full">{savingSettings === "local" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar tarifa local</Button>
+            </div>
+          </div>
+        </ModuleSection>
+      ) : null}
     </div>
   );
 }
-
-
-
-
 
 
 
