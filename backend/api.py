@@ -378,6 +378,11 @@ def _radar_bool(value):
     text = str(value or "").strip().lower()
     return text in ["true", "1", "yes", "si", "sÃƒÂ­"]
 
+class RadarEstadoRequest(BaseModel):
+    estado: str
+    usuario: str = "frontend"
+    notas: str = ""
+
 def _radar_datetime_iso(value):
     try:
         from sli_scraper import parse_sli_datetime
@@ -3716,6 +3721,7 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
                 "technical": str(e)[:500]
             }
         )
+
 
 
 
