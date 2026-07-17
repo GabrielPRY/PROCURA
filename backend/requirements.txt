@@ -10,7 +10,7 @@ uvicorn
 python-multipart
 python-dotenv
 openpyxl
-playwright
+playwright==1.44.0
 beautifulsoup4
 pypdf
 bcrypt
