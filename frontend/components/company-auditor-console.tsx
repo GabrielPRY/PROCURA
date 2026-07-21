@@ -1,7 +1,20 @@
-﻿"use client";
+"use client";
 
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, SearchCheck, ShieldAlert, ShieldCheck } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  Globe2,
+  History,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  SearchCheck,
+  ShieldAlert,
+  ShieldCheck
+} from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   auditCompany,
   COMPANY_AUDIT_DRAFT_KEY,
@@ -13,74 +26,74 @@ import {
 import { type AuthUser } from "@/lib/auth";
 import { cleanValue, getUserConfig } from "@/lib/rfq";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-function riskTone(value?: string) {
+type View = "prepare" | "result" | "history";
+type BadgeTone = "neutral" | "info" | "ok" | "warn" | "danger";
+
+function riskTone(value?: string): BadgeTone {
   const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("bajo")) return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  if (normalized.includes("alto")) return "border-rose-200 bg-rose-50 text-rose-900";
-  return "border-amber-200 bg-amber-50 text-amber-900";
+  if (normalized.includes("bajo")) return "ok";
+  if (normalized.includes("alto")) return "danger";
+  return "warn";
 }
 
-function decisionTone(value?: string) {
+function decisionTone(value?: string): BadgeTone {
   const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("avanzar") && !normalized.includes("cautela")) return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  if (normalized.includes("descartar")) return "border-rose-200 bg-rose-50 text-rose-900";
-  return "border-amber-200 bg-amber-50 text-amber-900";
+  if (normalized.includes("descartar")) return "danger";
+  if (normalized.includes("avanzar") && !normalized.includes("cautela")) return "ok";
+  if (normalized.includes("validacion") || normalized.includes("validación")) return "danger";
+  return "warn";
 }
 
-function scoreTone(value?: number) {
-  if (typeof value !== "number") return "border-slate-200 bg-slate-50 text-slate-700";
-  if (value >= 75) return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  if (value < 50) return "border-rose-200 bg-rose-50 text-rose-900";
-  return "border-amber-200 bg-amber-50 text-amber-900";
+function confidenceTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("alta")) return "ok";
+  if (normalized.includes("baja")) return "danger";
+  return "warn";
 }
 
 function formatAuditDate(value?: string) {
   if (!value) return "N/D";
-  try {
-    return new Intl.DateTimeFormat("es-PA", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
-}
-
-function decisionCopy(decision?: string, risk?: string) {
-  const text = `${decision || ""} ${risk || ""}`.toLowerCase();
-  if (text.includes("descartar") || text.includes("alto")) {
-    return "No avanzar sin validacion documental fuerte, contacto corporativo y condiciones de pago seguras.";
-  }
-  if (text.includes("avanzar") && !text.includes("cautela") && !text.includes("medio")) {
-    return "Puede avanzar a solicitud de cotizacion, manteniendo verificacion de ficha tecnica, pagos y trazabilidad.";
-  }
-  return "Avanzar con cautela: pedir evidencia corporativa, ficha tecnica, referencias y condiciones comerciales antes de comprar.";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("es-PA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(parsed);
 }
 
 function listValue(items?: string[]) {
-  return Array.isArray(items) ? items.filter(Boolean) : [];
+  return Array.isArray(items) ? [...new Set(items.map((item) => String(item || "").trim()).filter(Boolean))] : [];
 }
 
 function yesNo(value?: boolean) {
-  if (value === true) return "Si";
+  if (value === true) return "Sí";
   if (value === false) return "No";
   return "N/D";
 }
 
 function daysLabel(value?: number | null) {
   if (typeof value !== "number") return "N/D";
-  if (value >= 730) return `${Math.floor(value / 365)} anos`;
-  return `${value} dias`;
+  if (value >= 730) return `${Math.floor(value / 365)} años`;
+  return `${value} días`;
+}
+
+function scoreLabel(score?: number) {
+  if (typeof score !== "number") return "Sin puntuación";
+  if (score >= 75) return "Base favorable";
+  if (score >= 50) return "Requiere validación";
+  return "Riesgo elevado";
 }
 
 export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
+  const [view, setView] = useState<View>("prepare");
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("");
@@ -116,22 +129,22 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
       const raw = window.localStorage.getItem(COMPANY_AUDIT_DRAFT_KEY);
       if (!raw) return;
       const draft = JSON.parse(raw) as CompanyAuditDraft;
-      if (draft.company_name) setCompanyName(draft.company_name);
-      if (draft.website) setWebsite(draft.website);
-      if (draft.country) setCountry(draft.country);
-      if (draft.product_context) setProductContext(draft.product_context);
-      if (draft.notes) setNotes(draft.notes);
-      if (draft.source === "proveedores") setDraftSource("Datos precargados desde Proveedores.");
+      setCompanyName(draft.company_name || "");
+      setWebsite(draft.website || "");
+      setCountry(draft.country || "");
+      setProductContext(draft.product_context || "");
+      setNotes(draft.notes || "");
+      setDraftSource(draft.source === "proveedores" ? "Proveedor precargado desde el resultado de sourcing." : "");
       window.localStorage.removeItem(COMPANY_AUDIT_DRAFT_KEY);
     } catch {
-      // El auditor tambien funciona con entrada manual.
+      // La entrada manual permanece disponible cuando el navegador bloquea almacenamiento.
     }
   }, []);
 
   async function loadAuditHistory(search = historySearch) {
     setLoadingHistory(true);
     try {
-      const response = await listCompanyAudits({ search: search.trim(), limit: 40 });
+      const response = await listCompanyAudits({ search: search.trim(), limit: 60 });
       setAuditHistory(response.audits || []);
     } catch {
       setAuditHistory([]);
@@ -153,12 +166,11 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
       return;
     }
     if (!hasGeminiKey) {
-      setError("Falta Gemini. Admin debe cargar una llave global o asignarla al usuario.");
+      setError("La IA no está configurada. Admin debe cargar una llave global.");
       return;
     }
 
     setLoading(true);
-    setResult(null);
     try {
       const response = await auditCompany({
         username: user.username,
@@ -169,7 +181,8 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
         notes: notes.trim()
       });
       setResult(response);
-      loadAuditHistory(companyName.trim());
+      setView("result");
+      loadAuditHistory("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo auditar la empresa.");
     } finally {
@@ -177,370 +190,248 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
     }
   }
 
-  const positives = listValue(result?.senal_positiva);
-  const alerts = listValue(result?.senal_alerta);
-  const pending = listValue(result?.validaciones_pendientes);
-  const questions = listValue(result?.preguntas_al_proveedor);
+  function reuseAudit(audit: CompanyAuditListItem) {
+    setCompanyName(audit.company_name || "");
+    setWebsite(audit.website || audit.domain || "");
+    setCountry(audit.country || "");
+    setProductContext("");
+    setNotes("");
+    setDraftSource(`Datos recuperados de la auditoría del ${formatAuditDate(audit.created_at)}.`);
+    setView("prepare");
+  }
+
+  const positives = useMemo(() => listValue(result?.senal_positiva), [result]);
+  const alerts = useMemo(() => listValue(result?.senal_alerta), [result]);
+  const pending = useMemo(() => listValue(result?.validaciones_pendientes), [result]);
+  const questions = useMemo(() => listValue(result?.preguntas_al_proveedor), [result]);
+  const safeguards = useMemo(() => listValue(result?.reglas_seguridad_aplicadas), [result]);
   const technical = result?.auditoria_tecnica;
   const rdap = technical?.rdap;
   const sslInfo = technical?.ssl;
   const web = technical?.website;
-  const technicalScore = result?.score_final ?? technical?.scorecard?.score;
-  const operativeDecision = cleanValue(result?.decision, "Pedir validacion");
-  const operativeRisk = cleanValue(result?.riesgo, "Medio");
-  const operativeConfidence = cleanValue(result?.confianza, "Media");
-  const auditChecklist = [
-    ["Identidad", cleanValue(result?.empresa, companyName || "No confirmado")],
-    ["Dominio", technical?.domain || cleanValue(result?.website, website || "No confirmado")],
-    ["Riesgo", operativeRisk],
-    ["Accion", decisionCopy(result?.decision, result?.riesgo)]
-  ];
+  const score = typeof result?.score_final === "number" ? result.score_final : technical?.scorecard?.score;
+  const grounded = result?.engine === "gemini_google_search";
 
   return (
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Auditor IA"
-          title="Auditoria de empresas y proveedores"
-          copy="Evalua si un proveedor parece real, trazable y seguro antes de pedir cotizacion, negociar o comprar."
-          actions={<StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "warn"}>{loadingConfig ? "Verificando API" : hasGeminiKey ? geminiSource === "admin_global" ? "Gemini Admin" : "Gemini usuario" : "Falta Gemini"}</StatusBadge>}
+          eyebrow="Riesgo comercial"
+          title="Auditor IA de proveedores"
+          copy="Verifica identidad digital, antigüedad del dominio, contacto y señales comerciales antes de solicitar una cotización o realizar un pago."
+          actions={
+            <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "danger"}>
+              {loadingConfig ? "Verificando IA" : hasGeminiKey ? `IA lista${geminiSource === "admin_global" ? " · Admin" : ""}` : "IA no configurada"}
+            </StatusBadge>
+          }
         />
       </ModuleSection>
 
-      <section className="grid gap-4 xl:grid-cols-[0.42fr_0.58fr]">
-        <form onSubmit={submitAudit} className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <SearchCheck className="h-5 w-5 text-brand" />
-            Datos para auditar
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Mientras mas datos entregues, mas util sera la auditoria. Si no tienes web o pais, deja el campo en blanco.
-          </p>
-          {draftSource ? (
-            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">
-              {draftSource}
-            </div>
-          ) : null}
-
-          <label className="mt-5 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Empresa o proveedor</span>
-            <input
-              value={companyName}
-              onChange={(event) => setCompanyName(event.target.value)}
-              className="app-input"
-              placeholder="Ej: Rexroth distributor, ABC Industrial Supply..."
-            />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Web o link</span>
-            <input
-              value={website}
-              onChange={(event) => setWebsite(event.target.value)}
-              className="app-input"
-              placeholder="https://..."
-            />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Pais o region</span>
-            <input
-              value={country}
-              onChange={(event) => setCountry(event.target.value)}
-              className="app-input"
-              placeholder="Ej: China, USA, Europa, no confirmado..."
-            />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Producto o contexto</span>
-            <textarea
-              value={productContext}
-              onChange={(event) => setProductContext(event.target.value)}
-              rows={3}
-              className="w-full resize-none rounded-lg border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              placeholder="Que producto quieres comprar, marca/modelo, renglon o descripcion tecnica..."
-            />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Notas de riesgo</span>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={3}
-              className="w-full resize-none rounded-lg border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              placeholder="Ej: solo acepta transferencia, correo personal, precio demasiado bajo, no tiene direccion..."
-            />
-          </label>
-
-          <Button type="submit" disabled={loading || loadingConfig} variant="primary" size="lg" className="mt-5 w-full">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            {loading ? "Auditando..." : "Auditar empresa"}
-          </Button>
-
-          {error ? (
-            <div className="mt-4 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          ) : null}
-        </form>
-
-        <div className="space-y-4">
-          {result ? (
-            <>
-              <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-xs font-black uppercase tracking-wide text-brand">Decision operativa</div>
-                    <div className="mt-2 break-words text-2xl font-semibold text-slate-950">{operativeDecision}</div>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">{cleanValue(result.resumen, "Auditoria generada.")}</p>
-                  </div>
-                  <div className="grid min-w-0 gap-2 sm:grid-cols-3 xl:w-[420px]">
-                    <div className={`rounded-lg border p-3 text-center ${scoreTone(typeof technicalScore === "number" ? technicalScore : undefined)}`}>
-                      <div className="text-xs font-semibold opacity-75">Score</div>
-                      <div className="mt-1 text-xl font-semibold">{typeof technicalScore === "number" ? `${technicalScore}/100` : "N/D"}</div>
-                    </div>
-                    <div className={`rounded-lg border p-3 text-center ${riskTone(result.riesgo)}`}>
-                      <div className="text-xs font-semibold opacity-75">Riesgo</div>
-                      <div className="mt-1 text-xl font-semibold">{operativeRisk}</div>
-                    </div>
-                    <div className="rounded-lg border border-line bg-slate-50 p-3 text-center text-slate-800">
-                      <div className="text-xs font-semibold text-muted">Confianza</div>
-                      <div className="mt-1 text-xl font-semibold">{operativeConfidence}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {auditChecklist.map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                      <div className="mt-2 break-words text-sm font-semibold leading-5 text-slate-900">{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className={`mt-4 rounded-lg border p-4 text-sm leading-6 ${decisionTone(result.decision)}`}>
-                  <div className="font-semibold">Siguiente accion</div>
-                  <p className="mt-1">{cleanValue(result.recomendacion_operativa, decisionCopy(result.decision, result.riesgo))}</p>
-                </div>
-              </section>
-
-              {technical ? (
-                <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Verificacion tecnica automatica</div>
-                      <p className="mt-1 text-sm text-muted">
-                        RDAP/WHOIS, SSL/TLS, HTTPS y senales basicas de contacto web.
-                      </p>
-                    </div>
-                    <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${riskTone(result.riesgo_tecnico || technical.scorecard?.riesgo_tecnico)}`}>
-                      {cleanValue(result.decision_tecnica || technical.scorecard?.decision_tecnica, "Pedir validacion")}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">Dominio</div>
-                      <div className="mt-2 break-words text-sm font-semibold text-slate-900">{technical.domain || "No confirmado"}</div>
-                      <div className="mt-1 text-xs text-muted">Edad: {daysLabel(rdap?.domain_age_days)}</div>
-                    </div>
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">RDAP/WHOIS</div>
-                      <div className="mt-2 text-sm font-semibold text-slate-900">{rdap?.available ? "Disponible" : "No disponible"}</div>
-                      <div className="mt-1 text-xs text-muted">Registrador: {cleanValue(rdap?.registrar, "N/D")}</div>
-                    </div>
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">SSL/TLS</div>
-                      <div className="mt-2 text-sm font-semibold text-slate-900">{sslInfo?.valid ? "Valido" : "No confirmado"}</div>
-                      <div className="mt-1 text-xs text-muted">Expira: {daysLabel(sslInfo?.expires_in_days)}</div>
-                    </div>
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">Web/contacto</div>
-                      <div className="mt-2 text-sm font-semibold text-slate-900">{web?.available ? "Accesible" : "No accesible"}</div>
-                      <div className="mt-1 text-xs text-muted">Contacto: {yesNo(web?.has_contact_page)} | HTTPS: {yesNo(web?.https)}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">Correos detectados</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {(web?.emails || []).length ? (web?.emails || []).join(", ") : "No confirmado"}
-                      </div>
-                      {web?.free_email_detected ? (
-                        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
-                          Alerta: correo gratuito detectado.
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="app-data-card">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted">Nameservers</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {(rdap?.nameservers || []).length ? (rdap?.nameservers || []).join(", ") : "No confirmado"}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
-
-              <section className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    Senales positivas
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {(positives.length ? positives : ["No confirmado."]).map((item) => (
-                      <div key={item} className="rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item}</div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <ShieldAlert className="h-4 w-4 text-amber-600" />
-                    Alertas de riesgo
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {(alerts.length ? alerts : ["Sin alertas concretas detectadas, pero validar datos corporativos antes de comprar."]).map((item) => (
-                      <div key={item} className="rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item}</div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                  <div className="text-sm font-semibold text-slate-900">Validaciones pendientes</div>
-                  <div className="mt-3 space-y-2">
-                    {(pending.length ? pending : ["Pedir ficha tecnica, datos fiscales, direccion, contacto corporativo y condiciones de pago."]).map((item) => (
-                      <div key={item} className="rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item}</div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                  <div className="text-sm font-semibold text-slate-900">Preguntas al proveedor</div>
-                  <div className="mt-3 space-y-2">
-                    {(questions.length ? questions : ["Solicitar referencias, ficha tecnica, direccion, cuenta bancaria corporativa, Incoterm, lead time y Net 30 si aplica."]).map((item) => (
-                      <div key={item} className="rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item}</div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">Evidencia revisada</div>
-                    <p className="mt-1 text-sm text-muted">{result.engine || "gemini"} | {result.evidence_count ?? 0} senales</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  {(result.evidencia || []).map((item, index) => (
-                    <div key={`${item.titulo}-${index}`} className="app-data-card">
-                      <div className="text-sm font-semibold text-slate-900">{cleanValue(item.titulo, `Evidencia ${index + 1}`)}</div>
-                      <p className="mt-1 text-sm leading-6 text-slate-700">{cleanValue(item.detalle, "Sin detalle.")}</p>
-                      {item.url ? (
-                        <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-brand">
-                          Abrir fuente <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      ) : null}
-                    </div>
-                  ))}
-                  {!(result.evidencia || []).length ? (
-                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-muted">
-                      No se recibio evidencia detallada. Usa las validaciones pendientes antes de confiar en el proveedor.
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-            </>
-          ) : (
-            <section className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm leading-6 text-muted">
-              Aun no hay auditoria. Ingresa una empresa o proveedor y ejecuta la revision. El resultado debe ayudarte a decidir si avanzar,
-              pedir mas evidencia o descartar.
-            </section>
-          )}
+      <ModuleSection className="p-2">
+        <div className="grid grid-cols-3 gap-2">
+          <button type="button" onClick={() => setView("prepare")} className={`app-tab-button ${view === "prepare" ? "app-tab-button-active" : ""}`}>
+            Preparar <span>Empresa</span>
+          </button>
+          <button type="button" onClick={() => result && setView("result")} disabled={!result} className={`app-tab-button ${view === "result" ? "app-tab-button-active" : ""}`}>
+            Resultado <span>{result ? "Disponible" : "Pendiente"}</span>
+          </button>
+          <button type="button" onClick={() => setView("history")} className={`app-tab-button ${view === "history" ? "app-tab-button-active" : ""}`}>
+            Historial <span>{auditHistory.length} registros</span>
+          </button>
         </div>
-      </section>
+      </ModuleSection>
 
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-base font-semibold text-slate-900">Historial de proveedores auditados</div>
-            <p className="mt-1 text-sm text-muted">Memoria corporativa: aprobados, en validacion y descartados.</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={historySearch}
-              onChange={(event) => setHistorySearch(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              placeholder="Buscar proveedor, dominio o decision"
-            />
-            <button
-              type="button"
-              onClick={() => loadAuditHistory(historySearch)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand"
-            >
-              {loadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Refrescar
-            </button>
-          </div>
+      {error ? (
+        <div className="flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          {error}
         </div>
+      ) : null}
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {auditHistory.map((audit) => (
-            <div key={audit.id} className="rounded-xl border border-line bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="break-words text-sm font-semibold text-slate-950">{cleanValue(audit.company_name, "Sin nombre")}</div>
-                  <div className="mt-1 break-words text-xs text-muted">{cleanValue(audit.website || audit.domain, "Sin web confirmada")}</div>
-                </div>
-                <div className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${decisionTone(audit.decision)}`}>
-                  {cleanValue(audit.decision, "Validar")}
+      {view === "prepare" ? (
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <ModuleSection>
+            <form onSubmit={submitAudit}>
+              <div className="flex items-start gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand"><SearchCheck className="h-5 w-5" /></div>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">¿A quién vamos a validar?</h2>
+                  <p className="mt-1 text-sm leading-6 text-muted">El nombre es obligatorio. La web ayuda a confirmar que estás auditando la empresa correcta.</p>
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className={`rounded-lg border p-2 ${scoreTone(typeof audit.score_final === "number" ? audit.score_final : undefined)}`}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide opacity-75">Score</div>
-                  <div className="mt-1 text-sm font-semibold">{typeof audit.score_final === "number" ? `${audit.score_final}/100` : "N/D"}</div>
+              {draftSource ? <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-brand">{draftSource}</div> : null}
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-ink">Empresa o proveedor *</span>
+                  <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="app-input" placeholder="Ej: ABC Industrial Supply" autoComplete="organization" />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-ink">Sitio web</span>
+                  <input value={website} onChange={(event) => setWebsite(event.target.value)} className="app-input" placeholder="empresa.com" inputMode="url" />
+                </label>
+              </div>
+
+              <details className="mt-5 rounded-lg border border-line bg-slate-50 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-ink">Agregar contexto para una auditoría más precisa</summary>
+                <div className="mt-4 grid gap-4">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-ink">País o región esperada</span>
+                    <input value={country} onChange={(event) => setCountry(event.target.value)} className="app-input" placeholder="Ej: Estados Unidos, China, Europa" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-ink">Producto o contexto comercial</span>
+                    <textarea value={productContext} onChange={(event) => setProductContext(event.target.value)} rows={3} className="app-input min-h-24 resize-y py-3" placeholder="Producto, marca, código ACP o renglones que debe cotizar" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-ink">Señal que te preocupa</span>
+                    <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className="app-input min-h-24 resize-y py-3" placeholder="Ej: precio inusualmente bajo, pago a cuenta personal o correo gratuito" />
+                  </label>
                 </div>
-                <div className={`rounded-lg border p-2 ${riskTone(audit.riesgo)}`}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide opacity-75">Riesgo</div>
-                  <div className="mt-1 text-sm font-semibold">{cleanValue(audit.riesgo, "Medio")}</div>
+              </details>
+
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-5 text-muted">Preauditoría operativa. La aprobación financiera y legal sigue siendo manual.</p>
+                <Button type="submit" disabled={loading || loadingConfig || !hasGeminiKey} variant="primary" size="lg">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {loading ? "Verificando fuentes..." : "Auditar empresa"}
+                </Button>
+              </div>
+            </form>
+          </ModuleSection>
+
+          <ModuleSection className="self-start">
+            <h2 className="text-base font-semibold text-ink">Qué revisa el sistema</h2>
+            <div className="mt-4 space-y-3">
+              {[
+                [Globe2, "Identidad digital", "Dominio, web, país y coherencia corporativa."],
+                [ShieldCheck, "Controles técnicos", "RDAP/WHOIS, edad del dominio, SSL y contacto."],
+                [Search, "Evidencia pública", "Señales comerciales y fuentes encontradas en la web."],
+                [ShieldAlert, "Riesgo operativo", "Alertas, validaciones y preguntas antes de pagar."]
+              ].map(([Icon, title, copy]) => {
+                const ItemIcon = Icon as typeof Globe2;
+                return <div key={String(title)} className="flex gap-3 border-t border-line pt-3 first:border-0 first:pt-0"><ItemIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" /><div><div className="text-sm font-semibold text-ink">{String(title)}</div><p className="mt-1 text-xs leading-5 text-muted">{String(copy)}</p></div></div>;
+              })}
+            </div>
+          </ModuleSection>
+        </div>
+      ) : null}
+
+      {view === "result" ? (
+        result ? (
+          <div className="space-y-5">
+            <ModuleSection>
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 max-w-3xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone={decisionTone(result.decision)}>{cleanValue(result.decision, "Pedir validación")}</StatusBadge>
+                    <StatusBadge tone={riskTone(result.riesgo)}>Riesgo {cleanValue(result.riesgo, "Medio")}</StatusBadge>
+                    <StatusBadge tone={confidenceTone(result.confianza)}>Confianza {cleanValue(result.confianza, "Media")}</StatusBadge>
+                  </div>
+                  <h2 className="mt-4 break-words text-xl font-semibold text-ink">{cleanValue(result.empresa, companyName)}</h2>
+                  <p className="mt-2 text-sm leading-6 text-muted">{cleanValue(result.resumen, "Auditoría completada.")}</p>
+                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <div className="text-xs font-semibold uppercase text-brand">Acción recomendada</div>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-blue-950">{cleanValue(result.recomendacion_operativa, "Validar documentos corporativos y condiciones de pago antes de comprar.")}</p>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-line bg-slate-50 p-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Fecha</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{formatAuditDate(audit.created_at)}</div>
+                <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:w-[390px]">
+                  <div className="rounded-lg border border-line bg-slate-50 p-3"><div className="text-xs font-semibold text-muted">Puntaje final</div><div className="mt-1 text-xl font-semibold text-ink">{typeof score === "number" ? `${score}/100` : "N/D"}</div><div className="mt-1 text-xs text-muted">{scoreLabel(score)}</div></div>
+                  <div className="rounded-lg border border-line bg-slate-50 p-3"><div className="text-xs font-semibold text-muted">Técnico</div><div className="mt-1 text-xl font-semibold text-ink">{typeof result.score_tecnico === "number" ? result.score_tecnico : "N/D"}</div><div className="mt-1 text-xs text-muted">WHOIS + web</div></div>
+                  <div className="col-span-2 rounded-lg border border-line bg-slate-50 p-3 sm:col-span-1"><div className="text-xs font-semibold text-muted">Fuentes</div><div className="mt-1 text-xl font-semibold text-ink">{result.evidence_count ?? 0}</div><div className="mt-1 text-xs text-muted">{grounded ? "Búsqueda web" : "Sin grounding"}</div></div>
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <span className="rounded-full border border-line bg-slate-50 px-2 py-1">Usuario: {cleanValue(audit.username, "N/D")}</span>
-                <span className="rounded-full border border-line bg-slate-50 px-2 py-1">Dominio: {cleanValue(audit.domain, "N/D")}</span>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+                <div className="text-xs leading-5 text-muted">{cleanValue(result.criterio_puntaje, "Resultado combinado con evidencia disponible.")}</div>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setView("prepare")}><RotateCcw className="h-4 w-4" />Nueva auditoría</Button>
               </div>
+            </ModuleSection>
+
+            {!grounded ? (
+              <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                La búsqueda web de Gemini no estuvo disponible. Usa este resultado como orientación y valida manualmente las fuentes antes de comprar.
+              </div>
+            ) : null}
+
+            <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+              <ModuleSection>
+                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" /><h3 className="text-sm font-semibold text-ink">Señales favorables</h3></div>
+                <div className="mt-4 space-y-3">
+                  {(positives.length ? positives : ["No se confirmó una señal favorable suficiente."]).map((item) => <div key={item} className="flex gap-3 border-t border-line pt-3 text-sm leading-6 text-ink first:border-0 first:pt-0"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-600" /><span>{item}</span></div>)}
+                </div>
+              </ModuleSection>
+              <ModuleSection>
+                <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-rose-600" /><h3 className="text-sm font-semibold text-ink">Por qué requiere atención</h3></div>
+                <div className="mt-4 space-y-3">
+                  {(alerts.length ? alerts : ["No se detectaron alertas concretas; conserva la validación comercial estándar."]).map((item) => <div key={item} className="flex gap-3 border-t border-line pt-3 text-sm leading-6 text-ink first:border-0 first:pt-0"><AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-rose-600" /><span>{item}</span></div>)}
+                </div>
+                {safeguards.length ? <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3"><div className="text-xs font-semibold text-amber-900">Reglas de seguridad aplicadas</div><ul className="mt-2 space-y-1 text-xs leading-5 text-amber-900">{safeguards.map((item) => <li key={item}>• {item}</li>)}</ul></div> : null}
+              </ModuleSection>
             </div>
-          ))}
-          {!auditHistory.length ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-muted lg:col-span-2">
-              Todavia no hay auditorias guardadas o no hay resultados para ese filtro.
-            </div>
-          ) : null}
-        </div>
-      </section>
+
+            <ModuleSection>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div><h3 className="text-base font-semibold text-ink">Qué validar antes de avanzar</h3><p className="mt-1 text-sm text-muted">Checklist práctico para solicitar evidencia al proveedor.</p></div>
+                <StatusBadge tone="info">{pending.length} pendientes</StatusBadge>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {(pending.length ? pending : ["Confirmar identidad fiscal, dirección, cuenta bancaria corporativa y capacidad técnica."]).map((item) => <label key={item} className="flex items-start gap-3 rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-ink"><input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-blue-600" /><span>{item}</span></label>)}
+              </div>
+              {questions.length ? <details className="mt-4 rounded-lg border border-line bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-semibold text-ink">Preguntas sugeridas al proveedor ({questions.length})</summary><div className="mt-3 space-y-2">{questions.map((item) => <div key={item} className="border-t border-line pt-2 text-sm leading-6 text-ink first:border-0 first:pt-0">{item}</div>)}</div></details> : null}
+            </ModuleSection>
+
+            <details className="app-surface p-5">
+              <summary className="cursor-pointer text-sm font-semibold text-ink">Verificación técnica: dominio, WHOIS, SSL y contacto</summary>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Dominio", technical?.domain || "No confirmado", `Edad: ${daysLabel(rdap?.domain_age_days)}`],
+                  ["RDAP / WHOIS", rdap?.available ? "Disponible" : "No disponible", `Registrador: ${cleanValue(rdap?.registrar, "N/D")}`],
+                  ["SSL / TLS", sslInfo?.valid ? "Válido" : "No confirmado", `Expira: ${daysLabel(sslInfo?.expires_in_days)}`],
+                  ["Web y contacto", web?.available ? "Accesible" : "No accesible", `Contacto: ${yesNo(web?.has_contact_page)} · HTTPS: ${yesNo(web?.https)}`]
+                ].map(([label, value, detail]) => <div key={label} className="rounded-lg border border-line bg-slate-50 p-3"><div className="text-xs font-semibold text-muted">{label}</div><div className="mt-2 break-words text-sm font-semibold text-ink">{value}</div><div className="mt-1 break-words text-xs leading-5 text-muted">{detail}</div></div>)}
+              </div>
+              {(web?.emails || []).length ? <div className="mt-4 text-sm leading-6 text-ink"><span className="font-semibold">Correos publicados:</span> {(web?.emails || []).join(", ")}</div> : null}
+            </details>
+
+            <details className="app-surface p-5" open={false}>
+              <summary className="cursor-pointer text-sm font-semibold text-ink">Fuentes y evidencia revisada ({result.evidence_count ?? 0})</summary>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {(result.evidencia || []).map((item, index) => <div key={`${item.titulo}-${index}`} className="rounded-lg border border-line bg-slate-50 p-4"><div className="text-sm font-semibold text-ink">{cleanValue(item.titulo, `Evidencia ${index + 1}`)}</div><p className="mt-2 text-sm leading-6 text-muted">{cleanValue(item.detalle, "Sin detalle.")}</p>{item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand">Abrir fuente <ExternalLink className="h-3.5 w-3.5" /></a> : null}</div>)}
+                {!(result.evidencia || []).length ? <EmptyState icon={Search} title="Sin fuentes detalladas" copy="Valida manualmente la identidad y los documentos antes de comprar." className="lg:col-span-2" /> : null}
+              </div>
+            </details>
+          </div>
+        ) : <ModuleSection><EmptyState icon={ShieldCheck} title="Aún no hay una auditoría" copy="Completa el nombre de la empresa y ejecuta la validación." /></ModuleSection>
+      ) : null}
+
+      {view === "history" ? (
+        <ModuleSection>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div><div className="flex items-center gap-2"><History className="h-5 w-5 text-brand" /><h2 className="text-base font-semibold text-ink">Memoria corporativa de proveedores</h2></div><p className="mt-1 text-sm leading-6 text-muted">Visible para Analistas, Supervisores y Gerencia. Evita repetir validaciones sin contexto.</p></div>
+            <form className="flex min-w-0 gap-2" onSubmit={(event) => { event.preventDefault(); loadAuditHistory(historySearch); }}>
+              <input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} className="app-input min-w-0 sm:w-72" placeholder="Empresa, dominio o decisión" />
+              <Button type="submit" variant="secondary" size="icon" title="Buscar auditorías">{loadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
+              <Button type="button" variant="ghost" size="icon" title="Actualizar historial" onClick={() => loadAuditHistory(historySearch)}><RefreshCw className="h-4 w-4" /></Button>
+            </form>
+          </div>
+
+          <div className="mt-5 divide-y divide-line overflow-hidden rounded-lg border border-line">
+            {auditHistory.map((audit) => (
+              <div key={audit.id} className="grid min-w-0 gap-3 bg-panel p-4 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1fr)_110px_130px_170px_auto] lg:items-center">
+                <div className="min-w-0"><div className="break-words text-sm font-semibold text-ink">{cleanValue(audit.company_name, "Sin nombre")}</div><div className="mt-1 break-words text-xs text-muted">{cleanValue(audit.domain || audit.website, "Sin dominio confirmado")}</div></div>
+                <div><div className="text-xs text-muted">Puntaje</div><div className="mt-1 text-sm font-semibold text-ink">{typeof audit.score_final === "number" ? `${audit.score_final}/100` : "N/D"}</div></div>
+                <div className="flex flex-wrap gap-2 lg:block"><StatusBadge tone={riskTone(audit.riesgo)}>Riesgo {cleanValue(audit.riesgo, "N/D")}</StatusBadge></div>
+                <div><div className="text-xs text-muted">{formatAuditDate(audit.created_at)}</div><div className="mt-1 text-xs text-muted">Por {cleanValue(audit.username, "N/D")}</div></div>
+                <Button type="button" variant="secondary" size="sm" onClick={() => reuseAudit(audit)}><RotateCcw className="h-4 w-4" />Revisar de nuevo</Button>
+              </div>
+            ))}
+            {!auditHistory.length ? <EmptyState icon={History} title="No hay auditorías con ese filtro" copy="Cambia la búsqueda o crea la primera auditoría corporativa." /> : null}
+          </div>
+        </ModuleSection>
+      ) : null}
     </div>
   );
 }
-
-
-
-
-
-
-

@@ -20,9 +20,9 @@ export function DataTable<TData>({
   if (!data.length) return <EmptyState title={emptyTitle} copy={emptyCopy} />;
 
   return (
-    <div className={cn("overflow-x-auto rounded-xl border border-line", className)}>
-      <table className="min-w-full border-collapse text-sm">
-        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-muted">
+    <div className={cn("app-table-shell overflow-x-auto", className)}>
+      <table className="app-table min-w-full border-collapse text-sm">
+        <thead className="text-left text-xs uppercase text-muted">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
@@ -33,11 +33,11 @@ export function DataTable<TData>({
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-line bg-white">
+        <tbody className="divide-y divide-line">
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className="hover:bg-blue-50/40">
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-4 py-3 align-top text-slate-700">
+                <td key={cell.id} className="px-4 py-3 align-top text-ink">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}

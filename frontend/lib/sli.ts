@@ -6,6 +6,10 @@ export type SliActa = {
   resumen?: string;
   hallazgos?: string[];
   texto_muestra?: string;
+  menciona_proyelec?: boolean;
+  menciona_ep_international?: boolean;
+  posible_adjudicacion_propia?: boolean;
+  cumplimiento_tecnico?: "cumple" | "no_cumple" | "indeterminado";
   error?: string | null;
 };
 
@@ -24,6 +28,7 @@ export type SliLookupResult = {
   fecha_cierre?: string | null;
   fecha_publicacion?: string | null;
   ultima_revision?: string | null;
+  numero_enmienda?: string | null;
   agente_compras?: string | null;
   codigos_acp_detectados?: string[];
   renglones_detectados?: SliDetectedItem[];

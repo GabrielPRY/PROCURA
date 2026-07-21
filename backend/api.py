@@ -28,6 +28,7 @@ import base64
 import hmac
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import unicodedata
 import socket
 import ssl
@@ -40,6 +41,9 @@ from urllib.parse import urljoin, urlparse
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from dotenv import load_dotenv
+from decimal import Decimal, InvalidOperation
+import uuid
+import requests
 import database as db
 import logging
 from logging.handlers import RotatingFileHandler
@@ -245,6 +249,16 @@ def require_logistics_admin_session(
     role = str(session.get("r") or "")
     if role not in ("Logistica", "Admin"):
         raise HTTPException(status_code=403, detail="Solo Logistica o Admin puede modificar valores logisticos.")
+    return session
+
+
+def require_management_session(
+    _token: str = Depends(verify_internal_token),
+    session: Dict[str, Any] = Depends(verify_session_token),
+) -> Dict[str, Any]:
+    role = str(session.get("r") or "").strip()
+    if role not in ("Gerencia", "Admin"):
+        raise HTTPException(status_code=403, detail="Solo Gerencia o Admin puede consultar metricas.")
     return session
 # --- 3. APP FASTAPI ---
 app = FastAPI(title="Proyelec Core API v6.1")
@@ -1585,6 +1599,66 @@ class LogisticsForwarderRequest(BaseModel):
     observacion: str = ""
     activo: bool = True
 
+class LogisticsAddressRequest(BaseModel):
+    name: str = ""
+    address_line: str = ""
+    city: str = ""
+    state: str = ""
+    postal_code: str = ""
+    country_code: str = "US"
+    residential: bool = False
+
+class LogisticsPackageRequest(BaseModel):
+    package_type: str = "02"
+    quantity: int = 1
+    weight: float
+    weight_unit: str = "LBS"
+    length: float
+    width: float
+    height: float
+    dimension_unit: str = "IN"
+    description: str = ""
+
+class UpsQuoteRequest(BaseModel):
+    username: str = ""
+    origin: LogisticsAddressRequest
+    destination: LogisticsAddressRequest
+    packages: List[LogisticsPackageRequest]
+    pickup_date: str = ""
+    declared_value: float = 0
+    shipper_number: str = ""
+    licitacion: str = ""
+    renglon: str = ""
+
+class SchneiderCommodityRequest(BaseModel):
+    description: str = "General freight"
+    quantity: int = 1
+    weight: float
+    weight_unit: str = "LB"
+    length: float = 0
+    width: float = 0
+    height: float = 0
+    dimension_unit: str = "IN"
+    freight_class: str = ""
+    hazardous: bool = False
+
+class SchneiderQuoteRequest(BaseModel):
+    username: str = ""
+    origin: LogisticsAddressRequest
+    destination: LogisticsAddressRequest
+    commodities: List[SchneiderCommodityRequest]
+    mode: str = "LTL"
+    equipment: str = ""
+    services: List[str] = []
+    scac: str = ""
+    pickup_start: str = ""
+    pickup_end: str = ""
+    delivery_start: str = ""
+    delivery_end: str = ""
+    load_value: float = 0
+    licitacion: str = ""
+    renglon: str = ""
+
 class SourcingItem(BaseModel):
     renglon: Optional[str] = ""
     codigo_acp: Optional[str] = ""
@@ -2104,7 +2178,8 @@ def _audit_normalize_url(value: str):
     if not re.match(r"^https://", text, flags=re.IGNORECASE):
         text = f"https://{text}"
     parsed = urlparse(text)
-    if not parsed.netloc:
+    hostname = (parsed.hostname or "").strip()
+    if not parsed.netloc or "." not in hostname or re.search(r"\s", hostname):
         return ""
     return text
 
@@ -2295,7 +2370,7 @@ def _audit_website_signals(url: str):
         unique_emails = list(dict.fromkeys(email.lower() for email in emails))[:8]
         result["emails"] = unique_emails
         result["free_email_detected"] = any(re.search(r"@(gmail|yahoo|hotmail|outlook|qq|163|126)\.", email) for email in unique_emails)
-        result["phones_detected"] = len(re.findall(r"(:\+\d{1,3}[\s.-])(:\(\d{2,4}\)[\s.-]){2,4}\d{3,4}", raw))
+        result["phones_detected"] = len(re.findall(r"(?:\+\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{3,4}", raw))
         return result
     except Exception as exc:
         result["error"] = str(exc)[:300]
@@ -2399,16 +2474,79 @@ def _audit_score_signals(signals: dict):
 def _audit_collect_technical_signals(company_name: str, website: str):
     normalized_url = _audit_normalize_url(website)
     domain = _audit_domain_from_url(normalized_url)
+    if domain:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            rdap_future = executor.submit(_audit_rdap_lookup, domain)
+            ssl_future = executor.submit(_audit_ssl_info, domain)
+            website_future = executor.submit(_audit_website_signals, normalized_url)
+            rdap_result = rdap_future.result()
+            ssl_result = ssl_future.result()
+            website_result = website_future.result()
+    else:
+        rdap_result = {"available": False, "error": "Sin dominio."}
+        ssl_result = {"available": False, "valid": False, "error": "Sin dominio."}
+        website_result = {"available": False, "error": "Sin URL."}
     signals = {
         "company_name": company_name,
         "normalized_url": normalized_url,
         "domain": domain,
-        "rdap": _audit_rdap_lookup(domain) if domain else {"available": False, "error": "Sin dominio."},
-        "ssl": _audit_ssl_info(domain) if domain else {"available": False, "valid": False, "error": "Sin dominio."},
-        "website": _audit_website_signals(normalized_url) if normalized_url else {"available": False, "error": "Sin URL."},
+        "rdap": rdap_result,
+        "ssl": ssl_result,
+        "website": website_result,
     }
     signals["scorecard"] = _audit_score_signals(signals)
     return signals
+
+def _audit_finalize_assessment(result: dict, technical_signals: dict):
+    scorecard = technical_signals.get("scorecard", {}) or {}
+    rdap = technical_signals.get("rdap", {}) or {}
+    website = technical_signals.get("website", {}) or {}
+    domain = str(technical_signals.get("domain", "") or "").strip()
+
+    try:
+        ai_score = max(0, min(100, int(float(result.get("score_final", 50)))))
+    except (TypeError, ValueError):
+        ai_score = 50
+    try:
+        technical_score = max(0, min(100, int(float(scorecard.get("score", 50)))))
+    except (TypeError, ValueError):
+        technical_score = 50
+
+    final_score = round((technical_score * 0.65) + (ai_score * 0.35)) if domain else min(ai_score, 55)
+    safeguards = []
+    domain_age = rdap.get("domain_age_days")
+    if isinstance(domain_age, int) and domain_age < 90:
+        final_score = min(final_score, 39)
+        safeguards.append("Dominio creado hace menos de 90 dias.")
+    elif isinstance(domain_age, int) and domain_age < 365:
+        final_score = min(final_score, 59)
+        safeguards.append("Dominio con menos de un ano de antiguedad.")
+    if website.get("free_email_detected"):
+        final_score = min(final_score, 59)
+        safeguards.append("Se detecto correo gratuito en la web.")
+    if domain and not rdap.get("available") and not website.get("available"):
+        final_score = min(final_score, 44)
+        safeguards.append("No fue posible validar registro de dominio ni acceso web.")
+    if not domain:
+        safeguards.append("No hay dominio corporativo confirmado.")
+
+    model_risk = str(result.get("riesgo", "") or "").strip().lower()
+    model_decision = str(result.get("decision", "") or "").strip().lower()
+    if "alto" in model_risk:
+        final_score = min(final_score, 49)
+    if "descartar" in model_decision:
+        final_score = min(final_score, 39)
+
+    risk = "Bajo" if final_score >= 75 else "Medio" if final_score >= 50 else "Alto"
+    decision = "Avanzar" if final_score >= 82 else "Avanzar con cautela" if final_score >= 65 else "Pedir validacion" if final_score >= 45 else "Descartar"
+    result["score_ia"] = ai_score
+    result["score_tecnico"] = technical_score
+    result["score_final"] = final_score
+    result["riesgo"] = risk
+    result["decision"] = decision
+    result["criterio_puntaje"] = "65% evidencia tecnica y 35% investigacion IA" if domain else "Puntaje limitado por falta de dominio verificable"
+    result["reglas_seguridad_aplicadas"] = safeguards
+    return result
 
 def _audit_company_with_gemini(gemini_key: str, payload: dict, use_google_search=True):
     from google.genai import types
@@ -2659,11 +2797,376 @@ def metrics_usage(
     days: int = Query(30, ge=1, le=365),
     username: Optional[str] = Query(None),
     module: Optional[str] = Query(None),
-    _token: str = Depends(verify_internal_token),
+    _session: Dict[str, Any] = Depends(require_management_session),
 ):
     summary = db.get_usage_summary(days=days, username=username, module=module)
     options = db.get_usage_filter_options(days=max(days, 30))
     return {"status": "success", "summary": _json_summary(summary), "options": _radar_json_safe(options)}
+
+
+UPS_SERVICE_NAMES = {
+    "01": "UPS Next Day Air",
+    "02": "UPS 2nd Day Air",
+    "03": "UPS Ground",
+    "07": "UPS Worldwide Express",
+    "08": "UPS Worldwide Expedited",
+    "11": "UPS Standard",
+    "12": "UPS 3 Day Select",
+    "13": "UPS Next Day Air Saver",
+    "14": "UPS Next Day Air Early",
+    "54": "UPS Worldwide Express Plus",
+    "59": "UPS 2nd Day Air A.M.",
+    "65": "UPS Worldwide Saver",
+}
+_UPS_TOKEN_CACHE = {"environment": "", "access_token": "", "expires_at": 0.0}
+
+
+def _carrier_decimal(value: Any, default: str = "0") -> Decimal:
+    if isinstance(value, dict):
+        value = value.get("MonetaryValue", value.get("amount", value.get("value", default)))
+    try:
+        return Decimal(str(value if value not in (None, "") else default))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal(default)
+
+
+def _carrier_error_message(response: requests.Response, carrier: str) -> str:
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+    candidates = []
+    if isinstance(payload, dict):
+        response_node = payload.get("response") or payload.get("Response") or {}
+        errors = response_node.get("errors") or response_node.get("Errors") or payload.get("errors") or []
+        if isinstance(errors, dict):
+            errors = [errors]
+        for error in errors:
+            if isinstance(error, dict):
+                candidates.append(error.get("message") or error.get("Message") or error.get("description"))
+        candidates.extend([payload.get("message"), payload.get("detail"), payload.get("title")])
+    message = next((str(item).strip() for item in candidates if item), "")
+    return message or f"{carrier} rechazo la solicitud (HTTP {response.status_code})."
+
+
+def _validate_domestic_address(address: LogisticsAddressRequest, label: str) -> None:
+    country = str(address.country_code or "US").strip().upper()
+    if country != "US":
+        raise HTTPException(status_code=400, detail=f"{label}: esta calculadora solo admite direcciones dentro de Estados Unidos.")
+    if not re.fullmatch(r"\d{5}(?:-\d{4})?", str(address.postal_code or "").strip()):
+        raise HTTPException(status_code=400, detail=f"{label}: ingresa un ZIP Code valido de 5 o 9 digitos.")
+    if not str(address.city or "").strip() or not re.fullmatch(r"[A-Za-z]{2}", str(address.state or "").strip()):
+        raise HTTPException(status_code=400, detail=f"{label}: ciudad y estado de dos letras son obligatorios.")
+
+
+def _validate_packages(packages: List[LogisticsPackageRequest]) -> None:
+    total = sum(max(0, int(package.quantity or 0)) for package in packages)
+    if not packages or total < 1:
+        raise HTTPException(status_code=400, detail="Agrega al menos un paquete para cotizar.")
+    if total > 50:
+        raise HTTPException(status_code=400, detail="La cotizacion admite hasta 50 piezas por solicitud.")
+    for package in packages:
+        if package.weight <= 0 or min(package.length, package.width, package.height) <= 0:
+            raise HTTPException(status_code=400, detail="Peso y dimensiones deben ser mayores que cero en cada paquete.")
+
+
+def _ups_environment() -> str:
+    return "production" if os.getenv("UPS_ENVIRONMENT", "sandbox").strip().lower() in {"production", "prod", "live"} else "sandbox"
+
+
+def _ups_urls() -> Dict[str, str]:
+    if _ups_environment() == "production":
+        return {
+            "token": "https://onlinetools.ups.com/security/v1/oauth/token",
+            "api": "https://onlinetools.ups.com/api",
+        }
+    return {
+        "token": "https://wwwcie.ups.com/security/v1/oauth/token",
+        "api": "https://wwwcie.ups.com/api",
+    }
+
+
+def _ups_access_token() -> str:
+    client_id = os.getenv("UPS_CLIENT_ID", "").strip()
+    client_secret = os.getenv("UPS_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=503, detail="UPS no esta configurado. Logistica debe registrar UPS_CLIENT_ID y UPS_CLIENT_SECRET en Railway.")
+    environment = _ups_environment()
+    if _UPS_TOKEN_CACHE["environment"] == environment and _UPS_TOKEN_CACHE["access_token"] and float(_UPS_TOKEN_CACHE["expires_at"]) > time.time() + 60:
+        return str(_UPS_TOKEN_CACHE["access_token"])
+    try:
+        response = requests.post(
+            _ups_urls()["token"],
+            auth=(client_id, client_secret),
+            data={"grant_type": "client_credentials"},
+            headers={"Content-Type": "application/x-www-form-urlencoded", "x-merchant-id": os.getenv("UPS_ACCOUNT_NUMBER", "").strip()},
+            timeout=25,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible conectar con la autenticacion de UPS: {user_friendly_external_error(exc, 'UPS')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "UPS"))
+    payload = response.json()
+    token = str(payload.get("access_token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=502, detail="UPS no devolvio un token de acceso valido.")
+    _UPS_TOKEN_CACHE.update({
+        "environment": environment,
+        "access_token": token,
+        "expires_at": time.time() + int(payload.get("expires_in") or 3600),
+    })
+    return token
+
+
+def _ups_address_payload(address: LogisticsAddressRequest) -> Dict[str, Any]:
+    result = {
+        "AddressLine": [str(address.address_line or "").strip()] if str(address.address_line or "").strip() else [],
+        "City": str(address.city or "").strip(),
+        "StateProvinceCode": str(address.state or "").strip().upper(),
+        "PostalCode": str(address.postal_code or "").strip(),
+        "CountryCode": "US",
+    }
+    if address.residential:
+        result["ResidentialAddressIndicator"] = "Y"
+    return result
+
+
+def _ups_package_payload(package: LogisticsPackageRequest) -> Dict[str, Any]:
+    return {
+        "PackagingType": {"Code": str(package.package_type or "02"), "Description": package.description or "Package"},
+        "Dimensions": {
+            "UnitOfMeasurement": {"Code": str(package.dimension_unit or "IN").upper()},
+            "Length": f"{package.length:g}",
+            "Width": f"{package.width:g}",
+            "Height": f"{package.height:g}",
+        },
+        "PackageWeight": {
+            "UnitOfMeasurement": {"Code": str(package.weight_unit or "LBS").upper()},
+            "Weight": f"{package.weight:g}",
+        },
+    }
+
+
+def _normalize_ups_quotes(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rate_response = payload.get("RateResponse") or payload.get("rateResponse") or {}
+    shipments = rate_response.get("RatedShipment") or rate_response.get("ratedShipment") or []
+    if isinstance(shipments, dict):
+        shipments = [shipments]
+    quotes = []
+    for shipment in shipments:
+        if not isinstance(shipment, dict):
+            continue
+        service = shipment.get("Service") or shipment.get("service") or {}
+        code = str(service.get("Code") or service.get("code") or "")
+        negotiated = shipment.get("NegotiatedRateCharges") or {}
+        charge = negotiated.get("TotalCharge") or shipment.get("TotalCharges") or {}
+        total = _carrier_decimal(charge)
+        currency = str(charge.get("CurrencyCode") or charge.get("currencyCode") or "USD") if isinstance(charge, dict) else "USD"
+        transit = shipment.get("TimeInTransit") or {}
+        service_summary = transit.get("ServiceSummary") or {}
+        arrival = service_summary.get("EstimatedArrival") or {}
+        arrival_node = arrival.get("Arrival") or {}
+        quotes.append({
+            "id": f"ups-{code}-{len(quotes) + 1}",
+            "carrier": "UPS",
+            "service_code": code,
+            "service_name": str(service.get("Description") or UPS_SERVICE_NAMES.get(code) or f"UPS servicio {code}"),
+            "total": float(total),
+            "currency": currency,
+            "business_days": int(arrival.get("BusinessDaysInTransit") or 0),
+            "delivery_date": str(arrival_node.get("Date") or arrival.get("Date") or ""),
+            "delivery_time": str(arrival_node.get("Time") or arrival.get("Time") or ""),
+            "negotiated": bool(negotiated),
+        })
+    return sorted(quotes, key=lambda item: item["total"] if item["total"] > 0 else float("inf"))
+
+
+def _schneider_authorization() -> str:
+    bearer = os.getenv("SCHNEIDER_BEARER_TOKEN", "").strip()
+    if bearer:
+        return f"Bearer {bearer}"
+    client_id = os.getenv("SCHNEIDER_CLIENT_ID", "").strip()
+    client_secret = os.getenv("SCHNEIDER_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=503, detail="Schneider no esta configurado. Registra sus credenciales de API en Railway.")
+    encoded = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
+    return f"Basic {encoded}"
+
+
+def _schneider_address_payload(address: LogisticsAddressRequest) -> Dict[str, Any]:
+    return {
+        "name": str(address.name or "").strip(),
+        "addressLine1": str(address.address_line or "").strip(),
+        "city": str(address.city or "").strip(),
+        "state": str(address.state or "").strip().upper(),
+        "postalCode": str(address.postal_code or "").strip(),
+        "country": "US",
+    }
+
+
+def _normalize_schneider_quote(payload: Dict[str, Any]) -> Dict[str, Any]:
+    quote = payload.get("quote") if isinstance(payload.get("quote"), dict) else payload
+    total_node = quote.get("totalPrice", quote.get("total", 0))
+    currency = "USD"
+    if isinstance(total_node, dict):
+        currency = str(total_node.get("currency") or total_node.get("currencyCode") or "USD")
+    return {
+        "id": str(quote.get("quoteId") or quote.get("id") or f"schneider-{uuid.uuid4().hex[:8]}"),
+        "carrier": "Schneider",
+        "service_code": str(quote.get("mode") or ""),
+        "service_name": str(quote.get("serviceName") or quote.get("mode") or "Schneider domestic freight"),
+        "total": float(_carrier_decimal(total_node)),
+        "currency": currency,
+        "line_haul": float(_carrier_decimal(quote.get("lineHaul", 0))),
+        "fuel": float(_carrier_decimal(quote.get("fuel", 0))),
+        "accessorials": float(_carrier_decimal(quote.get("accessorials", 0))),
+        "transit_days": int(quote.get("transitDays") or 0),
+        "pickup_at": str(quote.get("startDateTime") or ""),
+        "delivery_at": str(quote.get("endDateTime") or ""),
+        "expires_at": str(quote.get("quoteExpiration") or ""),
+        "accessorial_list": quote.get("accessorialList") if isinstance(quote.get("accessorialList"), list) else [],
+    }
+
+
+@app.get("/api/v1/logistics/carriers/status")
+def logistics_carriers_status(_token: str = Depends(verify_internal_token)):
+    ups_ready = bool(os.getenv("UPS_CLIENT_ID", "").strip() and os.getenv("UPS_CLIENT_SECRET", "").strip())
+    schneider_ready = bool(
+        os.getenv("SCHNEIDER_SUBSCRIPTION_KEY", "").strip()
+        and (os.getenv("SCHNEIDER_BEARER_TOKEN", "").strip() or (os.getenv("SCHNEIDER_CLIENT_ID", "").strip() and os.getenv("SCHNEIDER_CLIENT_SECRET", "").strip()))
+        and (os.getenv("SCHNEIDER_SCAC", "").strip())
+    )
+    return {
+        "status": "success",
+        "carriers": {
+            "ups": {"configured": ups_ready, "environment": _ups_environment(), "official": True},
+            "schneider": {"configured": schneider_ready, "environment": os.getenv("SCHNEIDER_ENVIRONMENT", "production"), "official": True},
+        },
+    }
+
+
+@app.post("/api/v1/logistics/quotes/ups")
+def logistics_quote_ups(req: UpsQuoteRequest, _token: str = Depends(verify_internal_token)):
+    _validate_domestic_address(req.origin, "Origen")
+    _validate_domestic_address(req.destination, "Destino")
+    _validate_packages(req.packages)
+    shipper_number = str(req.shipper_number or os.getenv("UPS_ACCOUNT_NUMBER", "")).strip()
+    package_payloads = []
+    for package in req.packages:
+        package_payloads.extend([_ups_package_payload(package) for _ in range(max(1, int(package.quantity)))])
+    shipment = {
+        "Shipper": {"Name": req.origin.name or "Supplier", "Address": _ups_address_payload(req.origin)},
+        "ShipFrom": {"Name": req.origin.name or "Supplier", "Address": _ups_address_payload(req.origin)},
+        "ShipTo": {"Name": req.destination.name or "Forwarder", "Address": _ups_address_payload(req.destination)},
+        "NumOfPieces": str(len(package_payloads)),
+        "Package": package_payloads,
+        "DeliveryTimeInformation": {
+            "PackageBillType": "03",
+            "Pickup": {"Date": (req.pickup_date or datetime.now().strftime("%Y-%m-%d")).replace("-", ""), "Time": "1000"},
+        },
+    }
+    if req.declared_value > 0:
+        shipment["InvoiceLineTotal"] = {"CurrencyCode": "USD", "MonetaryValue": f"{req.declared_value:.2f}"}
+    if shipper_number:
+        shipment["Shipper"]["ShipperNumber"] = shipper_number
+        shipment["PaymentDetails"] = {"ShipmentCharge": [{"Type": "01", "BillShipper": {"AccountNumber": shipper_number}}]}
+        shipment["ShipmentRatingOptions"] = {"NegotiatedRatesIndicator": "Y"}
+    request_payload = {
+        "RateRequest": {
+            "Request": {"RequestOption": "Shoptimeintransit", "TransactionReference": {"CustomerContext": f"Procura AI {req.licitacion or req.username}"}},
+            "Shipment": shipment,
+        }
+    }
+    try:
+        response = requests.post(
+            f"{_ups_urls()['api']}/rating/v2409/Shoptimeintransit",
+            headers={
+                "Authorization": f"Bearer {_ups_access_token()}",
+                "Content-Type": "application/json",
+                "transId": uuid.uuid4().hex[:32],
+                "transactionSrc": "ProcuraAI",
+            },
+            json=request_payload,
+            timeout=45,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible conectar con UPS: {user_friendly_external_error(exc, 'UPS')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "UPS"))
+    provider_payload = response.json()
+    quotes = _normalize_ups_quotes(provider_payload)
+    if not quotes:
+        raise HTTPException(status_code=502, detail="UPS respondio correctamente, pero no devolvio servicios cotizables para esta ruta.")
+    return {"status": "success", "provider": "UPS", "official": True, "environment": _ups_environment(), "quotes": quotes}
+
+
+@app.post("/api/v1/logistics/quotes/schneider")
+def logistics_quote_schneider(req: SchneiderQuoteRequest, _token: str = Depends(verify_internal_token)):
+    _validate_domestic_address(req.origin, "Origen")
+    _validate_domestic_address(req.destination, "Destino")
+    if not req.commodities:
+        raise HTTPException(status_code=400, detail="Agrega al menos una mercancia para cotizar.")
+    scac = str(req.scac or os.getenv("SCHNEIDER_SCAC", "")).strip()
+    subscription_key = os.getenv("SCHNEIDER_SUBSCRIPTION_KEY", "").strip()
+    if not scac or not subscription_key:
+        raise HTTPException(status_code=503, detail="Schneider no esta configurado. Faltan SCHNEIDER_SCAC o SCHNEIDER_SUBSCRIPTION_KEY en Railway.")
+    commodities = []
+    for commodity in req.commodities:
+        if commodity.weight <= 0 or commodity.quantity < 1:
+            raise HTTPException(status_code=400, detail="Cantidad y peso deben ser mayores que cero en cada mercancia.")
+        if str(req.mode or "").upper() == "LTL" and not str(commodity.freight_class or "").strip():
+            raise HTTPException(status_code=400, detail="Schneider requiere Freight Class para una cotizacion LTL.")
+        row = {
+            "description": commodity.description,
+            "count": commodity.quantity,
+            "weight": {"value": commodity.weight, "unit": commodity.weight_unit.upper()},
+            "hazardous": commodity.hazardous,
+        }
+        if commodity.length > 0 and commodity.width > 0 and commodity.height > 0:
+            row["dimensions"] = {
+                "length": commodity.length,
+                "width": commodity.width,
+                "height": commodity.height,
+                "unit": commodity.dimension_unit.upper(),
+            }
+        if commodity.freight_class:
+            row["freightClass"] = commodity.freight_class
+        commodities.append(row)
+    payload = {
+        "scac": scac,
+        "mode": str(req.mode or "LTL").upper(),
+        "stops": [
+            {"stopType": "PICKUP", "sequence": 1, "address": _schneider_address_payload(req.origin), "startDateTime": req.pickup_start, "endDateTime": req.pickup_end},
+            {"stopType": "DELIVERY", "sequence": 2, "address": _schneider_address_payload(req.destination), "startDateTime": req.delivery_start, "endDateTime": req.delivery_end},
+        ],
+        "commodities": commodities,
+    }
+    if req.equipment:
+        payload["equipment"] = req.equipment
+    if req.services:
+        payload["services"] = req.services
+    if req.load_value > 0:
+        payload["loadValue"] = {"amount": req.load_value, "currency": "USD"}
+    base_url = os.getenv("SCHNEIDER_API_BASE_URL", "https://api.schneider.com/005/quote/v1").strip().rstrip("/")
+    try:
+        response = requests.post(
+            f"{base_url}/quotes",
+            headers={
+                "Ocp-Apim-Subscription-Key": subscription_key,
+                "Authorization": _schneider_authorization(),
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=60,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible conectar con Schneider: {user_friendly_external_error(exc, 'Schneider')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "Schneider"))
+    quote = _normalize_schneider_quote(response.json())
+    if quote["total"] <= 0:
+        raise HTTPException(status_code=502, detail="Schneider respondio, pero no devolvio un total cotizable. Revisa modo, SCAC y servicios autorizados.")
+    return {"status": "success", "provider": "Schneider", "official": True, "environment": os.getenv("SCHNEIDER_ENVIRONMENT", "production"), "quotes": [quote]}
 
 @app.get("/api/v1/logistics/settings")
 def logistics_settings(_token: str = Depends(verify_internal_token)):
@@ -2761,7 +3264,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
     started_at = time.perf_counter()
     api_key_clean = _resolve_gemini_key(req.username, req.gemini_key)
     target_count = max(3, min(10, int(req.target_count or 10)))
-    contexts = [item.model_dump() for item in req.items[:5]]
+    contexts = [item.model_dump() for item in req.items[:12]]
     if not contexts:
         raise HTTPException(status_code=400, detail="No hay renglones para buscar proveedores.")
     if not api_key_clean:
@@ -2772,6 +3275,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
     evidence_count = 0
     used_models = set()
     usage_metadata = None
+    grounding_used = True
 
     try:
         integral_mode = str(req.sourcing_strategy or "").strip().lower() in {"proveedor_integral", "integral", "multi_renglon"} and len(contexts) > 1
@@ -2786,6 +3290,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
                 )
             except Exception as exc:
                 logger.warning(f"Sourcing integral con Google Search no disponible, usando Gemini sin grounding: {exc}")
+                grounding_used = False
                 summary, rows, urls_found, used_model, usage = _ai_find_integral_providers_with_gemini(
                     api_key_clean,
                     contexts,
@@ -2813,6 +3318,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
                     )
                 except Exception as exc:
                     logger.warning(f"Sourcing con Google Search no disponible, usando Gemini sin grounding: {exc}")
+                    grounding_used = False
                     summary, rows, urls_found, used_model, usage = _ai_find_providers_with_gemini(
                         api_key_clean,
                         ctx,
@@ -2852,7 +3358,55 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
                 coverage_bonus += 20
             return technical + saving + decision_bonus + has_url + coverage_bonus - risk_penalty
 
-        ranked = sorted(all_rows, key=sort_key, reverse=True)[:target_count]
+        def coverage_count(value):
+            try:
+                return int(float(value or 0))
+            except (TypeError, ValueError):
+                return 0
+
+        ordered_rows = sorted(all_rows, key=sort_key, reverse=True)
+        ranked = []
+        provider_positions = {}
+        for row in ordered_rows:
+            url = str(row.get("url", "") or "").strip()
+            domain = _audit_domain_from_url(_audit_normalize_url(url)) if url else ""
+            normalized_name = unicodedata.normalize("NFKD", str(row.get("proveedor", "") or ""))
+            normalized_name = "".join(char for char in normalized_name if not unicodedata.combining(char))
+            normalized_name = re.sub(r"[^a-z0-9]+", " ", normalized_name.lower()).strip()
+            provider_key = domain or normalized_name
+
+            covered_rows = row.get("renglones_cubiertos") if isinstance(row.get("renglones_cubiertos"), list) else []
+            if row.get("renglon") not in (None, ""):
+                covered_rows = [*covered_rows, row.get("renglon")]
+            covered_rows = list(dict.fromkeys(str(value).strip() for value in covered_rows if str(value).strip()))
+            row["renglones_cubiertos"] = covered_rows
+            row["cobertura_renglones"] = max(coverage_count(row.get("cobertura_renglones")), len(covered_rows))
+
+            if provider_key and provider_key in provider_positions:
+                existing = ranked[provider_positions[provider_key]]
+                merged_rows = list(dict.fromkeys([
+                    *(existing.get("renglones_cubiertos") or []),
+                    *covered_rows,
+                ]))
+                existing["renglones_cubiertos"] = merged_rows
+                existing["cobertura_renglones"] = max(
+                    coverage_count(existing.get("cobertura_renglones")),
+                    coverage_count(row.get("cobertura_renglones")),
+                    len(merged_rows),
+                )
+                continue
+
+            if not url:
+                row["riesgo"] = "Alto"
+                if "recomendado" in str(row.get("decision", "")).lower():
+                    row["decision"] = "Validar antes de cotizar"
+            if provider_key:
+                provider_positions[provider_key] = len(ranked)
+            ranked.append(row)
+            if len(ranked) >= target_count:
+                break
+
+        engine_name = "gemini_google_search" if grounding_used else "gemini_reasoning_without_grounding"
         tokens_input, tokens_output, tokens_total = db.extract_usage_counts(usage_metadata)
         db.log_usage_event(
             username=req.username,
@@ -2870,7 +3424,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
                 "evidence_count": evidence_count,
                 "items": len(contexts),
                 "target_count": target_count,
-                "engine": "gemini_google_search",
+                "engine": engine_name,
                 "search_requests": 1 if integral_mode else len(contexts),
                 "sourcing_strategy": "proveedor_integral" if integral_mode else "por_renglon",
             },
@@ -2880,7 +3434,7 @@ def sourcing_providers(req: SourcingRequest, _token: str = Depends(verify_intern
             "resumen": " ".join(summaries[:3]) or ("Ranking integral generado con Gemini." if integral_mode else "Ranking preliminar generado con Gemini."),
             "proveedores": _radar_json_safe(ranked),
             "evidence_count": evidence_count,
-            "engine": "gemini_google_search",
+            "engine": engine_name,
             "search_plan": [_manual_sourcing_plan(ctx, custom_prompt=req.custom_prompt, depth=req.depth) for ctx in contexts],
         }
     except HTTPException:
@@ -2928,22 +3482,17 @@ def audit_company(req: CompanyAuditRequest, _token: str = Depends(verify_interna
             result, evidence_count, used_model, usage = _audit_company_with_gemini(api_key_clean, payload, use_google_search=False)
             engine = "gemini"
 
+        discovered_url = _audit_normalize_url(result.get("website", ""))
+        discovered_domain = _audit_domain_from_url(discovered_url)
+        if discovered_domain and discovered_domain != technical_signals.get("domain"):
+            technical_signals = _audit_collect_technical_signals(company_name, discovered_url)
+
         scorecard = technical_signals.get("scorecard", {}) or {}
-        score_final = result.get("score_final")
-        try:
-            score_final = int(float(score_final))
-        except Exception:
-            score_final = int(scorecard.get("score", 50))
-        score_final = max(0, min(100, score_final))
-        result["score_final"] = score_final
+        result = _audit_finalize_assessment(result, technical_signals)
         result["auditoria_tecnica"] = technical_signals
         result["riesgo_tecnico"] = scorecard.get("riesgo_tecnico")
         result["decision_tecnica"] = scorecard.get("decision_tecnica")
-        if not result.get("riesgo"):
-            result["riesgo"] = scorecard.get("riesgo_tecnico", "Medio")
-        if not result.get("decision"):
-            result["decision"] = scorecard.get("decision_tecnica", "Pedir validacion")
-        if not result.get("website") and technical_signals.get("normalized_url"):
+        if technical_signals.get("normalized_url"):
             result["website"] = technical_signals.get("normalized_url")
 
         technical_alerts = scorecard.get("alertas", []) or []
@@ -3017,14 +3566,26 @@ def company_audits(
 @app.get("/api/v1/historico")
 def historico_licitaciones(
     search: str = Query("", max_length=120),
+    terms: str = Query("", max_length=1200),
     anio: str = Query("Todos"),
     limit: int = Query(500, ge=1, le=5000),
     _token: str = Depends(verify_internal_token),
 ):
-    df = db.get_historico_licitaciones_df(limit=limit, search=search or None, anio=anio)
+    search_terms = list(dict.fromkeys(
+        term.strip()
+        for term in re.split(r"[\r\n|;]+", str(terms or ""))
+        if term.strip()
+    ))[:12]
+    df = db.get_historico_licitaciones_df(
+        limit=limit,
+        search=search or None,
+        searches=search_terms or None,
+        anio=anio,
+    )
     return {
         "status": "success",
         "count": db.get_historico_count(),
+        "matched_count": db.get_historico_count(search=search or None, searches=search_terms or None, anio=anio),
         "years": _radar_json_safe(db.get_historico_anios()),
         "rows": _json_records(df),
     }
@@ -3142,8 +3703,9 @@ def rfq_email_generate(req: RfqEmailRequest, _token: str = Depends(verify_intern
     prompt = f"""You are a professional procurement specialist writing a formal Request for Quotation (RFQ).
 
 LANGUAGE: Write the entire RFQ in {req.language}.
-STYLE: Polished, concise, human and supplier-friendly. Make it easy to copy/paste into Outlook. Use short sections, clear labels and compact plain-text tables. Avoid long paragraphs.
+STYLE: Polished, concise, human and supplier-friendly. Make it easy to copy/paste into Outlook. Use short paragraphs and avoid repetition.
 STRICT RULE: Use only the provided bid and item context. Do not invent technical requirements, brands, quantities, standards, delivery terms, warranties or certifications.
+OUTPUT RULE: Generate only the narrative email body. The frontend will append the supplier-confirmation table and the selected line-item table. Do not create tables and do not repeat the full item list.
 
 ACP BID CONTEXT:
 - Bid Number: {cg.get('numero_licitacion','N/A')}
@@ -3153,6 +3715,10 @@ ACP BID CONTEXT:
 - Warranty Required: {cg.get('garantia_exigida','N/A')}
 - Technical Proposal Required: {cg.get('propuesta_tecnica_requerida','N/A')}
 
+SUPPLIER RECIPIENT:
+- Contact name: {req.contact_name or 'Not specified'}
+- Supplier company: {req.company or 'Not specified'}
+
 
 ITEMS TO QUOTE:
 {items_ctx}
@@ -3160,49 +3726,12 @@ ITEMS TO QUOTE:
 INSTRUCTIONS:
 Generate only the email body, no subject line. Make it ready to paste into Outlook.
 
-Use this exact plain-text structure with clear section headers:
+Start with "Dear {req.contact_name}," when a contact name is provided. Otherwise start with "Dear Supplier,". Do not print a GREETING header and do not treat the supplier company or contact as the sender.
 
-Dear Supplier,
-
-RFQ CONTEXT
-- State that we are preparing a quotation for ACP bid {cg.get('numero_licitacion','N/A')}.
-- Ask for the supplier's best technical and commercial offer.
-- Mention reply deadline if provided: {req.reply_by or 'Not specified'}.
-
-ITEMS TO QUOTE
-For each item, use a compact block:
-Item/Renglon: ...
-ACP Code: ...
-Description: ...
-Quantity: ...
-Brand/Model restriction: ...
-Technical documentation required: ...
-
-SUPPLIER CONFIRMATION TABLE
-Use a simple plain-text table with these columns:
-Requirement | Supplier confirmation | Comments / model reference
-Rows must include: technical compliance, datasheet/catalog, new product condition, lead time, warranty, offer validity, packing data and country of origin when applicable.
-
-COMMERCIAL INFORMATION REQUIRED
-Ask clearly for:
-- Unit price and currency.
-- Best project discount / volume price.
-- Stock availability.
-- Country of origin.
-- Incoterm, preferably EXW or FOB.
-- Packing dimensions, weight and volume per package.
-- Warranty.
-- Lead time.
-- Payment terms requested: {req.payment_terms}.
-
-IMPORTANT NOTES
-- Ask them to confirm whether they can meet the ACP lead time: {lead_time}.
-- Alternatives are acceptable only if technically equivalent or superior and fully documented.
-- Request datasheets, catalog pages, manufacturer letters or compliance evidence when required by the item context.
-- Do not mention requirements that are not present in the provided context.
-
-CLOSING
-Use only a short professional closing line such as "Best regards,". Do not include sender name, position, phone number, company name or signature block because the Outlook digital signature will be inserted automatically.
+Write 3 concise parts without visible section headings:
+1. State that we are preparing a quotation for ACP bid {cg.get('numero_licitacion','N/A')}, ask for the supplier's best technical and commercial offer, and mention the reply deadline when provided: {req.reply_by or 'Not specified'}.
+2. Ask the supplier to complete the confirmation and line-item tables shown below the message. Emphasize best price, stock, payment terms {req.payment_terms}, and whether they can meet the ACP lead time {lead_time}. Mention alternatives only when technically equivalent or superior and fully documented.
+3. Close with one short professional line such as "Best regards,". Do not include sender name, position, phone number, company name or signature block because the Outlook digital signature will be inserted automatically.
 
 Keep it concise, polished and human. Use no Markdown code fences and no decorative symbols."""
     try:
@@ -3357,6 +3886,29 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
                 "error": "El acta no contiene texto legible."
             }
 
+        texto_normalizado = "".join(
+            ch for ch in unicodedata.normalize("NFD", texto_acta.lower())
+            if unicodedata.category(ch) != "Mn"
+        )
+        menciona_proyelec = "proyelec" in texto_normalizado
+        menciona_ep = bool(re.search(r"\bep\s+international\b", texto_normalizado))
+        contextos_empresa = re.findall(
+            r".{0,180}(?:proyelec|ep\s+international).{0,180}",
+            texto_normalizado,
+            flags=re.IGNORECASE,
+        )
+        contexto_empresa = " ".join(contextos_empresa)
+        posible_adjudicacion = bool(
+            contexto_empresa
+            and re.search(r"adjudicad[oa]|se\s+adjudica|orden\s+adjudicada", contexto_empresa)
+        )
+        if contexto_empresa and re.search(r"no\s+cumple|incumple|no\s+conforme|descalific", contexto_empresa):
+            cumplimiento_tecnico = "no_cumple"
+        elif contexto_empresa and re.search(r"\bcumple\b|\bconforme\b|cumplimiento\s+tecnico", contexto_empresa):
+            cumplimiento_tecnico = "cumple"
+        else:
+            cumplimiento_tecnico = "indeterminado"
+
         palabras_clave = [
             "no cumple", "incumple", "fallo", "falla", "deficiencia",
             "observacion", "observaciÃƒÂ³n", "subsan", "tecnico", "tÃƒÂ©cnico",
@@ -3389,6 +3941,10 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
             "resumen": resumen,
             "hallazgos": hallazgos,
             "texto_muestra": texto_acta[:1200],
+            "menciona_proyelec": menciona_proyelec,
+            "menciona_ep_international": menciona_ep,
+            "posible_adjudicacion_propia": posible_adjudicacion,
+            "cumplimiento_tecnico": cumplimiento_tecnico,
             "error": None
         }
 
@@ -3630,6 +4186,11 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
                 "ÃƒÅ¡ltima revisiÃƒÂ³n",
                 "Ultima Revision",
                 "ÃƒÅ¡ltima RevisiÃƒÂ³n"
+            ]),
+            "numero_enmienda": buscar_valor([
+                "# Enmienda",
+                "Numero de Enmienda",
+                "Enmienda"
             ]),
             "agente_compras": buscar_valor([
                 "Agente de compras",

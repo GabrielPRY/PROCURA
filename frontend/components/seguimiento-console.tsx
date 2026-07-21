@@ -1,6 +1,18 @@
-﻿"use client";
+"use client";
 
-import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, ExternalLink, Loader2, Plus, RefreshCcw, Search, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  BellRing,
+  CalendarClock,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  MessageSquareText,
+  Plus,
+  RefreshCcw,
+  Search,
+  Trash2
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type AuthUser } from "@/lib/auth";
 import {
@@ -14,6 +26,7 @@ import {
 } from "@/lib/seguimiento";
 import { consultarSli, type SliLookupResult } from "@/lib/sli";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -21,8 +34,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 const estadosBase = [
   "ANUNCIO",
   "ABIERTA",
-  "CERRADA",
-  "En Preparacion",
   "Oferta Enviada al SLI",
   "Cumple Tecnicamente",
   "No Cumple Tecnicamente",
@@ -32,15 +43,16 @@ const estadosBase = [
   "Desierta"
 ];
 
-function statusTone(estado?: string | null) {
-  const normalized = String(estado || "").toLowerCase();
-  if (normalized.includes("adjudicada") && !normalized.includes("no adjudicada")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("no cumple") || normalized.includes("no adjudicada") || normalized.includes("desierta")) return "border-rose-200 bg-rose-50 text-rose-800";
-  if (normalized.includes("anuncio") || normalized.includes("abierta")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("cerrada")) return "border-amber-200 bg-amber-50 text-amber-800";
-  if (normalized.includes("evaluacion") || normalized.includes("enviada")) return "border-blue-200 bg-blue-50 text-blue-800";
-  if (normalized.includes("cumple")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+type BadgeTone = "neutral" | "info" | "ok" | "warn" | "danger";
+
+function statusTone(status?: string | null): BadgeTone {
+  const normalized = normalizeStatus(status);
+  if (normalized.includes("no cumple") || normalized.includes("no adjudicada") || normalized.includes("desierta")) return "danger";
+  if (normalized.includes("adjudicada") || normalized.includes("cumple")) return "ok";
+  if (normalized.includes("evaluacion") || normalized.includes("enviada")) return "info";
+  if (normalized.includes("anuncio") || normalized.includes("abierta")) return "ok";
+  if (normalized.includes("cerrada") || normalized.includes("adjudicacion")) return "warn";
+  return "neutral";
 }
 
 function formatDate(value?: string | null) {
@@ -75,86 +87,101 @@ function parseSliDate(value?: string | null) {
 
 function hoursUntil(value?: string | null) {
   const date = parseSliDate(value);
-  if (!date) return null;
-  return (date.getTime() - Date.now()) / 36e5;
+  return date ? (date.getTime() - Date.now()) / 36e5 : null;
 }
 
-function sliOperationalAlert(item: Seguimiento, result?: SliLookupResult | null) {
-  if (!result) return "";
-  if (result.error) return result.error;
-  if (result.requiere_revision_rfq) return result.nota_revision_rfq || "Revisar RFQ/pliego: el SLI no expone suficiente detalle.";
-  const hours = hoursUntil(result.fecha_cierre);
-  if (hours !== null && hours >= 0 && hours <= 72) return `Cierre cercano: quedan ${Math.max(1, Math.round(hours))} hora(s).`;
-  const publication = String(result.fecha_publicacion || "").trim();
-  const revision = String(result.ultima_revision || "").trim();
-  if (publication && revision && publication !== revision) return "Tiene revision posterior a la publicacion; validar si hubo cambio o enmienda.";
-  const suggested = suggestedEstadoFromSli(result, item.estado || "En Preparacion");
-  if (suggested && suggested !== item.estado) return `SLI sugiere cambiar estado a ${suggested}.`;
-  return "";
+function hasRevisionChange(result?: SliLookupResult | null) {
+  if (!result) return false;
+  if (String(result.numero_enmienda || "").trim()) return true;
+  const publication = parseSliDate(result.fecha_publicacion);
+  const revision = parseSliDate(result.ultima_revision);
+  return Boolean(publication && revision && revision.getTime() > publication.getTime());
 }
 
 function cleanRfq(value?: string | null) {
   return String(value || "").replace(/\D/g, "");
 }
 
-function sliTone(status?: string | null) {
-  const normalized = String(status || "").toLowerCase();
-  if (normalized.includes("abierta")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("adjudic")) return "border-blue-200 bg-blue-50 text-blue-800";
-  if (normalized.includes("desierta") || normalized.includes("cancel")) return "border-rose-200 bg-rose-50 text-rose-800";
-  if (normalized.includes("cerrada") || normalized.includes("evalu")) return "border-amber-200 bg-amber-50 text-amber-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+function normalizeStatus(value?: string | null) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function suggestedEstadoFromSli(result?: SliLookupResult | null, current = "En Preparacion") {
-  const status = String(result?.estatus || "").toLowerCase();
-  if (!status) return "";
-  if (status.includes("adjudic")) return "Adjudicada";
-  if (status.includes("desierta")) return "Desierta";
-  if (status.includes("evalu") || status.includes("cerrada")) return "En Evaluacion Economica";
+  const status = normalizeStatus(result?.estatus);
+  if (status.includes("no adjudicada") || status.includes("no adjudicado")) return "No Adjudicada";
+  if (status.includes("adjudicada") || status.includes("adjudicado")) return "Adjudicada";
+  if (status.includes("adjudicacion") || status.includes("evalu") || status.includes("cerrada")) return "En Evaluacion Economica";
+  if (status.includes("desierta") || status.includes("acto desierto")) return "Desierta";
   if (status.includes("anuncio")) return "ANUNCIO";
   if (status.includes("abierta")) return current.includes("Oferta Enviada") ? current : "ABIERTA";
   return "";
 }
 
+function sliOperationalAlert(item: Seguimiento, result?: SliLookupResult | null) {
+  if (!result) return "";
+  if (result.error) return result.error;
+  const acta = result.resumen_acta;
+  if (acta?.posible_adjudicacion_propia) return "El acta menciona una posible adjudicación a Proyelec/EP. Verifica el documento oficial.";
+  if (acta?.cumplimiento_tecnico === "no_cumple") return "El acta contiene una posible observación de no cumplimiento técnico para Proyelec/EP.";
+  const hours = hoursUntil(result.fecha_cierre);
+  if (hours !== null && hours >= 0 && hours <= 72) return `Cierre cercano: quedan ${Math.max(1, Math.round(hours))} hora(s).`;
+  if (hasRevisionChange(result)) return `El SLI registra ${result.numero_enmienda ? `enmienda ${result.numero_enmienda}` : "una revisión posterior"}.`;
+  if (result.requiere_revision_rfq) return result.nota_revision_rfq || "Revisar RFQ/pliego: el SLI no expone suficiente detalle.";
+  const suggested = suggestedEstadoFromSli(result, item.estado || "En Preparacion");
+  if (suggested && suggested !== item.estado) return `El SLI actualizó el estado a ${suggested}.`;
+  return "";
+}
+
 function matchesSearch(item: Seguimiento, query: string) {
   if (!query.trim()) return true;
-  const haystack = [
-    item.numero_licitacion,
-    item.objeto,
-    item.estado,
-    item.responsable,
-    item.owner_username,
-    item.notas,
-    item.fecha_registro
-  ].join(" ").toLowerCase();
-  return query.toLowerCase().split(/\s+/).filter(Boolean).every((term) => haystack.includes(term));
+  const haystack = [item.numero_licitacion, item.objeto, item.estado, item.responsable, item.owner_username, item.notas]
+    .join(" ")
+    .toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((term) => haystack.includes(term));
 }
 
 export function SeguimientoConsole({ user }: { user: AuthUser }) {
   const isGlobalViewer = user.role === "Supervisor" || user.role === "Gerencia";
   const [items, setItems] = useState<Seguimiento[]>([]);
   const [selected, setSelected] = useState<Seguimiento | null>(null);
-  const [historial, setHistorial] = useState<SeguimientoHistorial[]>([]);
+  const [history, setHistory] = useState<SeguimientoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ numero_licitacion: "", objeto: "", responsable: user.username, notas: "" });
-  const [notaEstado, setNotaEstado] = useState("");
+  const [comment, setComment] = useState("");
   const [search, setSearch] = useState("");
-  const [estadoFilter, setEstadoFilter] = useState("Todos");
-  const autoSliCheckedRef = useRef(false);
+  const [statusFilter, setStatusFilter] = useState("Todos");
+  const [alertsOnly, setAlertsOnly] = useState(false);
   const [sliResults, setSliResults] = useState<Record<number, SliLookupResult>>({});
   const [sliLoading, setSliLoading] = useState<Record<number, boolean>>({});
   const [sliErrors, setSliErrors] = useState<Record<number, string>>({});
-  const [sliSyncMeta, setSliSyncMeta] = useState<Record<number, { checkedAt: string; suggested?: string; alert?: string; changed?: boolean }>>({});
-  const [bulkSync, setBulkSync] = useState<{ running: boolean; done: number; total: number }>({ running: false, done: 0, total: 0 });
+  const [syncMeta, setSyncMeta] = useState<Record<number, { checkedAt: string; changed?: boolean }>>({});
+  const [bulkSync, setBulkSync] = useState({ running: false, done: 0, total: 0 });
+  const itemsRef = useRef<Seguimiento[]>([]);
+  const bulkSyncRef = useRef(false);
+  const initialSyncRef = useRef(false);
+  const syncCursorRef = useRef(0);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   async function refresh() {
-    setError(null);
     setLoading(true);
+    setError(null);
     try {
       const response = await getSeguimientos({ username: user.username, role: user.role });
-      setItems(response.seguimientos || []);
+      const nextItems = response.seguimientos || [];
+      setItems(nextItems);
+      setSelected((current) => current ? nextItems.find((item) => item.id === current.id) || null : current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar seguimiento.");
     } finally {
@@ -163,232 +190,116 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
   }
 
   useEffect(() => {
+    initialSyncRef.current = false;
+    setSelected(null);
+    setSliResults({});
+    setSyncMeta({});
     void refresh();
-  }, [user.username, user.role]);
+  }, [user.role, user.username]);
 
-  async function openItem(item: Seguimiento) {
-    setSelected(item);
-    setNotaEstado("");
-    if (!sliResults[item.id]) void checkSli(item, true);
+  async function loadHistory(itemId: number) {
     try {
-      const response = await getSeguimientoHistorial(item.id);
-      setHistorial(response.historial || []);
+      const response = await getSeguimientoHistorial(itemId);
+      setHistory(response.historial || []);
     } catch {
-      setHistorial([]);
+      setHistory([]);
     }
   }
 
+  async function openItem(item: Seguimiento) {
+    setSelected(item);
+    setComment("");
+    void loadHistory(item.id);
+    if (!sliResults[item.id] && !sliLoading[item.id]) void checkSli(item, true);
+  }
+
   async function createItem() {
-    setError(null);
-    const numero = cleanRfq(form.numero_licitacion);
-    if (!numero) {
-      setError("Ingresa un numero de licitacion valido antes de agregarlo a seguimiento.");
+    const number = cleanRfq(form.numero_licitacion);
+    if (!number) {
+      setError("Ingresa un número de licitación válido.");
       return;
     }
+    setError(null);
     try {
       const response = await createSeguimiento({
         ...form,
-        numero_licitacion: numero,
+        numero_licitacion: number,
         owner_username: user.username,
         responsable: form.responsable || user.username,
         moneda: "USD",
         monto_ofertado: 0
       });
-      const saved = response.seguimiento;
-      if (saved) {
-        setItems((current) => {
-          const exists = current.some((row) => row.id === saved.id);
-          return exists ? current.map((row) => (row.id === saved.id ? saved : row)) : [saved, ...current];
-        });
-        setSelected(saved);
-      }
       setForm({ numero_licitacion: "", objeto: "", responsable: user.username, notas: "" });
-      setSearch("");
-      setEstadoFilter("Todos");
+      setShowCreate(false);
       await refresh();
-      if (saved) await openItem(saved);
+      if (response.seguimiento) await openItem(response.seguimiento);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear seguimiento.");
     }
   }
 
-  async function saveComment(item: Seguimiento) {
-    const note = notaEstado.trim();
-    if (!note) return;
+  async function saveComment() {
+    if (!selected || !comment.trim()) return;
     setError(null);
     try {
-      await updateSeguimientoEstado(item.id, {
-        estado: item.estado || "En Preparacion",
-        nota: note,
+      await updateSeguimientoEstado(selected.id, {
+        estado: selected.estado || "En Preparacion",
+        nota: comment.trim(),
         registrado_por: user.username
       });
-      const updated = {
-        ...item,
-        notas: item.notas ? `${item.notas} | ${note}` : note
-      };
-      setItems((current) => current.map((row) => (row.id === item.id ? updated : row)));
-      setNotaEstado("");
+      setComment("");
       await refresh();
-      await openItem(updated);
+      await loadHistory(selected.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar el comentario.");
     }
   }
 
-  async function checkSli(item: Seguimiento, syncEstado = false) {
+  async function checkSli(item: Seguimiento, syncStatus = true) {
     const rfq = cleanRfq(item.numero_licitacion);
     if (!rfq) {
-      setSliErrors((current) => ({ ...current, [item.id]: "Numero de licitacion invalido para consultar SLI." }));
+      setSliErrors((current) => ({ ...current, [item.id]: "Número de licitación inválido." }));
       return;
     }
-
     setSliLoading((current) => ({ ...current, [item.id]: true }));
     setSliErrors((current) => {
       const next = { ...current };
       delete next[item.id];
       return next;
     });
-
     try {
       const result = await consultarSli(rfq);
       const suggested = suggestedEstadoFromSli(result, item.estado || "En Preparacion");
-      const alert = sliOperationalAlert(item, result);
       setSliResults((current) => ({ ...current, [item.id]: result }));
-      setSliSyncMeta((current) => ({
+      setSyncMeta((current) => ({
         ...current,
-        [item.id]: {
-          checkedAt: new Date().toISOString(),
-          suggested,
-          alert,
-          changed: Boolean(suggested && suggested !== item.estado)
-        }
+        [item.id]: { checkedAt: new Date().toISOString(), changed: Boolean(suggested && suggested !== item.estado) }
       }));
-      if (result.error) {
-        setSliErrors((current) => ({ ...current, [item.id]: result.error || "SLI respondio con advertencia." }));
-      }
+      if (result.error) setSliErrors((current) => ({ ...current, [item.id]: result.error || "SLI respondió con advertencia." }));
 
-      if (syncEstado && suggested && suggested !== item.estado) {
-        const note = [
+      if (syncStatus && suggested && suggested !== item.estado) {
+        const notes = [
           `Sincronizado con SLI: ${result.estatus || "estado no especificado"}.`,
-          result.fecha_cierre ? `Cierre SLI: ${result.fecha_cierre}.` : "",
-          result.codigos_acp_detectados?.length ? `Codigos detectados: ${result.codigos_acp_detectados.join(", ")}.` : ""
+          result.fecha_cierre ? `Cierre: ${result.fecha_cierre}.` : "",
+          result.numero_enmienda ? `Enmienda: ${result.numero_enmienda}.` : "",
+          result.resumen_acta?.resumen || ""
         ].filter(Boolean).join(" ");
-        await updateSeguimientoEstado(item.id, { estado: suggested, nota: note, registrado_por: user.username });
-        const updated = {
-          ...item,
-          estado: suggested,
-          notas: item.notas ? `${item.notas} | ${note}` : note
-        };
-        setItems((current) => current.map((row) => (row.id === item.id ? updated : row)));
-        if (selected?.id === item.id) {
-          setSelected(updated);
-          const history = await getSeguimientoHistorial(item.id);
-          setHistorial(history.historial || []);
-        }
+        await updateSeguimientoEstado(item.id, { estado: suggested, nota: notes, registrado_por: "Sistema SLI" });
+        const updated = { ...item, estado: suggested };
+        setItems((current) => current.map((row) => row.id === item.id ? updated : row));
+        setSelected((current) => current?.id === item.id ? updated : current);
+        if (selected?.id === item.id) await loadHistory(item.id);
       }
     } catch (err) {
-      setSliErrors((current) => ({
-        ...current,
-        [item.id]: err instanceof Error ? err.message : "No se pudo consultar el SLI."
-      }));
+      setSliErrors((current) => ({ ...current, [item.id]: err instanceof Error ? err.message : "No se pudo consultar el SLI." }));
     } finally {
       setSliLoading((current) => ({ ...current, [item.id]: false }));
     }
   }
 
-  async function removeItem(item: Seguimiento) {
-    setError(null);
-    try {
-      await deleteSeguimiento(item.id);
-      setItems((current) => current.filter((row) => row.id !== item.id));
-      if (selected?.id === item.id) setSelected(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo borrar seguimiento.");
-    }
-  }
-
-  const estados = useMemo(() => {
-    const dynamicStates = items.map((item) => String(item.estado || "").trim()).filter(Boolean);
-    return Array.from(new Set([...estadosBase, ...dynamicStates]));
-  }, [items]);
-  const filteredItems = useMemo(() => {
-    return items
-      .filter((item) => estadoFilter === "Todos" || item.estado === estadoFilter)
-      .filter((item) => matchesSearch(item, search))
-      .sort((a, b) => String(b.fecha_registro || "").localeCompare(String(a.fecha_registro || "")));
-  }, [estadoFilter, items, search]);
-  const activeCount = items.filter((item) => !["Adjudicada", "No Adjudicada", "Desierta"].includes(String(item.estado || ""))).length;
-  const closedCount = items.length - activeCount;
-  const sliCheckedCount = Object.keys(sliResults).length;
-  const sliAlertCount = items.filter((item) => sliOperationalAlert(item, sliResults[item.id])).length;
-  const closeSoonCount = Object.values(sliResults).filter((result) => {
-    const hours = hoursUntil(result.fecha_cierre);
-    return hours !== null && hours >= 0 && hours <= 72;
-  }).length;
-  const revisionAlertCount = Object.values(sliResults).filter((result) => {
-    const publication = String(result.fecha_publicacion || "").trim();
-    const revision = String(result.ultima_revision || "").trim();
-    return publication && revision && publication !== revision;
-  }).length;
-  const myItemsCount = items.filter((item) => (item.owner_username || item.responsable) === user.username).length;
-  const priorityItems = filteredItems
-    .map((item) => {
-      const result = sliResults[item.id];
-      const meta = sliSyncMeta[item.id];
-      const alert = sliOperationalAlert(item, result);
-      const hours = hoursUntil(result?.fecha_cierre);
-      const closeSoon = hours !== null && hours >= 0 && hours <= 72;
-      const changed = Boolean(meta?.changed);
-      const errorText = sliErrors[item.id];
-      const title = closeSoon
-        ? "Cierre cercano"
-        : changed
-          ? "Cambio sugerido por SLI"
-          : errorText
-            ? "SLI requiere revision"
-            : alert
-              ? "Revisar proceso"
-              : "";
-      const tone = closeSoon || errorText ? "rose" : changed || alert ? "amber" : "neutral";
-      const detail = closeSoon
-        ? `Cierra en ${Math.max(1, Math.round(hours || 1))} hora(s).`
-        : changed
-          ? `SLI sugiere: ${meta?.suggested || "revisar estado"}.`
-          : errorText || alert;
-      return title ? { item, title, detail, tone } : null;
-    })
-    .filter(Boolean)
-    .slice(0, 6) as Array<{ item: Seguimiento; title: string; detail?: string; tone: string }>;
-  useEffect(() => {
-    if (loading || autoSliCheckedRef.current || !filteredItems.length) return;
-    autoSliCheckedRef.current = true;
-    const timer = window.setTimeout(() => {
-      void checkVisibleSli(8);
-    }, 450);
-    return () => window.clearTimeout(timer);
-  }, [filteredItems, loading]);
-
-  const summaryCards = [
-    { label: "Activos", value: activeCount, detail: "Procesos vivos", className: "border-blue-200 bg-blue-50 text-blue-900" },
-    { label: "Cerrados", value: closedCount, detail: "Adjudicados, no adjudicados o desiertos", className: "border-slate-200 bg-slate-50 text-slate-800" },
-    { label: "Alertas SLI", value: sliAlertCount, detail: `${sliCheckedCount} consultados`, className: sliAlertCount ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900" },
-    { label: "Cierre 72h", value: closeSoonCount, detail: "Procesos urgentes", className: closeSoonCount ? "border-rose-200 bg-rose-50 text-rose-900" : "border-emerald-200 bg-emerald-50 text-emerald-900" },
-    { label: "Revisiones", value: revisionAlertCount, detail: "Posibles cambios/enmiendas", className: revisionAlertCount ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-800" },
-    {
-      label: isGlobalViewer ? "Vista global" : "Mis procesos",
-      value: isGlobalViewer ? items.length : myItemsCount,
-      detail: isGlobalViewer ? "Supervisor/Gerencia" : user.username,
-      className: "border-violet-200 bg-violet-50 text-violet-900"
-    }
-  ];
-
-  async function checkVisibleSli(limit = 20) {
-    const candidates = filteredItems.filter((item) => cleanRfq(item.numero_licitacion)).slice(0, limit);
-    if (!candidates.length) {
-      setError("No hay licitaciones visibles con numero valido para consultar en SLI.");
-      return;
-    }
-    setError(null);
+  async function syncItems(candidates: Seguimiento[]) {
+    if (bulkSyncRef.current || !candidates.length) return;
+    bulkSyncRef.current = true;
     setBulkSync({ running: true, done: 0, total: candidates.length });
     try {
       for (const item of candidates) {
@@ -396,359 +307,306 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
         setBulkSync((current) => ({ ...current, done: current.done + 1 }));
       }
     } finally {
+      bulkSyncRef.current = false;
       setBulkSync((current) => ({ ...current, running: false }));
     }
   }
+
+  function nextAutomaticBatch(limit = 8) {
+    const validItems = itemsRef.current.filter((item) => cleanRfq(item.numero_licitacion));
+    if (!validItems.length) return [];
+    const start = syncCursorRef.current % validItems.length;
+    const batch = Array.from({ length: Math.min(limit, validItems.length) }, (_, offset) => validItems[(start + offset) % validItems.length]);
+    syncCursorRef.current = (start + batch.length) % validItems.length;
+    return batch;
+  }
+
+  useEffect(() => {
+    if (loading || initialSyncRef.current || !items.length) return;
+    initialSyncRef.current = true;
+    const timer = window.setTimeout(() => void syncItems(nextAutomaticBatch()), 600);
+    return () => window.clearTimeout(timer);
+  }, [items.length, loading]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => void syncItems(nextAutomaticBatch()), 25 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [user.role, user.username]);
+
+  async function removeItem(item: Seguimiento) {
+    if (!window.confirm(`¿Eliminar la licitación ${item.numero_licitacion} de tu seguimiento?`)) return;
+    try {
+      await deleteSeguimiento(item.id);
+      setItems((current) => current.filter((row) => row.id !== item.id));
+      if (selected?.id === item.id) setSelected(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar el seguimiento.");
+    }
+  }
+
+  const states = useMemo(() => {
+    const dynamic = items.map((item) => String(item.estado || "").trim()).filter(Boolean);
+    return Array.from(new Set([...estadosBase, ...dynamic]));
+  }, [items]);
+  const alertCount = items.filter((item) => Boolean(sliOperationalAlert(item, sliResults[item.id]) || sliErrors[item.id])).length;
+  const filteredItems = useMemo(
+    () => items
+      .filter((item) => statusFilter === "Todos" || item.estado === statusFilter)
+      .filter((item) => !alertsOnly || Boolean(sliOperationalAlert(item, sliResults[item.id]) || sliErrors[item.id]))
+      .filter((item) => matchesSearch(item, search))
+      .sort((a, b) => String(b.fecha_registro || "").localeCompare(String(a.fecha_registro || ""))),
+    [alertsOnly, items, search, sliErrors, sliResults, statusFilter]
+  );
+  const closedStates = ["Adjudicada", "No Adjudicada", "Desierta"];
+  const activeCount = items.filter((item) => !closedStates.includes(String(item.estado || ""))).length;
+  const closeSoonCount = Object.values(sliResults).filter((result) => {
+    const hours = hoursUntil(result.fecha_cierre);
+    return hours !== null && hours >= 0 && hours <= 72;
+  }).length;
+  const lastSync = Object.values(syncMeta)
+    .map((meta) => meta.checkedAt)
+    .sort()
+    .at(-1);
 
   return (
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
           eyebrow="Seguimiento"
-          title="Pipeline de licitaciones"
-          copy="Control operativo de procesos enviados, evaluacion tecnica/economica, adjudicaciones y comentarios sincronizados con SLI cuando sea posible."
-          actions={loading ? <Loader2 className="h-5 w-5 animate-spin text-brand" /> : null}
+          title="Procesos conectados con el SLI"
+          copy="El sistema revisa estados, cierres, enmiendas y actas. Los usuarios documentan comentarios; el estado no se elige manualmente."
+          actions={
+            <Button
+              type="button"
+              onClick={() => void syncItems(items.filter((item) => cleanRfq(item.numero_licitacion)).slice(0, 20))}
+              disabled={bulkSync.running || loading}
+              variant="primary"
+            >
+              {bulkSync.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              {bulkSync.running ? `${bulkSync.done}/${bulkSync.total}` : "Sincronizar SLI"}
+            </Button>
+          }
         />
-        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-          <StatusBadge tone="info">{activeCount} activos</StatusBadge>
-          <StatusBadge tone="neutral">{closedCount} cerrados</StatusBadge>
-          <StatusBadge tone="neutral">SLI {sliCheckedCount} consultados</StatusBadge>
-          {sliAlertCount ? <StatusBadge tone="warn">{sliAlertCount} requieren revisar RFQ</StatusBadge> : null}
+      </ModuleSection>
+
+      {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{error}</div> : null}
+
+      <ModuleSection className="p-0">
+        <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          {[
+            [isGlobalViewer ? "Vista global" : "Mis procesos", items.length, isGlobalViewer ? "Equipo completo" : user.username],
+            ["Activos", activeCount, "En curso"],
+            ["Alertas", alertCount, "Requieren revisión"],
+            ["Cierre 72 h", closeSoonCount, lastSync ? `Sync ${formatDate(lastSync)}` : "Pendiente de sync"]
+          ].map(([label, value, hint]) => (
+            <div key={String(label)} className="min-w-0 p-4 sm:p-5">
+              <div className="text-xs font-semibold text-muted">{String(label)}</div>
+              <div className="mt-2 text-xl font-semibold text-ink">{String(value)}</div>
+              <div className="mt-1 truncate text-xs text-muted">{String(hint)}</div>
+            </div>
+          ))}
         </div>
       </ModuleSection>
 
-      {error && <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section>}
-
-      <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {summaryCards.map((card) => (
-          <div key={card.label} className={`rounded-xl border p-4 shadow-sm ${card.className}`}>
-            <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{card.label}</div>
-            <div className="mt-2 text-2xl font-semibold">{card.value}</div>
-            <div className="mt-1 text-xs opacity-75">{card.detail}</div>
-          </div>
-        ))}
-      </section>
-
-      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Prioridades de seguimiento</div>
-            <p className="mt-1 text-sm text-muted">Procesos que requieren accion por cierre, cambio SLI, revision o error de consulta.</p>
-          </div>
-          <StatusBadge tone={priorityItems.length ? "warn" : "ok"}>{priorityItems.length ? `${priorityItems.length} prioridad(es)` : "Sin urgencias"}</StatusBadge>
-        </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-          {priorityItems.length ? priorityItems.map(({ item, title, detail, tone }) => (
-            <button
-              key={`priority-${item.id}`}
-              type="button"
-              onClick={() => void openItem(item)}
-              className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                tone === "rose"
-                  ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
-                  : tone === "amber"
-                    ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                    : "border-line bg-white text-slate-800 hover:bg-slate-50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-black uppercase tracking-wide opacity-75">{title}</div>
-                  <div className="mt-1 text-sm font-semibold leading-5">{item.numero_licitacion} | {item.objeto || "Sin objeto"}</div>
-                  {detail ? <p className="mt-2 text-xs leading-5 opacity-85">{detail}</p> : null}
-                </div>
-                <BellRing className="h-4 w-4 shrink-0" />
-              </div>
-            </button>
-          )) : (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 lg:col-span-2 2xl:col-span-3">
-              No hay prioridades críticas detectadas en los procesos visibles. Puedes sincronizar SLI para refrescar el estado.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <details className="rounded-xl border border-line bg-panel shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Agregar licitacion manual</div>
-            <p className="mt-1 text-sm text-muted">Usalo solo si el proceso no viene desde el Radar o desde un RFQ.</p>
-          </div>
-          <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-            Crear
-          </span>
-        </summary>
-        <div className="grid gap-3 border-t border-line p-5 lg:grid-cols-[0.35fr_1fr_0.4fr_1fr_auto]">
-          <input value={form.numero_licitacion} onChange={(event) => setForm((current) => ({ ...current, numero_licitacion: event.target.value }))} placeholder="RFQ" className="app-input" />
-          <input value={form.objeto} onChange={(event) => setForm((current) => ({ ...current, objeto: event.target.value }))} placeholder="Objeto" className="app-input" />
-          <input value={form.responsable} onChange={(event) => setForm((current) => ({ ...current, responsable: event.target.value }))} placeholder="Responsable" className="app-input" />
-          <input value={form.notas} onChange={(event) => setForm((current) => ({ ...current, notas: event.target.value }))} placeholder="Notas iniciales" className="app-input" />
-          <Button type="button" onClick={createItem} variant="primary" size="lg">
-            <Plus className="h-4 w-4" />
-            Agregar
-          </Button>
-        </div>
-      </details>
-
-      <section className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
-        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-slate-900">Pipeline operativo</div>
-              <p className="mt-1 text-xs text-muted">
-                {filteredItems.length} procesos visibles de {items.length} registrados. Atiende primero los procesos marcados por SLI o por cierre cercano.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void checkVisibleSli()}
-                disabled={loading || bulkSync.running}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
-              >
-                {bulkSync.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                {bulkSync.running ? `SLI ${bulkSync.done}/${bulkSync.total}` : "Sincronizar SLI"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                disabled={loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-60"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Actualizar
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_240px]">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar RFQ, objeto, responsable, comentario o estado..."
-                className="h-11 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              />
+      <ModuleSection>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Buscar seguimiento</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar RFQ, objeto, responsable o comentario" className="app-input h-11 w-full pl-9 pr-3" />
             </label>
-            <select
-              value={estadoFilter}
-              onChange={(event) => setEstadoFilter(event.target.value)}
-              className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-            >
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="app-input h-11 sm:w-56">
               <option value="Todos">Todos los estados</option>
-              {estados.map((estado) => (
-                <option key={estado} value={estado}>{estado}</option>
-              ))}
+              {states.map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
           </div>
-
-          <div className="mt-4 overflow-hidden rounded-lg border border-line">
-            {filteredItems.length ? (
-              <div className="divide-y divide-line">
-                {filteredItems.map((item) => (
-                  <div key={item.id} className={`bg-white p-4 hover:bg-slate-50 ${selected?.id === item.id ? "bg-blue-50/60" : ""}`}>
-                    <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
-                          <button type="button" onClick={() => openItem(item)} className="shrink-0 text-left text-base font-semibold text-brand">
-                            {item.numero_licitacion}
-                          </button>
-                          <button type="button" onClick={() => openItem(item)} className="block min-w-0 max-w-full text-left font-semibold leading-6 text-slate-900 hover:text-brand">
-                            <span className="line-clamp-2 break-words">{item.objeto || "Sin objeto"}</span>
-                          </button>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-                          <span>{item.responsable || item.owner_username || "Sin responsable"}</span>
-                          {isGlobalViewer && item.owner_username ? (
-                            <>
-                              <span className="text-slate-300">|</span>
-                              <span>Usuario: {item.owner_username}</span>
-                            </>
-                          ) : null}
-                          <span className="text-slate-300">|</span>
-                          <span>{formatDate(item.fecha_registro)}</span>
-                        </div>
-                        {item.notas ? <div className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{item.notas}</div> : null}
-                        {sliResults[item.id] || sliErrors[item.id] ? (
-                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                            {sliResults[item.id] ? (
-                              <>
-                                <span className={`inline-flex max-w-full rounded-full border px-2.5 py-1 leading-4 ${sliTone(sliResults[item.id].estatus)}`}>
-                                  SLI: {sliResults[item.id].estatus || "Sin estado"}
-                                </span>
-                                <span className="inline-flex max-w-full rounded-full border border-line bg-slate-50 px-2.5 py-1 leading-4 text-slate-700">
-                                  Cierre: {sliResults[item.id].fecha_cierre || "N/D"}
-                                </span>
-                                {sliSyncMeta[item.id]?.checkedAt ? (
-                                  <span className="inline-flex max-w-full rounded-full border border-line bg-white px-2.5 py-1 leading-4 text-slate-600">
-                                    Sync: {formatDate(sliSyncMeta[item.id].checkedAt)}
-                                  </span>
-                                ) : null}
-                                {sliResults[item.id].codigos_acp_detectados?.length ? (
-                                  <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 leading-4 text-emerald-800">
-                                    {sliResults[item.id].codigos_acp_detectados?.length} codigo(s) ACP
-                                  </span>
-                                ) : null}
-                              </>
-                            ) : null}
-                            {sliErrors[item.id] ? (
-                              <span className="inline-flex max-w-full rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 leading-4 text-amber-800">
-                                SLI: {sliErrors[item.id]}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {sliOperationalAlert(item, sliResults[item.id]) ? (
-                          <div className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900">
-                            <BellRing className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>{sliOperationalAlert(item, sliResults[item.id])}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex min-w-0 shrink-0 flex-col gap-3 sm:flex-row sm:items-center 2xl:w-[330px] 2xl:max-w-full 2xl:justify-end">
-                        <div className="app-data-card min-w-0 sm:flex-1 2xl:w-[230px] 2xl:flex-none">
-                          <span className={`inline-flex max-w-full rounded-full border px-3 py-1 text-xs font-semibold leading-4 ${statusTone(item.estado)}`}>
-                            <span className="break-words">{item.estado || "Pendiente SLI"}</span>
-                          </span>
-                          <div className="mt-2 text-xs leading-5 text-muted">
-                            {sliResults[item.id]
-                              ? `SLI sugiere: ${suggestedEstadoFromSli(sliResults[item.id], item.estado || "En Preparacion") || "sin cambio"}`
-                              : "Estado definido por analisis SLI"}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2 sm:justify-end">
-                          <button
-                            type="button"
-                            onClick={() => void checkSli(item, true)}
-                            disabled={sliLoading[item.id]}
-                            className="app-btn-mini h-9 w-11 border-blue-200 text-blue-700"
-                            title="Analizar con SLI"
-                          >
-                            {sliLoading[item.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                          </button>
-                          {item.link_sli && (
-                            <a href={item.link_sli} target="_blank" rel="noreferrer" className="app-btn-mini h-9 w-11">
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                          <button type="button" onClick={() => removeItem(item)} className="app-btn-mini app-btn-danger h-9 w-11">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-slate-50 p-5 text-sm text-muted">No hay licitaciones con esos filtros.</div>
-            )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setAlertsOnly((current) => !current)} variant={alertsOnly ? "primary" : "secondary"}>
+              <BellRing className="h-4 w-4" /> Solo alertas
+            </Button>
+            <Button type="button" onClick={() => setShowCreate((current) => !current)} variant="secondary">
+              <Plus className="h-4 w-4" /> Agregar
+            </Button>
+            <Button type="button" onClick={() => void refresh()} variant="ghost" size="icon" title="Actualizar registros">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
 
-        <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-900">{selected ? `Historial ${selected.numero_licitacion}` : "Detalle"}</div>
+        {showCreate ? (
+          <div className="mt-4 grid gap-3 border-t border-line pt-4 lg:grid-cols-[180px_minmax(0,1fr)_180px_minmax(0,1fr)_auto]">
+            <input value={form.numero_licitacion} onChange={(event) => setForm((current) => ({ ...current, numero_licitacion: event.target.value }))} placeholder="Número RFQ" className="app-input" />
+            <input value={form.objeto} onChange={(event) => setForm((current) => ({ ...current, objeto: event.target.value }))} placeholder="Objeto de la licitación" className="app-input" />
+            <input value={form.responsable} onChange={(event) => setForm((current) => ({ ...current, responsable: event.target.value }))} placeholder="Responsable" className="app-input" />
+            <input value={form.notas} onChange={(event) => setForm((current) => ({ ...current, notas: event.target.value }))} placeholder="Comentario inicial" className="app-input" />
+            <Button type="button" onClick={createItem} variant="primary"><Plus className="h-4 w-4" /> Crear</Button>
+          </div>
+        ) : null}
+      </ModuleSection>
+
+      <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_440px]">
+        <ModuleSection className="min-w-0 p-0">
+          <div className="flex items-center justify-between gap-3 border-b border-line p-4 sm:p-5">
+            <div>
+              <h2 className="text-base font-semibold text-ink">Procesos</h2>
+              <p className="mt-1 text-sm text-muted">{filteredItems.length} de {items.length} visibles</p>
+            </div>
+            <StatusBadge tone="neutral">Cada 25 min con la app abierta</StatusBadge>
+          </div>
+
+          {loading && !items.length ? (
+            <div className="flex min-h-56 items-center justify-center gap-2 text-sm font-semibold text-brand"><Loader2 className="h-4 w-4 animate-spin" /> Cargando...</div>
+          ) : filteredItems.length ? (
+            <div className="divide-y divide-line">
+              {filteredItems.map((item) => {
+                const result = sliResults[item.id];
+                const alert = sliErrors[item.id] || sliOperationalAlert(item, result);
+                const isSelected = selected?.id === item.id;
+                return (
+                  <article key={item.id} className={`min-w-0 p-4 transition sm:p-5 ${isSelected ? "bg-blue-50" : "bg-panel hover:bg-slate-50"}`}>
+                    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <button type="button" onClick={() => void openItem(item)} className="min-w-0 flex-1 text-left">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-semibold text-brand">{item.numero_licitacion}</span>
+                          <StatusBadge tone={statusTone(item.estado)}>{item.estado || "Pendiente SLI"}</StatusBadge>
+                          {result?.estatus ? <StatusBadge tone={statusTone(result.estatus)}>SLI: {result.estatus}</StatusBadge> : null}
+                        </div>
+                        <div className="mt-2 line-clamp-2 break-words text-sm font-semibold leading-6 text-ink">{item.objeto || "Sin objeto registrado"}</div>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+                          <span>{item.responsable || item.owner_username || "Sin responsable"}</span>
+                          {isGlobalViewer && item.owner_username ? <span>Usuario: {item.owner_username}</span> : null}
+                          <span>{formatDate(item.fecha_registro)}</span>
+                          {result?.fecha_cierre ? <span>Cierre: {result.fecha_cierre}</span> : null}
+                        </div>
+                        {alert ? (
+                          <div className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> <span>{alert}</span>
+                          </div>
+                        ) : null}
+                      </button>
+
+                      <div className="flex shrink-0 gap-2">
+                        <Button type="button" onClick={() => void checkSli(item, true)} disabled={sliLoading[item.id]} variant="secondary" size="icon" title="Sincronizar esta licitación">
+                          {sliLoading[item.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                        </Button>
+                        {(item.link_sli || result?.url) ? (
+                          <a href={item.link_sli || result?.url || "#"} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 w-10 items-center justify-center" title="Abrir en SLI">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : null}
+                        <Button type="button" onClick={() => void removeItem(item)} variant="danger" size="icon" title="Eliminar de mi seguimiento"><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-5"><EmptyState icon={Search} title="No hay procesos con esos filtros" copy="Cambia la búsqueda, desactiva Solo alertas o agrega una licitación manualmente." /></div>
+          )}
+        </ModuleSection>
+
+        <ModuleSection className="min-w-0 self-start">
           {selected ? (
-            <div className="mt-4 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className={`rounded-lg border p-3 ${statusTone(selected.estado)}`}>
-                  <div className="text-xs font-semibold uppercase tracking-wide opacity-80">Estado actual</div>
-                  <div className="mt-1 text-sm font-semibold">{selected.estado || "En Preparacion"}</div>
+            <div className="space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-muted">Detalle</div>
+                  <h2 className="mt-1 break-words text-lg font-semibold text-ink">{selected.numero_licitacion}</h2>
+                  <p className="mt-1 break-words text-sm leading-5 text-muted">{selected.objeto || "Sin objeto registrado"}</p>
                 </div>
-                <div className="app-data-card text-slate-800">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                    <CalendarClock className="h-3.5 w-3.5" />
-                    Registro
-                  </div>
-                  <div className="mt-1 text-sm font-semibold">{formatDate(selected.fecha_registro)}</div>
-                </div>
+                <StatusBadge tone={statusTone(selected.estado)}>{selected.estado || "Pendiente"}</StatusBadge>
               </div>
-              {selected.notas ? (
-                <div className="app-data-card">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Notas acumuladas</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-700">{selected.notas}</div>
+
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
+                Estado calculado automáticamente desde el SLI. Última revisión: {syncMeta[selected.id]?.checkedAt ? formatDate(syncMeta[selected.id].checkedAt) : "pendiente"}.
+              </div>
+
+              {sliResults[selected.id] || sliErrors[selected.id] ? (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-ink">Datos del SLI</h3>
+                    <Button type="button" onClick={() => void checkSli(selected, true)} disabled={sliLoading[selected.id]} variant="ghost" size="sm">
+                      {sliLoading[selected.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Actualizar
+                    </Button>
+                  </div>
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    {[
+                      ["Estado SLI", sliResults[selected.id]?.estatus || sliErrors[selected.id] || "N/D"],
+                      ["Cierre", sliResults[selected.id]?.fecha_cierre || "N/D"],
+                      ["Publicación", sliResults[selected.id]?.fecha_publicacion || "N/D"],
+                      ["Última revisión", sliResults[selected.id]?.ultima_revision || "N/D"],
+                      ["Enmienda", sliResults[selected.id]?.numero_enmienda || "No detectada"],
+                      ["Agente ACP", sliResults[selected.id]?.agente_compras || "N/D"]
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0 border-t border-line pt-2 first:border-0 first:pt-0 sm:[&:nth-child(2)]:border-0 sm:[&:nth-child(2)]:pt-0">
+                        <dt className="text-xs font-semibold text-muted">{label}</dt>
+                        <dd className="mt-1 break-words text-ink">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               ) : null}
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Analisis automatico SLI</div>
-                    <p className="mt-1 leading-6">
-                      El estado de seguimiento se calcula desde el SLI. Los usuarios pueden agregar comentarios, pero no cambiar manualmente el estado.
-                    </p>
+
+              {sliResults[selected.id]?.resumen_acta?.disponible ? (
+                <div className="rounded-lg border border-line bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-ink">Lectura del acta</h3>
+                    {sliResults[selected.id]?.resumen_acta?.posible_adjudicacion_propia ? <StatusBadge tone="ok">Posible adjudicación propia</StatusBadge> : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void checkSli(selected, true)}
-                    disabled={sliLoading[selected.id]}
-                    className="app-btn-mini border-blue-200 text-blue-800 disabled:opacity-60"
-                  >
-                    {sliLoading[selected.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                    Analizar con SLI
-                  </button>
-                </div>
-              </div>
-              {sliResults[selected.id] || sliErrors[selected.id] ? (
-                <div className={`rounded-lg border p-3 text-sm ${sliResults[selected.id] ? sliTone(sliResults[selected.id].estatus) : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-wide opacity-80">Estado SLI conectado</div>
-                      <div className="mt-1 font-semibold">{sliResults[selected.id]?.estatus || sliErrors[selected.id] || "Sin respuesta"}</div>
-                      <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
-                        <span>Publicacion: {sliResults[selected.id]?.fecha_publicacion || "N/D"}</span>
-                        <span>Ultima revision: {sliResults[selected.id]?.ultima_revision || "N/D"}</span>
-                        <span>Cierre: {sliResults[selected.id]?.fecha_cierre || "N/D"}</span>
-                        <span>Agente: {sliResults[selected.id]?.agente_compras || "N/D"}</span>
-                        <span>Codigos ACP: {sliResults[selected.id]?.codigos_acp_detectados?.length || 0}</span>
-                        <span>Sincronizado: {sliSyncMeta[selected.id]?.checkedAt ? formatDate(sliSyncMeta[selected.id].checkedAt) : "N/D"}</span>
-                      </div>
-                      {sliResults[selected.id]?.descripcion ? (
-                        <p className="mt-1 leading-6">{sliResults[selected.id].descripcion}</p>
-                      ) : null}
-                    </div>
-                    <span className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-800">
-                      Estado calculado: {suggestedEstadoFromSli(sliResults[selected.id], selected.estado || "En Preparacion") || selected.estado || "Pendiente"}
-                    </span>
+                  <p className="mt-2 text-sm leading-6 text-ink">{sliResults[selected.id]?.resumen_acta?.resumen}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {sliResults[selected.id]?.resumen_acta?.menciona_proyelec ? <StatusBadge tone="info">Menciona Proyelec</StatusBadge> : null}
+                    {sliResults[selected.id]?.resumen_acta?.menciona_ep_international ? <StatusBadge tone="info">Menciona EP International</StatusBadge> : null}
+                    {sliResults[selected.id]?.resumen_acta?.cumplimiento_tecnico && sliResults[selected.id]?.resumen_acta?.cumplimiento_tecnico !== "indeterminado" ? (
+                      <StatusBadge tone={sliResults[selected.id]?.resumen_acta?.cumplimiento_tecnico === "cumple" ? "ok" : "danger"}>
+                        Técnico: {sliResults[selected.id]?.resumen_acta?.cumplimiento_tecnico === "cumple" ? "Cumple" : "Posible no cumple"}
+                      </StatusBadge>
+                    ) : null}
                   </div>
-                  {sliOperationalAlert(selected, sliResults[selected.id]) ? (
-                    <div className="mt-3 flex gap-2 rounded-md border border-amber-200 bg-white/70 p-2 text-amber-900">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{sliOperationalAlert(selected, sliResults[selected.id])}</span>
-                    </div>
+                  {sliResults[selected.id]?.resumen_acta?.hallazgos?.length ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-brand">Ver evidencia detectada</summary>
+                      <ul className="mt-2 space-y-2 text-xs leading-5 text-muted">
+                        {sliResults[selected.id]?.resumen_acta?.hallazgos?.map((finding, index) => <li key={index}>• {finding}</li>)}
+                      </ul>
+                    </details>
                   ) : null}
                 </div>
               ) : null}
-              <div className="space-y-2">
-                <textarea value={notaEstado} onChange={(event) => setNotaEstado(event.target.value)} placeholder="Agregar comentario de seguimiento sin cambiar el estado calculado por SLI" className="min-h-24 w-full rounded-lg border border-line bg-white px-3 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100" />
-                <button
-                  type="button"
-                  onClick={() => void saveComment(selected)}
-                  disabled={!notaEstado.trim()}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
-                >
-                  Guardar comentario
-                </button>
+
+              <div>
+                <label className="grid gap-2 text-sm font-semibold text-ink">
+                  Comentario de seguimiento
+                  <textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Ej.: proveedor confirmó entrega; pendiente validar garantía." className="min-h-24 w-full p-3 text-sm leading-6" />
+                </label>
+                <Button type="button" onClick={() => void saveComment()} disabled={!comment.trim()} variant="primary" className="mt-3">
+                  <MessageSquareText className="h-4 w-4" /> Guardar comentario
+                </Button>
               </div>
-              <div className="space-y-3">
-                {historial.map((row, index) => (
-                  <div key={index} className="app-data-card">
-                    <div className="text-sm font-semibold text-slate-900">{row.estado_nuevo}</div>
-                    <div className="mt-1 text-xs text-muted">{row.fecha} | {row.registrado_por || "Sistema"}</div>
-                    {row.nota && <div className="mt-2 text-sm leading-6 text-slate-700">{row.nota}</div>}
-                  </div>
-                ))}
-                {!historial.length && <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-muted">Sin historial registrado.</div>}
+
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-ink"><CalendarClock className="h-4 w-4 text-brand" /> Historial</div>
+                {history.length ? (
+                  <ol className="mt-3 space-y-4 border-l border-line pl-4">
+                    {history.map((row, index) => (
+                      <li key={index} className="relative">
+                        <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-blue-500 bg-panel" />
+                        <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold text-ink">{row.estado_nuevo}</span><span className="text-xs text-muted">{formatDate(row.fecha)}</span></div>
+                        <div className="mt-1 text-xs text-muted">{row.registrado_por || "Sistema"}</div>
+                        {row.nota ? <p className="mt-2 text-sm leading-6 text-ink">{row.nota}</p> : null}
+                      </li>
+                    ))}
+                  </ol>
+                ) : <div className="mt-3 text-sm text-muted">Sin historial registrado.</div>}
               </div>
             </div>
           ) : (
-            <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-muted">Selecciona una licitacion para ver comentarios e historial.</div>
+            <EmptyState icon={CheckCircle2} title="Selecciona un proceso" copy="Verás datos del SLI, acta, comentarios e historial en un solo lugar." className="min-h-72" />
           )}
-        </div>
-      </section>
+        </ModuleSection>
+      </div>
     </div>
   );
 }
-
-
-

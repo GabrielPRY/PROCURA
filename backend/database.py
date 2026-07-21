@@ -547,24 +547,34 @@ def import_historico_excel_to_db(excel_path="ACP DATA LIC PASADAS v2_2.xlsx", re
     conn.close()
     return {"rows_source": int(len(df)), "rows_processed": int(len(df)), "replace": bool(replace)}
 
-def get_historico_licitaciones_df(limit=5000, search=None, anio=None):
-    conn = get_connection()
+def _historico_filter_sql(search=None, searches=None, anio=None):
     params = []
     filters = []
-    if search:
-        q = f"%{search}%"
-        filters.append("(numero_licitacion ILIKE %s OR codigo_acp ILIKE %s OR observaciones ILIKE %s OR analista_procura ILIKE %s OR mes ILIKE %s OR CAST(anio AS TEXT) ILIKE %s)")
-        params.extend([q, q, q, q, q, q])
+    terms = searches if isinstance(searches, (list, tuple)) else []
+    if not terms and search:
+        terms = [search]
+    terms = list(dict.fromkeys(str(term or "").strip() for term in terms if str(term or "").strip()))[:12]
+    if terms:
+        term_filters = []
+        for term in terms:
+            q = f"%{term}%"
+            term_filters.append("(numero_licitacion ILIKE %s OR codigo_acp ILIKE %s OR observaciones ILIKE %s OR analista_procura ILIKE %s OR mes ILIKE %s OR CAST(anio AS TEXT) ILIKE %s)")
+            params.extend([q, q, q, q, q, q])
+        filters.append("(" + " OR ".join(term_filters) + ")")
     if anio and str(anio) != "Todos":
         filters.append("anio = %s")
         params.append(int(anio))
-    where_clause = ("WHERE " + " AND ".join(filters)) if filters else ""
+    return (("WHERE " + " AND ".join(filters)) if filters else ""), params
+
+def get_historico_licitaciones_df(limit=5000, search=None, searches=None, anio=None):
+    conn = get_connection()
+    where_clause, params = _historico_filter_sql(search=search, searches=searches, anio=anio)
     params.append(int(limit))
     df = pd.read_sql_query(f"""
-        SELECT numero_licitacion AS "NÂ° LicitaciÃ³n",
-               anio AS "AÃ±o",
+        SELECT numero_licitacion AS "N° Licitación",
+               anio AS "Año",
                mes AS "Mes",
-               codigo_acp AS "CÃ³digo ACP",
+               codigo_acp AS "Código ACP",
                cantidad AS "Cantidad",
                precio_proyelec AS "Precio Proyelec",
                precio_competencia AS "Precio Competencia",
@@ -1155,10 +1165,11 @@ def get_historical_prices_df():
     conn.close()
     return df
 
-def get_historico_count():
+def get_historico_count(search=None, searches=None, anio=None):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM historico_licitaciones")
+    where_clause, params = _historico_filter_sql(search=search, searches=searches, anio=anio)
+    c.execute(f"SELECT COUNT(*) FROM historico_licitaciones {where_clause}", tuple(params))
     count = c.fetchone()[0]
     conn.close()
     return int(count or 0)
@@ -1180,14 +1191,68 @@ def get_all_workspaces(username, all_users=False):
     conn = get_connection()
     if all_users:
         df = pd.read_sql_query(
-            """SELECT username, licitacion, fecha_guardado FROM workspaces
+            """SELECT username, licitacion, fecha_guardado, data_json, cg_json FROM workspaces
                ORDER BY fecha_guardado DESC""", conn)
     else:
         df = pd.read_sql_query(
-            """SELECT username, licitacion, fecha_guardado FROM workspaces
+            """SELECT username, licitacion, fecha_guardado, data_json, cg_json FROM workspaces
                WHERE username=%s ORDER BY fecha_guardado DESC""",
             conn, params=(username,))
     conn.close()
+    if df.empty:
+        return df.drop(columns=["data_json", "cg_json"], errors="ignore")
+
+    def workspace_summary(row):
+        try:
+            data = json.loads(row.get("data_json") or "[]")
+            if not isinstance(data, list):
+                data = []
+        except Exception:
+            data = []
+        try:
+            cg = json.loads(row.get("cg_json") or "{}")
+            if not isinstance(cg, dict):
+                cg = {}
+        except Exception:
+            cg = {}
+
+        def first_value(keys, fallback=""):
+            for key in keys:
+                value = str(cg.get(key, "") or "").strip()
+                if value and value.lower() not in {"nan", "none", "no especificado", "no especificado en los documentos adjuntos"}:
+                    return value
+            return fallback
+
+        object_value = first_value(["objeto_licitacion", "objeto", "descripcion_licitacion", "titulo", "nombre_proyecto"])
+        if not object_value:
+            descriptions = []
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                description = str(
+                    item.get("termino_de_busqueda_corto")
+                    or item.get("descripcion")
+                    or item.get("ficha_tecnica_completa")
+                    or ""
+                ).strip().replace("\n", " ")
+                if description and description not in descriptions:
+                    descriptions.append(description)
+            if descriptions:
+                object_value = descriptions[0][:110]
+                if len(data) > 1:
+                    object_value = f"{object_value} + {len(data) - 1} renglones"
+
+        return pd.Series({
+            "renglones": len(data),
+            "objeto": object_value,
+            "entidad": first_value(["entidad_contratante", "entidad", "unidad_compras"], "ACP"),
+            "fecha_cierre": first_value(["fecha_cierre", "fecha_hora_cierre", "cierre", "fecha_entrega_propuesta"]),
+            "empresa_sugerida": first_value(["empresa_sugerida", "empresa_recomendada_participacion", "participar_con"]),
+            "riesgo": first_value(["riesgo_tecnico_global", "riesgo_global"]),
+        })
+
+    summaries = df.apply(workspace_summary, axis=1)
+    df = pd.concat([df.drop(columns=["data_json", "cg_json"]), summaries], axis=1)
     return df
 
 def load_workspace(username, licitacion):

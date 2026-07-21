@@ -20,7 +20,7 @@ export const StatCard = memo(function StatCard({
 }) {
   if (loading) {
     return (
-      <div className={cn("rounded-xl border border-line bg-panel p-4 shadow-sm", className)}>
+      <div className={cn("app-stat-card p-4", className)}>
         <div className="flex items-center justify-between gap-3">
           <span className="app-skeleton h-3 w-20" />
           <span className="app-skeleton h-4 w-4 rounded" />
@@ -32,12 +32,12 @@ export const StatCard = memo(function StatCard({
   }
 
   return (
-    <div className={cn("rounded-xl border border-line bg-panel p-4 shadow-sm", className)}>
+    <div className={cn("app-stat-card p-4", className)}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
         {Icon ? <Icon className="h-4 w-4 text-brand" /> : null}
       </div>
-      <div className="mt-2 truncate text-xl font-semibold text-slate-950 dark:text-white">{String(value)}</div>
+      <div className="mt-2 truncate text-xl font-semibold text-ink">{String(value)}</div>
       {hint ? <div className="mt-1 text-xs leading-5 text-muted">{hint}</div> : null}
     </div>
   );

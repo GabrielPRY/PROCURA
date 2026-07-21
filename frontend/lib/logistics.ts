@@ -66,8 +66,93 @@ export type LogisticsSettingsResponse = {
   incoterms: Incoterm[];
 };
 
+export type CarrierStatus = {
+  configured: boolean;
+  environment: string;
+  official: boolean;
+};
+
+export type LogisticsCarriersResponse = {
+  status: string;
+  carriers: {
+    ups: CarrierStatus;
+    schneider: CarrierStatus;
+  };
+};
+
+export type LogisticsAddress = {
+  name?: string;
+  address_line?: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country_code?: "US";
+  residential?: boolean;
+};
+
+export type QuotePackage = {
+  package_type?: string;
+  quantity: number;
+  weight: number;
+  weight_unit: "LBS" | "KGS";
+  length: number;
+  width: number;
+  height: number;
+  dimension_unit: "IN" | "CM";
+  description?: string;
+};
+
+export type CarrierQuote = {
+  id: string;
+  carrier: "UPS" | "Schneider" | string;
+  service_code?: string;
+  service_name: string;
+  total: number;
+  currency: string;
+  business_days?: number;
+  transit_days?: number;
+  delivery_date?: string;
+  delivery_time?: string;
+  pickup_at?: string;
+  delivery_at?: string;
+  expires_at?: string;
+  negotiated?: boolean;
+  line_haul?: number;
+  fuel?: number;
+  accessorials?: number;
+  accessorial_list?: unknown[];
+};
+
+export type CarrierQuoteResponse = {
+  status: string;
+  provider: string;
+  official: boolean;
+  environment: string;
+  quotes: CarrierQuote[];
+};
+
 export function getLogisticsSettings() {
   return apiRequest<LogisticsSettingsResponse>("/logistics/settings");
+}
+
+export function getLogisticsCarriersStatus() {
+  return apiRequest<LogisticsCarriersResponse>("/logistics/carriers/status");
+}
+
+export function getUpsQuotes(payload: Record<string, unknown>) {
+  return apiRequest<CarrierQuoteResponse>("/logistics/quotes/ups", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 70000
+  });
+}
+
+export function getSchneiderQuotes(payload: Record<string, unknown>) {
+  return apiRequest<CarrierQuoteResponse>("/logistics/quotes/schneider", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 90000
+  });
 }
 
 export function getLogisticsCalculations(limit = 50) {

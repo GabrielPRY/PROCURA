@@ -147,7 +147,7 @@ export function AppShell({
                 }`}
               />
             </button>
-            <Button onClick={onLogout} variant="secondary" className="hidden sm:inline-flex">
+            <Button onClick={onLogout} variant="secondary" className="app-desktop-logout hidden sm:inline-flex">
               <LogOut className="h-4 w-4" />
               Salir
             </Button>
@@ -158,7 +158,7 @@ export function AppShell({
           id="app-main-nav"
           className="mx-auto w-full max-w-[1800px] overflow-hidden px-4 sm:px-5 xl:px-7"
           style={{
-            maxHeight: navOpen ? "200px" : "0px",
+            maxHeight: navOpen ? "32rem" : "0px",
             paddingBottom: navOpen ? "0.75rem" : "0px",
             transition: "max-height 0.28s cubic-bezier(0.4,0,0.2,1), padding-bottom 0.28s cubic-bezier(0.4,0,0.2,1)",
           }}

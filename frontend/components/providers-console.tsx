@@ -1,198 +1,79 @@
-﻿"use client";
+"use client";
 
 import {
   AlertTriangle,
-  BrainCircuit,
   Bot,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Globe2,
   Loader2,
-  ListChecks,
   PackageSearch,
   Search,
-  Send,
   ShieldCheck,
   Sparkles,
-  Target,
-  UserRound
+  Target
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { asBool, asOptionalBool, cleanValue, getUserConfig, loadActiveRfqContext, loadLastRfq, type ActiveRfqItemContext, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { type AuthUser } from "@/lib/auth";
 import { COMPANY_AUDIT_DRAFT_KEY, listCompanyAudits, type CompanyAuditDraft, type CompanyAuditListItem } from "@/lib/company-audit";
 import type { ModuleId } from "@/lib/navigation";
+import {
+  asBool,
+  asOptionalBool,
+  cleanValue,
+  getUserConfig,
+  loadActiveRfqContext,
+  loadLastRfq,
+  type RfqAnalysisResponse,
+  type RfqItem
+} from "@/lib/rfq";
 import { searchProviders, type SourcingProvider, type SourcingSearchPlan } from "@/lib/sourcing";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type SearchScope = "renglon" | "seleccion" | "todos";
-type SourcingStrategy = "por_renglon" | "proveedor_integral";
-type ChatRole = "user" | "assistant";
-type SourcingTab = "buscar" | "ranking" | "validar";
-
-type ChatMessage = {
-  role: ChatRole;
-  content: string;
-};
+type Strategy = "proveedor_integral" | "por_renglon";
+type View = "prepare" | "results";
+type ChatMessage = { role: "user" | "assistant"; content: string };
+type BadgeTone = "neutral" | "info" | "ok" | "warn" | "danger";
 
 const starterPrompts = [
-  "Busca 10 proveedores globales con mejor oportunidad de ahorro y bajo riesgo comercial.",
-  "Prioriza fabricantes directos y distribuidores menos obvios. Alibaba puede servir si se valida bien.",
-  "Busca alternativas tecnicamente compatibles, pero no asumas cumplimiento sin evidencia.",
-  "Encuentra proveedores con stock o capacidad de cotizar rapido y condiciones Net 30 si es posible."
+  "Prioriza fabricante directo y stock disponible.",
+  "Busca el precio más bajo sin sacrificar cumplimiento técnico.",
+  "Incluye marketplaces B2B solo cuando el proveedor sea trazable."
 ];
 
 function itemLabel(item: RfqItem, index: number) {
-  const renglon = cleanValue(item.renglon, String(index + 1));
+  const line = cleanValue(item.renglon, String(index + 1));
   const code = cleanValue(item.codigo_articulo, "S/C");
-  const desc = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "Sin descripcion");
-  return `Renglon ${renglon} | ${code} | ${desc.slice(0, 80)}`;
+  const description = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "Sin descripción");
+  return `Renglón ${line} | ${code} | ${description.slice(0, 78)}`;
 }
 
 function queryFromItem(item?: RfqItem) {
   if (!item) return "";
-  const parts = [
+  return Array.from(new Set([
     cleanValue(item.termino_de_busqueda_corto, ""),
     cleanValue(item.marca_modelo_requerido, ""),
     cleanValue(item.codigo_articulo, ""),
-    cleanValue(item.descripcion || item.ficha_tecnica_completa, "").slice(0, 160)
-  ].filter(Boolean);
-  return Array.from(new Set(parts)).join(" ");
+    cleanValue(item.descripcion || item.ficha_tecnica_completa, "").slice(0, 150)
+  ].filter(Boolean))).join(" ");
 }
 
-function sourceCards(query: string) {
+function sourceLinks(query: string) {
   const encoded = encodeURIComponent(query || "industrial supplier");
   return [
-    {
-      label: "Google Global",
-      type: "Abierto",
-      hint: "Fabricantes, distribuidores, stockistas y resultados menos obvios.",
-      href: `https://www.google.com/search?q=${encoded}+manufacturer+distributor+stock+price+datasheet`
-    },
-    {
-      label: "Google exacto",
-      type: "Preciso",
-      hint: "Numero de parte o codigo como frase exacta.",
-      href: `https://www.google.com/search?q=%22${encoded}%22+supplier+OR+distributor+OR+manufacturer`
-    },
-    {
-      label: "Alibaba",
-      type: "Marketplace B2B",
-      hint: "Puede servir para precio agresivo. Validar empresa, producto, pagos y trazabilidad.",
-      href: `https://www.alibaba.com/trade/search?SearchText=${encoded}`
-    },
-    {
-      label: "Made-in-China",
-      type: "Factory direct",
-      hint: "Fabricantes directos y exportadores. Validar ficha tecnica y muestras.",
-      href: `https://www.made-in-china.com/products-search/hot-china-products/${encoded}.html`
-    },
-    {
-      label: "Global Sources",
-      type: "Asia B2B",
-      hint: "Proveedores y fabricantes globales. Revisar certificaciones y contacto.",
-      href: `https://www.globalsources.com/search?query=${encoded}`
-    },
-    {
-      label: "Thomasnet",
-      type: "Industrial USA",
-      hint: "Proveedores industriales, fabricantes y distribuidores en Norteamerica.",
-      href: `https://www.thomasnet.com/search.html?cov=NA&what=${encoded}`
-    },
-    {
-      label: "Octopart",
-      type: "Componentes",
-      hint: "Partes, datasheets, stock y distribuidores electronicos.",
-      href: `https://octopart.com/search?q=${encoded}`
-    },
-    {
-      label: "Europages",
-      type: "Europa",
-      hint: "Fabricantes y distribuidores europeos menos obvios.",
-      href: `https://www.europages.com/en/search?q=${encoded}`
-    }
+    ["Google Global", `https://www.google.com/search?q=${encoded}+manufacturer+distributor+stock+price+datasheet`],
+    ["Alibaba", `https://www.alibaba.com/trade/search?SearchText=${encoded}`],
+    ["Made-in-China", `https://www.made-in-china.com/products-search/hot-china-products/${encoded}.html`],
+    ["Global Sources", `https://www.globalsources.com/search?query=${encoded}`],
+    ["Thomasnet", `https://www.thomasnet.com/search.html?cov=NA&what=${encoded}`],
+    ["Europages", `https://www.europages.com/en/search?q=${encoded}`]
   ];
-}
-
-function validationRows() {
-  return [
-    ["Cumplimiento tecnico", "Ficha tecnica, marca/modelo, numero de parte, equivalencia y certificaciones si aplican."],
-    ["Oportunidad de ahorro", "Fabricante directo, stockista, excedente nuevo, distribuidor regional o marketplace B2B validado."],
-    ["Empresa real", "Web propia o perfil B2B consistente, correo corporativo, telefono, direccion y actividad verificable."],
-    ["Riesgo comercial", "Evitar pagos sin trazabilidad, dominios dudosos, datos inconsistentes o falta de evidencia tecnica."],
-    ["Cotizacion usable", "Precio, moneda, stock, lead time, Incoterm, validez, garantia y Net 30 o superior cuando sea posible."]
-  ];
-}
-
-function smartPromptForItem(item: RfqItem | undefined, scope: SearchScope, totalItems: number, strategy: SourcingStrategy) {
-  if (!item && scope === "renglon") {
-    return "Busca 10 proveedores globales utiles para el RFQ. Razona primero los requisitos tecnicos, luego busca candidatos reales y prioriza precio bajo con bajo riesgo comercial.";
-  }
-  if (scope === "todos" || scope === "seleccion") {
-    const integral = strategy === "proveedor_integral";
-    return [
-      `Busca 10 proveedores globales utiles para los ${Math.min(totalItems, 5)} renglones principales del RFQ.`,
-      integral
-        ? "Prioridad maxima: encontrar proveedores integrales que puedan cotizar todos los renglones o la mayor cantidad posible en una sola solicitud."
-        : "Prioriza el mejor proveedor por cada renglon, aunque sean proveedores distintos.",
-      "Primero identifica familias tecnicas, codigos ACP, marcas/modelos, equivalencias permitidas y requisitos documentales.",
-      "Luego busca proveedores reales a nivel global: fabricantes directos, distribuidores regionales, stockistas, excedentes nuevos y marketplaces B2B confiables.",
-      "Rankea por cobertura de renglones, precio bajo, cumplimiento tecnico, evidencia trazable y bajo riesgo comercial. No inventes precios ni contactos."
-    ].join(" ");
-  }
-
-  return [
-    `Busca 10 proveedores globales para el renglon ${cleanValue(item?.renglon, "")}.`,
-    `Codigo ACP: ${cleanValue(item?.codigo_articulo, "No especificado")}.`,
-    `Descripcion tecnica: ${cleanValue(item?.ficha_tecnica_completa || item?.descripcion || item?.termino_de_busqueda_corto, "No especificado")}.`,
-    `Marca/modelo requerido: ${cleanValue(item?.marca_modelo_requerido, "No especificado")}.`,
-    `Acepta equivalente: ${asOptionalBool(item?.acepta_equivalente) === false ? "No, buscar exacto o autorizado" : "Si aplica, buscar equivalentes tecnicamente compatibles"}.`,
-    `Requiere propuesta tecnica: ${asBool(item?.requiere_propuesta_tecnica) ? "Si" : "No especificado"}.`,
-    `Requiere ficha/catalogo: ${asBool(item?.requiere_ficha_tecnica) ? "Si" : "No especificado"}.`,
-    "Razona primero que producto se necesita, luego busca proveedores reales y rankea por cumplimiento tecnico, oportunidad de ahorro, riesgo y evidencia. Alibaba puede servir solo si el proveedor es trazable."
-  ].join(" ");
-}
-
-function riskTone(value?: string) {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("bajo")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("alto")) return "border-rose-200 bg-rose-50 text-rose-800";
-  return "border-amber-200 bg-amber-50 text-amber-800";
-}
-
-function savingTone(value?: string) {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("alta")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("baja")) return "border-rose-200 bg-rose-50 text-rose-800";
-  return "border-blue-200 bg-blue-50 text-blue-800";
-}
-
-function decisionTone(value?: string) {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("recomendado")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("descartar")) return "border-rose-200 bg-rose-50 text-rose-800";
-  return "border-amber-200 bg-amber-50 text-amber-800";
-}
-
-function auditDecisionTone(value?: string) {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("avanzar") || normalized.includes("aprob")) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized.includes("descartar") || normalized.includes("bloquear")) return "border-rose-200 bg-rose-50 text-rose-800";
-  return "border-amber-200 bg-amber-50 text-amber-800";
-}
-
-function domainFromUrl(value?: string) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  try {
-    const withProtocol = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
-    return new URL(withProtocol).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].toLowerCase();
-  }
 }
 
 function normalizeCompanyName(value?: string) {
@@ -200,35 +81,90 @@ function normalizeCompanyName(value?: string) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|s\.a\.?|sa|gmbh|group|international|intl)\b/g, "")
+    .replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|sa|gmbh|group|international|intl)\b/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
 
-function formatAuditDate(value?: string) {
-  if (!value) return "Sin fecha";
+function domainFromUrl(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
   try {
-    return new Intl.DateTimeFormat("es-PA", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+    const parsed = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+    return parsed.hostname.replace(/^www\./, "").toLowerCase();
   } catch {
-    return value;
+    return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].toLowerCase();
   }
+}
+
+function riskTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("bajo")) return "ok";
+  if (normalized.includes("alto")) return "danger";
+  return "warn";
+}
+
+function decisionTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("recomendado") || normalized.includes("avanzar") || normalized.includes("aprob")) return "ok";
+  if (normalized.includes("descartar") || normalized.includes("bloquear")) return "danger";
+  return "warn";
+}
+
+function savingTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("alta")) return "ok";
+  if (normalized.includes("baja")) return "danger";
+  return "info";
+}
+
+function itemPayload(item: RfqItem) {
+  return {
+    renglon: cleanValue(item.renglon, ""),
+    codigo_acp: cleanValue(item.codigo_articulo, ""),
+    descripcion: cleanValue(item.ficha_tecnica_completa || item.descripcion, ""),
+    busqueda_sugerida: cleanValue(item.termino_de_busqueda_corto, ""),
+    cantidad: cleanValue(item.cantidad, ""),
+    unidad: cleanValue(item.unidad_de_medida || item.unidad, ""),
+    marca_modelo: cleanValue(item.marca_modelo_requerido, ""),
+    acepta_equivalente: asOptionalBool(item.acepta_equivalente),
+    requiere_propuesta_tecnica: asBool(item.requiere_propuesta_tecnica),
+    requiere_ficha_tecnica: asBool(item.requiere_ficha_tecnica),
+    evidencia_tecnica: cleanValue(item.evidencia_tecnica, "")
+  };
+}
+
+function smartPrompt(items: RfqItem[], strategy: Strategy) {
+  const lines = items.map((item, index) => {
+    const equivalent = asOptionalBool(item.acepta_equivalente);
+    return [
+      `Renglón ${cleanValue(item.renglon, String(index + 1))}`,
+      `código ACP ${cleanValue(item.codigo_articulo, "no especificado")}`,
+      cleanValue(item.marca_modelo_requerido, "") ? `marca/modelo ${cleanValue(item.marca_modelo_requerido, "")}` : "",
+      equivalent === false ? "sin equivalentes" : equivalent === true ? "equivalentes permitidos si cumplen" : "equivalencia no confirmada"
+    ].filter(Boolean).join(", ");
+  });
+  return [
+    `Busca 10 proveedores globales reales para ${items.length} renglón(es).`,
+    strategy === "proveedor_integral"
+      ? "Prioriza proveedores que cubran todos los renglones o la mayor cantidad posible."
+      : "Busca el mejor proveedor especializado para cada renglón.",
+    "Prioridad: cumplimiento técnico verificable, oportunidad de ahorro, stock/lead time y bajo riesgo comercial.",
+    "No inventes precios, stock, contactos, certificaciones ni cumplimiento. Toda afirmación debe quedar como confirmada o pendiente de validar.",
+    lines.join("\n")
+  ].join("\n");
 }
 
 export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
-  const [scope, setScope] = useState<SearchScope>("renglon");
-  const [sourcingStrategy, setSourcingStrategy] = useState<SourcingStrategy>("proveedor_integral");
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
-  const [input, setInput] = useState("");
+  const [strategy, setStrategy] = useState<Strategy>("proveedor_integral");
   const [depth, setDepth] = useState("Profunda");
+  const [input, setInput] = useState("");
+  const [view, setView] = useState<View>("prepare");
   const [searching, setSearching] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Selecciona un renglon y presiona busqueda inteligente. Yo traduzco el RFQ a una estrategia de sourcing y rankeo proveedores por cumplimiento, ahorro y riesgo."
-    }
+    { role: "assistant", content: "Selecciona los renglones y dime si tienes una condición especial. Yo construiré la estrategia de búsqueda." }
   ]);
   const [summary, setSummary] = useState("");
   const [providers, setProviders] = useState<SourcingProvider[]>([]);
@@ -238,24 +174,20 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [geminiSource, setGeminiSource] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
-  const [activeTab, setActiveTab] = useState<SourcingTab>("buscar");
   const [auditHistory, setAuditHistory] = useState<CompanyAuditListItem[]>([]);
   const [loadingAudits, setLoadingAudits] = useState(false);
-  const [activeRfqContext, setActiveRfqContext] = useState<ActiveRfqItemContext | null>(null);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   useEffect(() => {
-    const savedRfq = loadLastRfq(user.username);
+    const saved = loadLastRfq(user.username);
     const context = loadActiveRfqContext(user.username);
-    setRfq(savedRfq);
-    setActiveRfqContext(context?.target_module === "proveedores" ? context : null);
-    if (savedRfq?.items?.length && context?.target_module === "proveedores") {
-      const nextIndex = Math.min(Math.max(Number(context.item_index) || 0, 0), savedRfq.items.length - 1);
-      setSelectedIndex(nextIndex);
-      setSelectedIndexes([nextIndex]);
-      setScope("renglon");
-      setInput(
-        `Busca 10 proveedores globales para el renglon ${context.renglon || nextIndex + 1}. Prioriza precio bajo, cumplimiento tecnico, proveedor real y bajo riesgo comercial.`
-      );
+    const savedItems = saved?.items || [];
+    setRfq(saved);
+    if (savedItems.length && context?.target_module === "proveedores") {
+      const index = Math.min(Math.max(Number(context.item_index) || 0, 0), savedItems.length - 1);
+      setSelectedIndexes([index]);
+    } else {
+      setSelectedIndexes(savedItems.length ? [0] : []);
     }
     setLoadingConfig(true);
     getUserConfig(user.username)
@@ -271,94 +203,55 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   }, [user.username]);
 
   const items = useMemo(() => rfq?.items || [], [rfq]);
-  const selectedItem = items[selectedIndex];
-  const selectedItems = scope === "todos" ? items : scope === "seleccion" ? items.filter((_, index) => selectedIndexes.includes(index)) : selectedItem ? [selectedItem] : [];
-  const selectedQuery = queryFromItem(selectedItem);
-  const allQueries = items.map(queryFromItem).filter(Boolean);
-  const selectedQueries = selectedItems.map(queryFromItem).filter(Boolean);
-  const activeQuery = scope === "todos" ? allQueries.slice(0, 5).join(" | ") : scope === "seleccion" ? selectedQueries.slice(0, 5).join(" | ") : selectedQuery;
-  const richLinks = sourceCards(activeQuery || "industrial supplier");
+  const selectedItems = useMemo(
+    () => selectedIndexes.filter((index) => items[index]).sort((a, b) => a - b).map((index) => items[index]),
+    [items, selectedIndexes]
+  );
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion, "Sin RFQ");
-  const selectedRenglon = selectedItem ? cleanValue(selectedItem.renglon, String(selectedIndex + 1)) : "N/D";
-  const selectedCode = selectedItem ? cleanValue(selectedItem.codigo_articulo, "S/C") : "S/C";
-  const selectedDescription = selectedItem
-    ? cleanValue(selectedItem.termino_de_busqueda_corto || selectedItem.descripcion || selectedItem.ficha_tecnica_completa, "Sin descripcion")
-    : "Analiza o abre un RFQ para activar el contexto tecnico.";
-
-  function toggleSelectedIndex(index: number) {
-    setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index].sort((a, b) => a - b));
-  }
-
-  function selectAllItems() {
-    setSelectedIndexes(items.map((_, index) => index));
-    setScope("seleccion");
-  }
-
-  function clearSelection() {
-    setSelectedIndexes(selectedItem ? [selectedIndex] : []);
-    setScope("renglon");
-  }
+  const activeQuery = selectedItems.map(queryFromItem).filter(Boolean).slice(0, 12).join(" | ");
+  const grounded = engine === "gemini_google_search";
 
   useEffect(() => {
     if (!providers.length) {
       setAuditHistory([]);
       return;
     }
-
     let mounted = true;
     setLoadingAudits(true);
     listCompanyAudits({ limit: 300 })
-      .then((response) => {
-        if (mounted) setAuditHistory(response.audits || []);
-      })
-      .catch(() => {
-        if (mounted) setAuditHistory([]);
-      })
-      .finally(() => {
-        if (mounted) setLoadingAudits(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
+      .then((response) => { if (mounted) setAuditHistory(response.audits || []); })
+      .catch(() => { if (mounted) setAuditHistory([]); })
+      .finally(() => { if (mounted) setLoadingAudits(false); });
+    return () => { mounted = false; };
   }, [providers.length]);
 
-  function itemPayload(item: RfqItem) {
-    return {
-      renglon: cleanValue(item.renglon, ""),
-      codigo_acp: cleanValue(item.codigo_articulo, ""),
-      descripcion: cleanValue(item.ficha_tecnica_completa || item.descripcion, ""),
-      busqueda_sugerida: cleanValue(item.termino_de_busqueda_corto, ""),
-      cantidad: cleanValue(item.cantidad, ""),
-      unidad: cleanValue(item.unidad_de_medida || item.unidad, ""),
-      marca_modelo: cleanValue(item.marca_modelo_requerido, ""),
-      acepta_equivalente: asOptionalBool(item.acepta_equivalente),
-      requiere_propuesta_tecnica: asBool(item.requiere_propuesta_tecnica),
-      requiere_ficha_tecnica: asBool(item.requiere_ficha_tecnica),
-      evidencia_tecnica: cleanValue(item.evidencia_tecnica, "")
-    };
+  function auditForProvider(provider: SourcingProvider) {
+    const providerDomain = domainFromUrl(provider.url);
+    const providerName = normalizeCompanyName(provider.proveedor);
+    return auditHistory.find((audit) => {
+      const auditDomain = String(audit.domain || domainFromUrl(audit.website)).toLowerCase();
+      if (providerDomain && auditDomain && providerDomain === auditDomain) return true;
+      const auditName = normalizeCompanyName(audit.company_name);
+      return Boolean(providerName && auditName && (providerName === auditName || providerName.includes(auditName) || auditName.includes(providerName)));
+    });
   }
 
   function sendProviderToAudit(provider: SourcingProvider) {
-    const previousAudit = auditForProvider(provider);
-    const contextParts = [
-      `RFQ: ${rfqNumber}`,
-      provider.renglon ? `Renglon: ${provider.renglon}` : "",
-      activeQuery ? `Busqueda tecnica: ${activeQuery}` : "",
-      provider.evidencia ? `Evidencia sourcing: ${provider.evidencia}` : "",
-      provider.que_validar ? `Validar: ${provider.que_validar}` : ""
-    ].filter(Boolean);
+    const prior = auditForProvider(provider);
     const draft: CompanyAuditDraft = {
       company_name: provider.proveedor || "",
       website: provider.url || "",
       country: provider.pais_region || "",
-      product_context: contextParts.join("\n"),
+      product_context: [
+        `RFQ: ${rfqNumber}`,
+        `Renglones: ${provider.renglones_cubiertos?.join(", ") || provider.renglon || "Por validar"}`,
+        provider.evidencia ? `Evidencia de sourcing: ${provider.evidencia}` : "",
+        provider.que_validar ? `Pendiente: ${provider.que_validar}` : ""
+      ].filter(Boolean).join("\n"),
       notes: [
-        provider.tipo ? `Tipo sugerido: ${provider.tipo}` : "",
-        provider.riesgo ? `Riesgo preliminar sourcing: ${provider.riesgo}` : "",
-        provider.probabilidad_buen_precio ? `Oportunidad de ahorro: ${provider.probabilidad_buen_precio}` : "",
-        provider.decision ? `Decision preliminar: ${provider.decision}` : "",
-        previousAudit ? `Auditoria previa: ${previousAudit.score_final}/100 | ${previousAudit.riesgo || "Sin riesgo"} | ${previousAudit.decision || "Sin decision"}` : ""
+        provider.tipo ? `Tipo: ${provider.tipo}` : "",
+        provider.riesgo ? `Riesgo preliminar: ${provider.riesgo}` : "",
+        prior ? `Auditoría previa: ${prior.score_final}/100 | ${prior.decision || "Revisar"}` : ""
       ].filter(Boolean).join("\n"),
       source: "proveedores",
       created_at: new Date().toISOString()
@@ -366,63 +259,47 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     try {
       window.localStorage.setItem(COMPANY_AUDIT_DRAFT_KEY, JSON.stringify(draft));
     } catch {
-      // Si localStorage no esta disponible, solo cambiamos de modulo.
+      // El auditor permite completar los datos manualmente si el navegador bloquea almacenamiento local.
     }
     onModuleChange?.("auditor_empresas");
   }
 
-  function auditForProvider(provider: SourcingProvider) {
-    const providerDomain = domainFromUrl(provider.url);
-    const providerName = normalizeCompanyName(provider.proveedor);
-
-    return auditHistory.find((audit) => {
-      const auditDomain = String(audit.domain || domainFromUrl(audit.website)).toLowerCase();
-      if (providerDomain && auditDomain && providerDomain === auditDomain) return true;
-
-      const auditName = normalizeCompanyName(audit.company_name);
-      if (!providerName || !auditName) return false;
-      return providerName === auditName || providerName.includes(auditName) || auditName.includes(providerName);
-    });
-  }
-
-  async function runSourcing(prompt: string) {
-    const cleanPrompt = prompt.trim();
-    if (!cleanPrompt || searching) return;
+  async function runSourcing() {
+    if (!selectedItems.length || searching || !hasGeminiKey) return;
+    const visiblePrompt = input.trim() || "Busca los mejores proveedores para los renglones seleccionados.";
+    const requestPrompt = [smartPrompt(selectedItems, strategy), input.trim() ? `Condición adicional: ${input.trim()}` : ""].filter(Boolean).join("\n\n");
+    setMessages((current) => [...current, { role: "user", content: visiblePrompt }]);
     setInput("");
-    setError(null);
     setSearching(true);
+    setError(null);
     setSummary("");
     setProviders([]);
-    setEngine("");
     setSearchPlan([]);
-    setMessages((current) => [...current, { role: "user", content: cleanPrompt }]);
-
+    setEngine("");
     try {
-      const selectedItems = scope === "todos" ? items : scope === "seleccion" ? items.filter((_, index) => selectedIndexes.includes(index)) : selectedItem ? [selectedItem] : [];
       const response = await searchProviders({
         username: user.username,
-        items: selectedItems.map(itemPayload),
-        custom_prompt: cleanPrompt,
+        items: selectedItems.slice(0, 12).map(itemPayload),
+        custom_prompt: requestPrompt,
         depth,
         target_count: 10,
-        sourcing_strategy: scope === "todos" || scope === "seleccion" ? sourcingStrategy : "por_renglon"
+        sourcing_strategy: selectedItems.length > 1 ? strategy : "por_renglon"
       });
-
+      const nextProviders = response.proveedores || [];
       setSummary(response.resumen || "");
-      setProviders(response.proveedores || []);
-      setEngine(response.engine || (response.evidence_count ? "web_search" : ""));
+      setProviders(nextProviders);
+      setEngine(response.engine || "");
       setSearchPlan(response.search_plan || []);
-
-      const providerCount = response.proveedores?.length || 0;
-      const answer = providerCount
-        ? sourcingStrategy === "proveedor_integral" && (scope === "todos" || scope === "seleccion")
-          ? `Encontre ${providerCount} candidatos. Los ordene dando prioridad a proveedores que puedan cubrir varios renglones o todo el RFQ.`
-          : `Encontre ${providerCount} candidatos. Los ordene por match tecnico, oportunidad de ahorro y riesgo comercial. Revisa el panel de ranking antes de cotizar.`
-        : "Gemini no genero candidatos suficientes con evidencia util. Te deje fuentes abiertas y criterios de validacion para continuar manualmente.";
-      setMessages((current) => [...current, { role: "assistant", content: answer }]);
-      setActiveTab(providerCount ? "ranking" : "validar");
+      setExpandedIndex(nextProviders.length ? 0 : null);
+      setMessages((current) => [...current, {
+        role: "assistant",
+        content: nextProviders.length
+          ? `${response.resumen || `Encontré ${nextProviders.length} candidatos.`} Revisa evidencia y auditoría antes de solicitar cotización.`
+          : "No encontré candidatos con evidencia suficiente. Ajusta los renglones o la instrucción."
+      }]);
+      setView("results");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo completar el sourcing.";
+      const message = err instanceof Error ? err.message : "No se pudo completar la búsqueda.";
       setError(message);
       setMessages((current) => [...current, { role: "assistant", content: message }]);
     } finally {
@@ -430,585 +307,220 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     }
   }
 
-  async function runSmartSourcing() {
-    const prompt = [
-      smartPromptForItem(selectedItem, scope, selectedItems.length || items.length, sourcingStrategy),
-      input.trim() ? `Instruccion adicional del usuario: ${input.trim()}` : ""
-    ].filter(Boolean).join("\n\n");
-    await runSourcing(prompt);
-  }
-
-  const tabs = [
-    {
-      id: "buscar" as const,
-      label: "Buscar",
-      detail: scope === "todos" ? "Todos los renglones" : scope === "seleccion" ? `${selectedItems.length} seleccionados` : selectedItem ? `Renglon ${cleanValue(selectedItem.renglon, String(selectedIndex + 1))}` : "Definir busqueda"
-    },
-    {
-      id: "ranking" as const,
-      label: "Ranking",
-      detail: providers.length ? `${providers.length} candidatos` : "Sin resultados"
-    },
-    {
-      id: "validar" as const,
-      label: "Validar",
-      detail: "Fuentes y checklist"
-    }
-  ];
-
   return (
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Sourcing global asistido"
-          title="Proveedores"
-          copy="Busca 10 proveedores utiles por renglon o por RFQ completo. La prioridad es precio bajo, cumplimiento tecnico, empresa real y riesgo comercial controlado."
+          eyebrow="Sourcing global"
+          title="Búsqueda inteligente de proveedores"
+          copy="Selecciona las partidas y deja que la IA prepare una búsqueda global orientada a cumplimiento, ahorro y proveedor real."
           actions={
-            <>
-              <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "warn"}>
-                {loadingConfig ? "Verificando IA" : hasGeminiKey ? "IA lista" : "IA pendiente"}
-              </StatusBadge>
-              <Button onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" size="lg">
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Buscar 10 proveedores
-              </Button>
-            </>
+            <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "danger"}>
+              {loadingConfig ? "Verificando IA" : hasGeminiKey ? `IA lista${geminiSource === "admin_global" ? " · Admin" : ""}` : "IA no configurada"}
+            </StatusBadge>
           }
         />
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-line bg-slate-50 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">RFQ activo</div>
-            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{rfqNumber}</div>
-          </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon / Codigo</div>
-            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{scope === "seleccion" ? `${selectedItems.length} seleccionados` : scope === "todos" ? `${items.length} renglones` : `${selectedRenglon} | ${selectedCode}`}</div>
-          </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Producto buscado</div>
-            <div className="mt-1 truncate text-sm font-semibold text-slate-950">{scope === "seleccion" ? "Busqueda conjunta de renglones seleccionados" : scope === "todos" ? "Busqueda integral del RFQ completo" : selectedDescription}</div>
-          </div>
-        </div>
       </ModuleSection>
 
-      <ModuleSection>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-            <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 ${hasGeminiKey ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-              {hasGeminiKey ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-              {loadingConfig ? "Verificando IA" : hasGeminiKey ? "IA lista" : "IA pendiente"}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-blue-800">
-              <Globe2 className="h-3.5 w-3.5" />
-              Alcance global
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-800">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Validar empresa antes de cotizar
-            </span>
-          </div>
-          {activeRfqContext ? (
-            <div className="min-w-0 rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs text-slate-700 lg:max-w-[48%]">
-              <span className="font-semibold text-slate-900">Desde RFQ:</span>{" "}
-              <span className="inline-block max-w-full truncate align-bottom">
-                Renglon {activeRfqContext.renglon || activeRfqContext.item_index + 1} | {activeRfqContext.codigo_acp || "S/C"} | {activeRfqContext.descripcion || "Sin descripcion"}
-              </span>
-            </div>
-          ) : null}
-        </div>
-      </ModuleSection>
-
-      <ModuleSection className="p-2">
-        <div className="grid gap-2 md:grid-cols-3">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            const disabled = tab.id === "ranking" && !providers.length && !searching;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => !disabled && setActiveTab(tab.id)}
-                disabled={disabled}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
-                  active
-                    ? "border-blue-200 bg-blue-50 text-brand"
-                    : disabled
-                      ? "border-transparent bg-white text-slate-400"
-                      : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"
-                }`}
-              >
-                <span className="block text-sm font-semibold">{tab.label}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted">{tab.detail}</span>
-              </button>
-            );
-          })}
-        </div>
-      </ModuleSection>
+      {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{error}</div> : null}
 
       {!items.length ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          Analiza primero un RFQ. El chat necesita la matriz tecnica para buscar proveedores que realmente cumplan.
-        </section>
+        <ModuleSection>
+          <EmptyState icon={PackageSearch} title="Primero necesitas un RFQ analizado" copy="La búsqueda utiliza códigos, descripciones, marcas y requisitos del RFQ para evitar resultados genéricos." />
+        </ModuleSection>
       ) : (
         <>
-          {(activeTab === "buscar" || activeTab === "ranking") ? (
-          <section className={`grid gap-4 ${activeTab === "buscar" ? "xl:grid-cols-[0.95fr_1.05fr]" : "xl:grid-cols-1"}`}>
-            {activeTab === "buscar" ? (
-            <ModuleSection className="overflow-hidden p-0">
-              <div className="border-b border-line p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <ModuleSection className="p-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setView("prepare")} className={`app-tab-button ${view === "prepare" ? "app-tab-button-active" : ""}`}>
+                Preparar búsqueda <span>{selectedItems.length} renglones</span>
+              </button>
+              <button type="button" onClick={() => providers.length && setView("results")} disabled={!providers.length} className={`app-tab-button ${view === "results" ? "app-tab-button-active" : ""}`}>
+                Resultados <span>{providers.length ? `${providers.length} candidatos` : "Pendiente"}</span>
+              </button>
+            </div>
+          </ModuleSection>
+
+          {view === "prepare" ? (
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
+              <ModuleSection className="min-w-0 self-start">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Busqueda inteligente</div>
-                    <p className="mt-1 text-xs text-muted">El sistema interpreta el RFQ y arma la estrategia. El texto adicional es opcional.</p>
+                    <h2 className="text-base font-semibold text-ink">Renglones a buscar</h2>
+                    <p className="mt-1 text-sm text-muted">Selecciona hasta 12 partidas relacionadas.</p>
                   </div>
-                  <select
-                    value={depth}
-                    onChange={(event) => setDepth(event.target.value)}
-                    className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="Profunda">Busqueda profunda</option>
-                    <option value="Rapida">Busqueda rapida</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid gap-3 border-b border-line bg-slate-50/70 p-4 lg:grid-cols-[0.42fr_0.58fr_1fr]">
-                <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                  Alcance
-                  <select
-                    value={scope}
-                    onChange={(event) => {
-                      const nextScope = event.target.value as SearchScope;
-                      setScope(nextScope);
-                      if (nextScope === "seleccion" && !selectedIndexes.length && selectedItem) {
-                        setSelectedIndexes([selectedIndex]);
-                      }
-                    }}
-                    className="app-input"
-                  >
-                    <option value="renglon">Un renglon</option>
-                    <option value="seleccion">Renglones seleccionados</option>
-                    <option value="todos">Todos los renglones</option>
-                  </select>
-                </label>
-                {scope === "renglon" ? (
-                  <label className="grid gap-2 text-sm font-semibold text-slate-800 lg:col-span-2">
-                    Renglon base
-                    <select
-                      value={selectedIndex}
-                      onChange={(event) => setSelectedIndex(Number(event.target.value))}
-                      className="app-input"
-                    >
-                      {items.map((item, index) => (
-                        <option key={`${item.renglon}-${index}`} value={index}>
-                          {itemLabel(item, index)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : scope === "seleccion" ? (
-                  <div className="lg:col-span-2 rounded-xl border border-blue-100 bg-white p-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">Renglones incluidos</div>
-                        <p className="mt-1 text-xs text-muted">Marca exactamente los renglones que quieres buscar juntos.</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={selectAllItems} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-brand">Todos</button>
-                        <button type="button" onClick={clearSelection} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700">Solo activo</button>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {items.map((item, index) => (
-                        <label key={`select-${index}`} className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-slate-50 p-2 text-xs text-slate-700 hover:border-blue-200 hover:bg-blue-50">
-                          <input
-                            type="checkbox"
-                            checked={selectedIndexes.includes(index)}
-                            onChange={() => toggleSelectedIndex(index)}
-                            className="mt-0.5 h-4 w-4 accent-blue-600"
-                          />
-                          <span className="min-w-0 leading-5">{itemLabel(item, index)}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr]">
-                      <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                        Estrategia
-                        <select
-                          value={sourcingStrategy}
-                          onChange={(event) => setSourcingStrategy(event.target.value as SourcingStrategy)}
-                          className="app-input"
-                        >
-                          <option value="proveedor_integral">Priorizar proveedor integral</option>
-                          <option value="por_renglon">Mejor proveedor por renglon</option>
-                        </select>
-                      </label>
-                      <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm text-slate-700">
-                        {selectedItems.length} renglon(es) seleccionados. Se buscaran proveedores que puedan cubrirlos con el mejor precio posible y bajo riesgo.
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                      Estrategia
-                      <select
-                        value={sourcingStrategy}
-                        onChange={(event) => setSourcingStrategy(event.target.value as SourcingStrategy)}
-                        className="app-input"
-                      >
-                        <option value="proveedor_integral">Priorizar proveedor integral</option>
-                        <option value="por_renglon">Mejor proveedor por renglon</option>
-                      </select>
-                    </label>
-                    <div className="rounded-lg border border-line bg-white p-3 text-sm text-slate-700">
-                      {sourcingStrategy === "proveedor_integral"
-                        ? "Se buscaran proveedores capaces de cubrir todos o la mayor cantidad de renglones del RFQ."
-                        : "Se usaran hasta 5 renglones para encontrar los mejores candidatos por item."}
-                    </div>
-                  </>
-                )}
-              </div>
-
-                <div className="border-b border-line bg-white p-4">
-                  <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
-                        <BrainCircuit className="h-4 w-4" />
-                        Estrategia automatica
-                      </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                        <div className="rounded-lg border border-blue-100 bg-white/80 p-3">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">1. Interpretar</div>
-                          <div className="mt-1 text-xs leading-5 text-blue-900">Producto, codigo, marca, equivalencias y documentos.</div>
-                        </div>
-                        <div className="rounded-lg border border-blue-100 bg-white/80 p-3">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">2. Buscar</div>
-                          <div className="mt-1 text-xs leading-5 text-blue-900">Fabricantes, stockistas, distribuidores y B2B global.</div>
-                        </div>
-                        <div className="rounded-lg border border-blue-100 bg-white/80 p-3">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">3. Rankear</div>
-                          <div className="mt-1 text-xs leading-5 text-blue-900">Cumplimiento, oportunidad de ahorro y riesgo comercial.</div>
-                        </div>
-                      </div>
-                    </div>
-                    <Button type="button" onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" className="min-h-28 py-4">
-                      {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-                      Buscar 10 proveedores
-                    </Button>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIndexes(items.slice(0, 12).map((_, index) => index))}>Todos</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIndexes([])}>Limpiar</Button>
                   </div>
                 </div>
 
-                <div className="max-h-[420px] space-y-3 overflow-y-auto p-4">
-                {messages.map((message, index) => (
-                  <div key={`${message.role}-${index}`} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {message.role === "assistant" ? (
-                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-brand">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                    ) : null}
-                    <div
-                      className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
-                        message.role === "user"
-                          ? "bg-brand text-white"
-                          : "border border-line bg-slate-50 text-slate-800"
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                    {message.role === "user" ? (
-                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600">
-                        <UserRound className="h-4 w-4" />
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-                {searching ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Buscando evidencia, descartando ruido y rankeando proveedores...
-                  </div>
-                ) : null}
-              </div>
-
-                <div className="border-t border-line p-4">
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {starterPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => setInput(prompt)}
-                      className="app-btn-mini"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                    <ListChecks className="h-3.5 w-3.5" />
-                    Ajuste opcional
-                  </div>
-                  <textarea
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    rows={3}
-                    className="min-h-20 flex-1 resize-none rounded-xl border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                    placeholder="Ej: prioriza fabricantes directos asiaticos, distribuidores con stock en USA, Net 30, o descarta usados/refurbished."
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" onClick={() => void runSmartSourcing()} disabled={searching || !items.length} variant="primary" size="lg">
-                      {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-                      Buscar con RFQ
-                    </Button>
-                  <Button type="button" onClick={() => runSourcing(input)} disabled={searching || !input.trim()} variant="secondary" size="lg" title="Buscar solo con la instruccion escrita">
-                    <Send className="h-5 w-5" />
-                    Solo instruccion
-                  </Button>
-                  </div>
-                </div>
-              </div>
-            </ModuleSection>
-            ) : null}
-
-            <div className="space-y-4">
-              <div className="app-card p-5 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">Ranking de proveedores</div>
-                    <p className="mt-1 text-sm text-muted">Ordenado por match tecnico, oportunidad de ahorro y riesgo comercial.</p>
-                  </div>
-                  <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                    engine === "manual_sources"
-                      ? "border-amber-200 bg-amber-50 text-amber-800"
-                      : providers.length
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : "border-blue-200 bg-blue-50 text-blue-700"
-                  }`}>
-                    {engine === "manual_sources" ? "Fuentes abiertas" : providers.length ? `${providers.length} candidatos` : "Sin ranking aun"}
-                  </div>
-                </div>
-
-                {error ? (
-                  <div className="mt-4 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    {error}
-                  </div>
-                ) : null}
-
-                {summary ? (
-                  <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
-                    {summary}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 space-y-3">
-                  {providers.map((provider, index) => {
-                    const previousAudit = auditForProvider(provider);
-                    const previousAuditBlocks = String(previousAudit?.decision || "").toLowerCase().includes("descartar");
+                <div className="mt-4 max-h-[430px] space-y-2 overflow-y-auto pr-1">
+                  {items.map((item, index) => {
+                    const checked = selectedIndexes.includes(index);
+                    const disabled = !checked && selectedIndexes.length >= 12;
                     return (
-                    <div key={`${provider.proveedor}-${index}`} className="app-workflow-card p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-brand">Proveedor #{index + 1}</div>
-                          <div className="mt-1 text-lg font-semibold text-slate-900">{provider.proveedor || "Proveedor sin nombre"}</div>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                            <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-slate-700">{provider.pais_region || "Region no confirmada"}</span>
-                            <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-slate-700">{provider.tipo || "Tipo no confirmado"}</span>
-                            {provider.renglon ? <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Renglon {provider.renglon}</span> : null}
-                            {provider.cobertura_renglones ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">Cubre {provider.cobertura_renglones} renglon(es)</span> : null}
-                          </div>
-                          {loadingAudits ? (
-                            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Revisando auditorias previas
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary" size="sm">
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            Auditar
-                          </Button>
-                          {provider.url ? (
-                            <a
-                              href={provider.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-brand"
-                            >
-                              Fuente
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                      {previousAudit ? (
-                        <div className={`mt-4 rounded-xl border p-3 ${previousAuditBlocks ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50"}`}>
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                              <div className={`text-xs font-semibold uppercase tracking-wide ${previousAuditBlocks ? "text-rose-700" : "text-emerald-700"}`}>
-                                Auditoria previa encontrada
-                              </div>
-                              <div className={`mt-1 text-sm leading-6 ${previousAuditBlocks ? "text-rose-800" : "text-emerald-800"}`}>
-                                {previousAudit.domain || domainFromUrl(previousAudit.website) || previousAudit.company_name} | {formatAuditDate(previousAudit.created_at)}
-                              </div>
-                            </div>
-                            <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-full lg:max-w-[460px]">
-                              <div className="rounded-lg border border-white/70 bg-white/70 p-2">
-                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Score</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">{previousAudit.score_final ?? 0}/100</div>
-                              </div>
-                              <div className={`rounded-lg border p-2 ${riskTone(previousAudit.riesgo)}`}>
-                                <div className="text-[11px] font-semibold uppercase tracking-wide">Riesgo</div>
-                                <div className="mt-1 text-sm font-semibold">{previousAudit.riesgo || "Sin clasificar"}</div>
-                              </div>
-                              <div className={`rounded-lg border p-2 ${auditDecisionTone(previousAudit.decision)}`}>
-                                <div className="text-[11px] font-semibold uppercase tracking-wide">Decision</div>
-                                <div className="mt-1 text-sm font-semibold">{previousAudit.decision || "Revisar"}</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                        <div className="app-data-card">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Match tecnico</div>
-                          <div className="mt-1 text-xl font-semibold text-slate-900">{provider.match_tecnico ?? 0}%</div>
-                        </div>
-                        <div className={`rounded-lg border p-3 ${savingTone(provider.probabilidad_buen_precio)}`}>
-                          <div className="text-xs font-semibold uppercase tracking-wide">Ahorro</div>
-                          <div className="mt-1 text-sm font-semibold">{provider.probabilidad_buen_precio || "Media"}</div>
-                        </div>
-                        <div className={`rounded-lg border p-3 ${riskTone(provider.riesgo)}`}>
-                          <div className="text-xs font-semibold uppercase tracking-wide">Riesgo</div>
-                          <div className="mt-1 text-sm font-semibold">{provider.riesgo || "Medio"}</div>
-                        </div>
-                        <div className={`rounded-lg border p-3 ${decisionTone(provider.decision)}`}>
-                          <div className="text-xs font-semibold uppercase tracking-wide">Decision</div>
-                          <div className="mt-1 text-sm font-semibold">{provider.decision || "Validar"}</div>
-                        </div>
-                      </div>
-                      {provider.cobertura_detalle || provider.renglones_cubiertos?.length ? (
-                        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Cobertura del RFQ</div>
-                          <div className="mt-1 text-sm leading-6 text-emerald-900">
-                            {provider.cobertura_detalle || `Renglones cubiertos: ${provider.renglones_cubiertos?.join(", ")}`}
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        <div className="app-data-card">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Evidencia</div>
-                          <div className="mt-1 text-sm leading-6 text-slate-700">{provider.evidencia || "Sin evidencia resumida."}</div>
-                        </div>
-                        <div className="app-data-card">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Que validar</div>
-                          <div className="mt-1 text-sm leading-6 text-slate-700">
-                            {provider.que_validar || "Pedir ficha tecnica, precio, stock, lead time, Incoterm, validez y datos corporativos."}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      <label key={`${index}-${cleanValue(item.codigo_articulo, "")}`} className={`flex items-start gap-3 rounded-lg border p-3 transition ${checked ? "border-blue-300 bg-blue-50 text-blue-950" : "border-line bg-panel text-ink hover:border-blue-300"} ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                        <input type="checkbox" checked={checked} disabled={disabled} onChange={() => setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index].sort((a, b) => a - b))} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold leading-5">{itemLabel(item, index)}</span>
+                          <span className="mt-1 block text-xs text-muted">Cant. {cleanValue(item.cantidad, "N/D")} {cleanValue(item.unidad_de_medida || item.unidad, "")}</span>
+                        </span>
+                      </label>
                     );
                   })}
-                  {!providers.length ? (
-                    <div className="grid min-h-[240px] place-items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                      <div>
-                        <PackageSearch className="mx-auto h-8 w-8 text-brand" />
-                        <div className="mt-3 text-sm font-semibold text-slate-900">Sin ranking todavia</div>
-                        <p className="mt-1 max-w-md text-sm leading-6 text-muted">
-                          Escribe una instruccion en el chat. El resultado aparecera aqui con auditoria previa, evidencia y acciones.
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
-              </div>
 
-              <div className="app-card p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  Criterios obligatorios
-                </div>
-                <div className="mt-3 grid gap-2">
-                  {validationRows().map(([title, copy]) => (
-                    <div key={title} className="app-data-card">
-                      <div className="text-sm font-semibold text-slate-900">{title}</div>
-                      <div className="mt-1 text-xs leading-5 text-muted">{copy}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-          ) : null}
-
-          {activeTab === "validar" ? (
-          <section className="app-card p-5 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Fuentes y plan de busqueda</div>
-                <p className="mt-1 max-w-4xl text-sm leading-6 text-muted">{activeQuery || "No hay descripcion tecnica suficiente."}</p>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                <Target className="h-3.5 w-3.5 text-brand" />
-                No limitado a un portal
-              </div>
-            </div>
-
-            {searchPlan.length > 0 ? (
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                {searchPlan.map((plan, index) => (
-                  <div key={`${plan.renglon}-${index}`} className="rounded-xl border border-line bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted">Renglon {plan.renglon || index + 1}</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">{plan.query_base || "Sin query base"}</div>
-                    <div className="mt-3 space-y-2">
-                      {(plan.queries || []).slice(0, 6).map((query) => (
-                        <div key={query} className="rounded-md bg-white px-3 py-2 text-xs leading-5 text-slate-700">{query}</div>
-                      ))}
+                {selectedItems.length > 1 ? (
+                  <div className="mt-5 border-t border-line pt-4">
+                    <div className="text-sm font-semibold text-ink">Estrategia</div>
+                    <div className="mt-3 grid gap-2">
+                      <button type="button" onClick={() => setStrategy("proveedor_integral")} className={`app-action-card p-3 text-left ${strategy === "proveedor_integral" ? "border-blue-400 bg-blue-50" : ""}`}>
+                        <span className="block text-sm font-semibold">Máxima cobertura</span>
+                        <span className="mt-1 block text-xs leading-5 text-muted">Prioriza empresas capaces de cotizar varios renglones.</span>
+                      </button>
+                      <button type="button" onClick={() => setStrategy("por_renglon")} className={`app-action-card p-3 text-left ${strategy === "por_renglon" ? "border-blue-400 bg-blue-50" : ""}`}>
+                        <span className="block text-sm font-semibold">Especialista por renglón</span>
+                        <span className="mt-1 block text-xs leading-5 text-muted">Busca el mejor candidato específico para cada partida.</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : null}
+                ) : null}
+              </ModuleSection>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {richLinks.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border border-line bg-white p-3 text-sm transition hover:border-blue-300 hover:shadow-sm"
-                >
-                  <span className="flex items-center justify-between gap-3 font-semibold text-slate-900">
-                    <span className="inline-flex items-center gap-2">
-                      <Globe2 className="h-4 w-4 text-brand" />
-                      {item.label}
-                    </span>
-                    <ExternalLink className="h-3.5 w-3.5 text-muted" />
-                  </span>
-                  <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{item.type}</span>
-                  <p className="mt-2 text-xs leading-5 text-muted">{item.hint}</p>
-                </a>
-              ))}
+              <div className="min-w-0 space-y-5">
+                <ModuleSection className="min-w-0 overflow-hidden p-0">
+                  <div className="flex items-start gap-3 border-b border-line p-5">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand"><Bot className="h-4 w-4" /></div>
+                    <div><h2 className="text-base font-semibold text-ink">Asistente de sourcing</h2><p className="mt-1 text-sm text-muted">El contexto técnico se agrega automáticamente.</p></div>
+                  </div>
+
+                  <div className="max-h-64 space-y-3 overflow-y-auto bg-slate-50 p-4 sm:p-5">
+                    {messages.slice(-5).map((message, index) => (
+                      <div key={index} className={`max-w-[88%] rounded-lg border p-3 text-sm leading-6 ${message.role === "user" ? "ml-auto border-blue-200 bg-blue-50 text-blue-950" : "border-line bg-panel text-ink"}`}>
+                        {message.content}
+                      </div>
+                    ))}
+                    {searching ? <div className="flex items-center gap-2 text-sm font-semibold text-brand"><Loader2 className="h-4 w-4 animate-spin" /> Analizando requisitos y buscando candidatos...</div> : null}
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <label className="grid gap-2 text-sm font-semibold text-ink">
+                      Instrucción adicional
+                      <textarea value={input} onChange={(event) => setInput(event.target.value)} placeholder="Opcional: stock inmediato, marca exacta, región, certificación, condición comercial..." className="min-h-28 w-full p-3 text-sm leading-6" />
+                    </label>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {starterPrompts.map((prompt) => <button key={prompt} type="button" onClick={() => setInput(prompt)} className="app-filter-pill app-filter-pill-idle border px-3 py-2 text-left text-xs font-semibold">{prompt}</button>)}
+                    </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+                        Profundidad
+                        <select value={depth} onChange={(event) => setDepth(event.target.value)} className="app-input h-10">
+                          <option value="Profunda">Profunda</option>
+                          <option value="Rapida">Rápida</option>
+                        </select>
+                      </label>
+                      <Button type="button" onClick={() => void runSourcing()} disabled={searching || !selectedItems.length || !hasGeminiKey} variant="primary" size="lg">
+                        {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        Buscar 10 proveedores
+                      </Button>
+                    </div>
+                  </div>
+                </ModuleSection>
+
+                <details className="app-surface p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">Fuentes manuales de respaldo</summary>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {sourceLinks(activeQuery).map(([label, href]) => (
+                      <a key={label} href={href} target="_blank" rel="noreferrer" className="app-action-card flex items-center justify-between gap-2 p-3 text-sm font-semibold">
+                        <span className="inline-flex items-center gap-2"><Globe2 className="h-4 w-4 text-brand" />{label}</span><ExternalLink className="h-4 w-4 text-muted" />
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              </div>
             </div>
-          </section>
-          ) : null}
+          ) : (
+            <div className="space-y-5">
+              <ModuleSection>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-semibold text-ink">Ranking preliminar</h2>
+                      <StatusBadge tone={grounded ? "ok" : "warn"}>{grounded ? "Búsqueda web activa" : "Sin grounding web confirmado"}</StatusBadge>
+                    </div>
+                    <p className="mt-2 max-w-4xl text-sm leading-6 text-ink">{summary || "Resultados ordenados por cobertura, ajuste técnico, oportunidad de ahorro y riesgo."}</p>
+                    {!grounded ? <p className="mt-2 text-xs leading-5 text-amber-700">Verifica manualmente URLs, existencia y disponibilidad. Esta ejecución pudo usar razonamiento del modelo sin búsqueda web.</p> : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={() => setView("prepare")} variant="secondary">Ajustar búsqueda</Button>
+                    <Button type="button" onClick={() => void runSourcing()} disabled={searching} variant="primary"><Search className="h-4 w-4" />Repetir</Button>
+                  </div>
+                </div>
+              </ModuleSection>
+
+              {providers.length ? providers.map((provider, index) => {
+                const prior = auditForProvider(provider);
+                const expanded = expandedIndex === index;
+                return (
+                  <ModuleSection key={`${provider.proveedor}-${provider.url}-${index}`} className="min-w-0 p-0">
+                    <div className="p-4 sm:p-5">
+                      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <button type="button" onClick={() => setExpandedIndex(expanded ? null : index)} className="min-w-0 flex-1 text-left">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-sm font-semibold text-brand">{index + 1}</span>
+                            <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{provider.proveedor || "Proveedor sin nombre"}</h3>
+                            {expanded ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <StatusBadge tone="neutral">{provider.pais_region || "Región no confirmada"}</StatusBadge>
+                            <StatusBadge tone="neutral">{provider.tipo || "Tipo no confirmado"}</StatusBadge>
+                            <StatusBadge tone="info">Match preliminar {provider.match_tecnico ?? 0}%</StatusBadge>
+                            <StatusBadge tone={savingTone(provider.probabilidad_buen_precio)}>Ahorro: {provider.probabilidad_buen_precio || "Validar"}</StatusBadge>
+                            <StatusBadge tone={riskTone(provider.riesgo)}>Riesgo: {provider.riesgo || "Validar"}</StatusBadge>
+                            <StatusBadge tone={decisionTone(provider.decision)}>{provider.decision || "Validar"}</StatusBadge>
+                          </div>
+                          <div className="mt-3 text-sm leading-6 text-muted">
+                            Cobertura: {provider.renglones_cubiertos?.length ? provider.renglones_cubiertos.join(", ") : provider.cobertura_detalle || provider.renglon || "Por validar"}
+                          </div>
+                        </button>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          {provider.url ? <a href={provider.url} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 items-center justify-center gap-2 border px-3 text-sm font-semibold">Fuente <ExternalLink className="h-4 w-4" /></a> : null}
+                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary"><ShieldCheck className="h-4 w-4" />Auditar</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {expanded ? (
+                      <div className="grid border-t border-line bg-slate-50 lg:grid-cols-3 lg:divide-x lg:divide-line">
+                        <div className="p-4 sm:p-5"><div className="text-xs font-semibold text-muted">Por qué puede servir</div><p className="mt-2 text-sm leading-6 text-ink">{provider.evidencia || "Sin evidencia suficiente; validar fuente."}</p></div>
+                        <div className="border-t border-line p-4 sm:p-5 lg:border-t-0"><div className="text-xs font-semibold text-muted">Qué validar antes de cotizar</div><p className="mt-2 text-sm leading-6 text-ink">{provider.que_validar || "Ficha, precio, stock, lead time, Incoterm, garantía y empresa."}</p></div>
+                        <div className="border-t border-line p-4 sm:p-5 lg:border-t-0">
+                          <div className="text-xs font-semibold text-muted">Auditoría corporativa</div>
+                          {loadingAudits ? <div className="mt-2 flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Buscando antecedentes...</div> : prior ? (
+                            <div className="mt-2"><div className="text-lg font-semibold text-ink">{prior.score_final ?? 0}/100</div><div className="mt-2 flex flex-wrap gap-2"><StatusBadge tone={riskTone(prior.riesgo)}>Riesgo {prior.riesgo || "N/D"}</StatusBadge><StatusBadge tone={decisionTone(prior.decision)}>{prior.decision || "Revisar"}</StatusBadge></div></div>
+                          ) : <p className="mt-2 text-sm leading-6 text-muted">Sin auditoría previa. Usa Auditar antes de solicitar cotización.</p>}
+                        </div>
+                      </div>
+                    ) : null}
+                  </ModuleSection>
+                );
+              }) : (
+                <ModuleSection><EmptyState icon={Target} title="No hay candidatos" copy="Vuelve a Preparar búsqueda y ajusta los renglones o la instrucción." /></ModuleSection>
+              )}
+
+              {searchPlan.length ? (
+                <details className="app-surface p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">Cómo se construyó la búsqueda</summary>
+                  <div className="mt-4 space-y-3">
+                    {searchPlan.map((plan, index) => <div key={index} className="border-t border-line pt-3 first:border-0 first:pt-0"><div className="text-sm font-semibold text-ink">Renglón {plan.renglon || index + 1} · {plan.codigo_acp || "S/C"}</div><p className="mt-1 break-words text-xs leading-5 text-muted">{plan.queries?.join(" · ") || plan.query_base || "Plan no disponible"}</p></div>)}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

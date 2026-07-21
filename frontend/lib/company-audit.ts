@@ -71,6 +71,10 @@ export type CompanyAuditResponse = {
   decision?: "Avanzar" | "Avanzar con cautela" | "Pedir validacion" | "Descartar" | string;
   confianza?: "Alta" | "Media" | "Baja" | string;
   score_final?: number;
+  score_ia?: number;
+  score_tecnico?: number;
+  criterio_puntaje?: string;
+  reglas_seguridad_aplicadas?: string[];
   riesgo_tecnico?: string;
   decision_tecnica?: string;
   empresa?: string;

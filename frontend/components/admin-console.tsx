@@ -36,8 +36,8 @@ const roleHelp: Record<string, string> = {
   Analista: "RFQ, proveedores, historico, costos, seguimiento y logistica.",
   Supervisor: "Funciones de analista mas Radar SLI y seguimiento supervisor.",
   Gerencia: "Vista gerencial, metricas, radar, historico y modulos operativos.",
-  Admin: "Solo administracion, usuarios, roles y configuracion critica.",
-  Logistica: "Logistica e historico sin analisis RFQ."
+  Admin: "Administracion, usuarios, roles, configuracion critica y metricas.",
+  Logistica: "Dashboard, logistica, historico y espacios guardados. Puede actualizar tarifas globales."
 };
 
 function normalizeRole(role: string) {

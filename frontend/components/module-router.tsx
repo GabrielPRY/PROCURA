@@ -107,12 +107,11 @@ const moduleContent: Record<ModuleId, { eyebrow: string; subtitle: string; icon:
   workspaces: { eyebrow: "Workspaces", subtitle: "Recupera matrices RFQ guardadas por usuario o equipo.", icon: FileText, cards: [] },
   logistica: {
     eyebrow: "Modulo Logistica",
-    subtitle: "Calculos por paquete/bulto con peso, dimensiones, forwarder, ruta USA-Panama e incoterms claros.",
+    subtitle: "Cotizaciones UPS desde el proveedor hasta el forwarder dentro de Estados Unidos.",
     icon: Truck,
     cards: [
-      { title: "Dimensiones y peso", copy: "Peso real vs volumetrico para costo mas confiable." },
-      { title: "Forwarders", copy: "Localidades, modalidad, tiempos y tarifas administrables por logistica." },
-      { title: "Uso en RFQ", copy: "Adjuntar lead time y costo logistico al correo o analisis de margen." }
+      { title: "UPS", copy: "Tarifas de paqueteria y tiempos de entrega desde la cuenta corporativa." },
+      { title: "Forwarders", copy: "Destinos compartidos y administrados por Logistica." }
     ]
   },
   metricas: {

@@ -7,7 +7,7 @@ export const ModuleSection = memo(function ModuleSection({
 }: HTMLAttributes<HTMLElement>) {
   return (
     <section
-      className={cn("rounded-xl border border-line bg-panel p-5 shadow-sm", className)}
+      className={cn("app-surface p-5", className)}
       {...props}
     />
   );

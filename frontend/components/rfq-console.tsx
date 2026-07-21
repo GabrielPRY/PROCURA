@@ -85,6 +85,10 @@ function itemLabel(item: RfqItem, index: number) {
   return `Renglon ${renglon} | ${code} | ${desc.slice(0, 72)}`;
 }
 
+function isValidAcpCode(value: unknown) {
+  return /^[A-Z]{3}-[A-Z]{3}-\d{5}$/.test(cleanValue(value, "").trim().toUpperCase());
+}
+
 export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [geminiKey, setGeminiKey] = useState("");
@@ -135,7 +139,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     const nextFiles = Array.from(event.target.files || []);
     if (!nextFiles.length) return;
     // Confirm before clearing an existing analysis
-    if (result && !window.confirm("Ya hay un analisis cargado. Â¿Cargar nuevos documentos y reemplazarlo?")) {
+    if (result && !window.confirm("Ya hay un análisis cargado. ¿Cargar nuevos documentos y reemplazarlo?")) {
       // Reset the input so the same files can be selected again if needed
       event.target.value = "";
       return;
@@ -204,16 +208,15 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const items = useMemo(() => result?.items || [], [result]);
   const selectedItem = items[selectedIndex];
   const presenceDecision = localPresenceDecision(cg);
-  const validCodeCount = items.filter((item) => /^[A-Z]{3}-[A-Z]{3}-\d{5}$/.test(cleanValue(item.codigo_articulo, ""))).length;
+  const validCodeCount = items.filter((item) => isValidAcpCode(item.codigo_articulo)).length;
   const proposalCount = items.filter((item) => asBool(item.requiere_propuesta_tecnica)).length;
   const fichaCount = items.filter((item) => asBool(item.requiere_ficha_tecnica)).length;
   const marcaCount = items.filter((item) => cleanValue(item.marca_modelo_requerido, "")).length;
   const obsolCount = items.filter((item) => asBool(item.posible_obsolescencia)).length;
-  const contactCount = [
-    getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "agente_de_compras"], ""),
-    getCg(cg, ["correo_encargado_licitacion", "correo_encargado", "correo_contacto"], ""),
-    getCg(cg, ["telefono_encargado_licitacion", "telefono_encargado", "telefono_contacto"], "")
-  ].filter(Boolean).length;
+  const contactName = getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "agente_de_compras"], "");
+  const contactEmail = getCg(cg, ["correo_encargado_licitacion", "correo_encargado", "correo_contacto"], "");
+  const contactPhone = getCg(cg, ["telefono_encargado_licitacion", "telefono_encargado", "telefono_contacto"], "");
+  const contactCount = [contactName, contactEmail, contactPhone].filter(Boolean).length;
   const risk = getCg(cg, ["riesgo_tecnico_global"], "Bajo");
   const proposalGlobal = getCg(cg, ["propuesta_tecnica_requerida"], "No especificado en los documentos adjuntos");
   const rfqNumber = getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"], "");
@@ -231,12 +234,10 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   ];
 
   const decisionStats = [
-    ["Empresa", presenceDecision.company],
-    ["Complejidad", risk],
-    ["Renglones", String(items.length)],
-    ["Prop. tecnica", proposalCount ? `Si (${proposalCount})` : "No detectada"],
-    ["Ficha/catalogo", fichaCount ? `Si (${fichaCount})` : "No pedida"],
-    ["Contacto ACP", contactCount >= 2 ? "Detectado" : "Incompleto"]
+    ["Empresa sugerida", presenceDecision.company],
+    ["Riesgo técnico", risk],
+    ["Propuesta técnica", proposalCount ? `Preparar en ${proposalCount} renglón(es)` : "No detectada"],
+    ["Ficha o catálogo", fichaCount ? `Preparar en ${fichaCount} renglón(es)` : "No solicitado aparte"]
   ];
 
   const generalCards = [
@@ -257,9 +258,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     ["No. licitacion", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
     ["Garantia", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
     ["Tiempo entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
-    ["Req. prop. tecnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
-    ["Encargado ACP", getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "contacto_acp", "encargado_acp", "encargado"])],
-    ["Correo", getCg(cg, ["correo_encargado_licitacion", "correo_acp", "email_acp", "correo"])]
+    ["Lugar entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
+    ["Contacto ACP", contactName || "No especificado"],
+    ["Correo ACP", contactEmail || "No especificado"]
   ];
 
   function openModuleFromItem(moduleId: ModuleId) {
@@ -379,12 +380,17 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     if (asBool(item.requiere_ficha_tecnica) || asBool(item.posible_obsolescencia) || cleanValue(item.marca_modelo_requerido, "")) {
       return { label: "Revisar", tone: "warn" as const };
     }
-    if (asBool(item.requiere_propuesta_tecnica)) return { label: "Propuesta", tone: "ok" as const };
+    if (asBool(item.requiere_propuesta_tecnica)) return { label: "Preparar propuesta", tone: "warn" as const };
     return { label: "Normal", tone: "neutral" as const };
   }
 
   const detailFlags: DetailFlag[] = selectedItem
     ? [
+        {
+          label: "Codigo ACP",
+          value: isValidAcpCode(selectedItem.codigo_articulo) ? cleanValue(selectedItem.codigo_articulo) : "No detectado",
+          tone: isValidAcpCode(selectedItem.codigo_articulo) ? "ok" : "warn"
+        },
         {
           label: "Cantidad",
           value: cleanValue(selectedItem.cantidad, "No especificada"),
@@ -393,7 +399,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         {
           label: "Propuesta tecnica",
           value: asBool(selectedItem.requiere_propuesta_tecnica) ? "Requerida" : "No requerida",
-          tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "ok" : "neutral"
+          tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "warn" : "neutral"
         },
         {
           label: "Documentos por renglon",
@@ -435,8 +441,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="RFQ operativo"
-          copy={result ? `RFQ ${rfqNumber || "sin numero"} | ${items.length} renglon(es) detectados` : "Sube el pliego, anexos o enmiendas para iniciar el analisis."}
+          eyebrow="Análisis de RFQ"
+          copy={result ? `RFQ ${rfqNumber || "sin número"} · ${items.length} renglón(es) detectados` : "Sube el pliego, anexos y enmiendas disponibles para iniciar el análisis."}
           actions={
             <>
               <StatusBadge tone={loadingConfig ? "warn" : hasStoredKey ? "ok" : "warn"}>
@@ -456,7 +462,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       ? progressStep === 1 ? "Enviando documentos..."
                         : progressStep === 2 ? "Analizando con IA..."
                         : progressStep === 3 ? "Extrayendo renglones..."
-                        : progressStep === 4 ? "Guardando anÃ¡lisis..."
+                        : progressStep === 4 ? "Guardando análisis..."
                         : "Procesando..."
                       : "Procesar RFQ"}
                   </Button>
@@ -494,7 +500,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         />
       </ModuleSection>
 
-      <section className="app-card p-2 shadow-sm">
+      <section className="app-surface p-2">
         <div className="grid gap-2 md:grid-cols-3">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -505,12 +511,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 type="button"
                 onClick={() => !disabled && setActiveTab(tab.id)}
                 disabled={disabled}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
+                className={`app-tab-button px-4 py-3 ${
                   active
-                    ? "border-blue-200 bg-blue-50 text-brand"
+                    ? "app-tab-button-active"
                     : disabled
-                      ? "border-transparent bg-white text-slate-400"
-                      : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"
+                      ? "text-slate-400"
+                      : ""
                 }`}
               >
                 <span className="block text-sm font-semibold">{tab.label}</span>
@@ -525,15 +531,15 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         <ModuleSection className="border-l-4 border-l-blue-500">
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr] xl:items-center">
             <div>
-              <div className="text-sm font-semibold text-brand">Decision inicial</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{presenceDecision.company}</div>
+              <div className="text-sm font-semibold text-brand">Recomendación operativa</div>
+              <div className="mt-2 text-2xl font-semibold text-ink">{presenceDecision.company}</div>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{presenceDecision.note}</p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               {decisionStats.map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
+                <div key={label} className="app-data-card">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
+                  <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
                 </div>
               ))}
             </div>
@@ -548,8 +554,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode as "simple" | "advanced")}
-                  className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                    viewMode === mode ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-950"
+                  className={`app-filter-pill px-3 py-1.5 text-sm font-semibold ${
+                    viewMode === mode ? "app-filter-pill-active" : "app-filter-pill-idle"
                   }`}
                 >
                   {label}
@@ -561,16 +567,16 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       ) : null}
 
       {activeTab === "entrada" || activeTab === "resumen" ? (
-      <section className={`grid gap-4 ${activeTab === "entrada" ? "xl:grid-cols-[0.42fr_0.58fr]" : ""}`}>
+      <section className="grid gap-4">
         {activeTab === "entrada" ? (
-        <div className="app-card p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-brand">1. Entrada</div>
+        <div className="app-card mx-auto w-full max-w-4xl p-5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand">Documentos</div>
           <div className="mt-1 text-base font-semibold">Documentos del RFQ</div>
-          <p className="mt-2 text-sm leading-6 text-muted">PDF del pliego, anexos tecnicos y enmiendas disponibles.</p>
+          <p className="mt-2 text-sm leading-6 text-muted">Adjunta el pliego, anexos técnicos y enmiendas disponibles en formato PDF.</p>
 
-          <label className="mt-5 grid min-h-52 cursor-pointer place-items-center rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center transition hover:border-brand hover:bg-blue-50">
+          <label className="app-file-drop mt-5 min-h-40">
             <UploadCloud className="h-9 w-9 text-brand" />
-            <span className="mt-3 text-sm font-semibold text-slate-950">Arrastra o selecciona el pliego PDF</span>
+            <span className="mt-3 text-sm font-semibold text-ink">Arrastra o selecciona los documentos</span>
             <span className="mt-1 text-xs text-muted">Puedes subir varios documentos</span>
             <input className="hidden" type="file" accept="application/pdf,.pdf" multiple onChange={handleFiles} />
           </label>
@@ -588,13 +594,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           ) : null}
 
           {hasStoredKey ? (
-            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              <div className="font-semibold">API lista</div>
-              <p className="mt-1 leading-6">
-                {geminiSource === "admin_global"
-                  ? "Se usara la llave Gemini administrada por Admin. No necesitas pegar ninguna API key."
-                  : "Se usara la llave Gemini guardada para este usuario."}
-              </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted">
+              <StatusBadge tone="ok">IA configurada</StatusBadge>
+              <span>{geminiSource === "admin_global" ? "Configuración administrada por Admin." : "Configuración del usuario disponible."}</span>
             </div>
           ) : (
             <label className="mt-5 block">
@@ -625,12 +627,13 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         </div>
         ) : null}
 
+        {activeTab === "resumen" ? (
         <div className="app-card p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-brand">2. Resumen ejecutivo</div>
-              <div className="mt-1 text-base font-semibold">Informacion de la licitacion</div>
-              <p className="mt-1 text-sm text-muted">Datos criticos extraidos para decidir y cotizar.</p>
+              <div className="text-xs font-semibold uppercase tracking-wide text-brand">Información principal</div>
+              <div className="mt-1 text-base font-semibold">Datos de la licitación</div>
+              <p className="mt-1 text-sm text-muted">Datos críticos extraídos para decidir y cotizar.</p>
             </div>
             {result ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Analizado</span> : null}
           </div>
@@ -710,22 +713,19 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 </div>
               ) : null}
             </>
-          ) : (
-            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-muted">
-              Cuando proceses el RFQ, aqui apareceran numero de licitacion, garantia, entrega, contacto ACP, presencia local y empresa sugerida.
-            </div>
-          )}
+          ) : null}
         </div>
+        ) : null}
       </section>
       ) : null}
 
 
       {result && activeTab === "resumen" ? (
-        <section className="rounded-xl border border-line bg-panel shadow-sm">
+        <section className="app-surface">
           <div className="border-b border-line p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-brand">3. Puntos de control</div>
-            <div className="mt-1 text-base font-semibold">Antes de cotizar</div>
-            <p className="mt-1 text-sm text-muted">Solo aparecen los temas que requieren confirmacion comercial, tecnica o documental.</p>
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand">Revisiones necesarias</div>
+            <div className="mt-1 text-base font-semibold">Antes de solicitar cotización</div>
+            <p className="mt-1 text-sm text-muted">Aquí solo aparecen requisitos que todavía exigen una acción o confirmación.</p>
           </div>
           <div className="divide-y divide-line">
             {visibleAlerts.length ? (
@@ -739,24 +739,24 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       </div>
                       <div className="mt-1 truncate text-sm text-muted">{alert.value}</div>
                     </div>
-                    <span className="shrink-0 text-xs font-semibold text-brand">Detalle</span>
+                    <span className="shrink-0 text-xs font-semibold text-brand">Ver evidencia</span>
                   </summary>
                   <p className="mt-3 rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{alert.detail}</p>
                 </details>
               ))
             ) : (
-              <div className="p-4 text-sm text-muted">No hay puntos urgentes. La informacion completa esta disponible en vista avanzada.</div>
+              <div className="p-4 text-sm text-muted">No se detectaron revisiones urgentes. La evidencia completa permanece disponible en la vista avanzada.</div>
             )}
           </div>
         </section>
       ) : null}
 
       {activeTab === "renglones" && items.length ? (
-        <section className="rounded-xl border border-line bg-panel shadow-sm">
+        <section className="app-surface">
           <div className="border-b border-line p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-brand">4. Matriz de renglones</div>
-            <div className="mt-1 text-base font-semibold">Vista tecnica compacta</div>
-            <p className="mt-1 text-sm text-muted">Vista compacta para revisar cumplimiento tecnico antes de pedir cotizaciones.</p>
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand">Matriz técnica</div>
+            <div className="mt-1 text-base font-semibold">Renglones y requisitos</div>
+            <p className="mt-1 text-sm text-muted">Selecciona un renglón para revisar sus requisitos y continuar con proveedores, costos, logística o correo.</p>
           </div>
 
           <div className="overflow-hidden">
@@ -778,10 +778,19 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   <tr
                     key={`${cleanValue(item.renglon, String(index))}-${index}`}
                     onClick={() => setSelectedIndex(index)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") setSelectedIndex(index);
+                    }}
+                    tabIndex={0}
                     className={`cursor-pointer border-b border-line last:border-0 hover:bg-slate-50 ${selectedIndex === index ? "bg-blue-50/60" : ""}`}
                   >
                     <td className="px-4 py-3 font-semibold">{cleanValue(item.renglon, String(index + 1))}</td>
-                    <td className="px-4 py-3 text-brand">{cleanValue(item.codigo_articulo, "S/C")}</td>
+                    <td className="px-4 py-3">
+                      <div className={isValidAcpCode(item.codigo_articulo) ? "font-semibold text-brand" : "font-semibold text-amber-700"}>
+                        {cleanValue(item.codigo_articulo, "No detectado")}
+                      </div>
+                      {!isValidAcpCode(item.codigo_articulo) ? <div className="mt-1 text-xs text-muted">Formato por validar</div> : null}
+                    </td>
                     <td className="max-w-[360px] px-4 py-3">
                       <div className="truncate font-medium">{cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa)}</div>
                     </td>
@@ -811,10 +820,10 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           {selectedItem ? (
             <div className="border-t border-line p-4">
               <div className="mb-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-brand">5. Detalle y acciones</div>
-                <div className="mt-1 text-sm font-semibold">Detalle: {itemLabel(selectedItem, selectedIndex)}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglón seleccionado</div>
+                <div className="mt-1 text-sm font-semibold">{itemLabel(selectedItem, selectedIndex)}</div>
               </div>
-              <div className="grid gap-3 md:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 {detailFlags.map((flag) => (
                   <div key={flag.label} className={`rounded-lg border p-3 ${flagTone(flag.tone)}`}>
                     <div className="text-xs font-semibold uppercase tracking-wide">{flag.label}</div>
@@ -832,18 +841,21 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <details className="rounded-lg border border-line bg-slate-50 p-4">
                   <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    Ver evidencia / riesgo
+                    Ver evidencia del documento
                   </summary>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                     {cleanValue(selectedItem.evidencia_tecnica, "No especificado en los documentos adjuntos")}
                   </p>
                 </details>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 border-t border-line pt-4">
+                <div className="mb-3 text-xs font-semibold uppercase text-muted">Siguiente paso</div>
+                <div className="flex flex-wrap gap-2">
                 <Button onClick={() => openModuleFromItem("proveedores")} variant="primary">Buscar proveedores</Button>
-                <Button onClick={() => openModuleFromItem("evaluacion")} variant="secondary">Evaluar propuesta</Button>
+                <Button onClick={() => openModuleFromItem("costos")} variant="secondary">Comparar costos</Button>
                 <Button onClick={() => openModuleFromItem("logistica")} variant="secondary">Calcular logistica</Button>
                 <Button onClick={() => openModuleFromItem("rfq_email")} variant="secondary">Generar correo RFQ</Button>
+                </div>
               </div>
             </div>
           ) : null}

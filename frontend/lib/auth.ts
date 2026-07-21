@@ -46,8 +46,14 @@ export function clearSession() {
 }
 
 export function normalizeRole(role: ProcuraRole) {
-  const value = String(role || "Analista");
-  const comparable = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (comparable.toLowerCase() === "logistica") return "Logistica";
-  return comparable;
+  const value = String(role || "Analista").trim();
+  const comparable = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const roles: Record<string, ProcuraRole> = {
+    analista: "Analista",
+    supervisor: "Supervisor",
+    gerencia: "Gerencia",
+    admin: "Admin",
+    logistica: "Logistica"
+  };
+  return roles[comparable] || value;
 }

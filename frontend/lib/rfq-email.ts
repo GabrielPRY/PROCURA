@@ -26,12 +26,14 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-export function emailHtml(subject: string, body: string, meta: Array<[string, string]>) {
+export function emailHtml(subject: string, body: string, meta: Array<[string, string]>, richBody = "") {
   const escapedSubject = escapeHtml(subject);
   const escapedBody = escapeHtml(body);
   const metaHtml = meta
     .map(([key, value]) => `<span><b>${escapeHtml(key)}</b><em>${escapeHtml(value)}</em></span>`)
     .join("");
+
+  const bodyMarkup = richBody ? `<div class="rich">${richBody}</div>` : `<pre>${escapedBody}</pre>`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 body{margin:0;background:#eef3f8;color:#111827;font-family:Arial,Helvetica,sans-serif}
@@ -45,8 +47,9 @@ h1{margin:8px 0 0;font-size:22px;line-height:1.3}
 .meta b{display:block;color:#0f172a;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
 .meta em{font-style:normal;font-weight:700;color:#1f2937}
 .body{padding:26px}.body pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:Arial,Helvetica,sans-serif;line-height:1.68;font-size:14px;color:#111827}
+.rich table{max-width:100%}.rich td,.rich th{word-break:break-word}
 .footer{padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;color:#64748b;font-size:12px}
 @media(max-width:760px){.meta{grid-template-columns:1fr 1fr}.wrap{margin:12px auto}.head,.body{padding:20px}}
 @media(max-width:480px){.meta{grid-template-columns:1fr}}
-</style></head><body><main class="wrap"><section class="card"><div class="head"><small>Proyelec International RFQ</small><h1>${escapedSubject}</h1></div><div class="meta">${metaHtml}</div><div class="body"><pre>${escapedBody}</pre></div><div class="footer">Generated from Procura AI. Review technical requirements and attachments before sending.</div></section></main></body></html>`;
+</style></head><body><main class="wrap"><section class="card"><div class="head"><small>Request for Quotation</small><h1>${escapedSubject}</h1></div><div class="meta">${metaHtml}</div><div class="body">${bodyMarkup}</div><div class="footer">Review technical requirements and attachments before sending.</div></section></main></body></html>`;
 }

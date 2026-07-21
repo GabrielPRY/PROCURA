@@ -1686,3 +1686,390 @@ button.app-stat-card:hover {
   background: rgba(37, 99, 235, 0.16) !important;
   border-color: #60a5fa !important;
 }
+
+/* ============================================================
+   PHASE 2 - CANONICAL UI SYSTEM
+   This final layer is intentionally authoritative while legacy
+   modules are migrated component by component.
+   ============================================================ */
+:root {
+  --ui-bg: #f4f7fb;
+  --ui-surface: #ffffff;
+  --ui-surface-muted: #f8fafc;
+  --ui-surface-strong: #eef3f9;
+  --ui-text: #172033;
+  --ui-text-muted: #64748b;
+  --ui-border: #d8e0eb;
+  --ui-border-strong: #b9c6d8;
+  --ui-primary: #155eef;
+  --ui-primary-hover: #0b4fd8;
+  --ui-primary-soft: #edf4ff;
+  --ui-success: #067647;
+  --ui-success-soft: #ecfdf3;
+  --ui-warning: #b54708;
+  --ui-warning-soft: #fffaeb;
+  --ui-danger: #b42318;
+  --ui-danger-soft: #fef3f2;
+  --ui-focus: rgba(21, 94, 239, 0.22);
+  --ui-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --ui-shadow-action: 0 6px 14px rgba(21, 94, 239, 0.16);
+  --color-ink: var(--ui-text);
+  --color-panel: var(--ui-surface);
+  --color-line: var(--ui-border);
+  --color-muted: var(--ui-text-muted);
+  --app-bg: var(--ui-bg);
+  --app-soft: var(--ui-surface-muted);
+  --app-raised: var(--ui-surface);
+}
+
+.dark {
+  --ui-bg: #0a101b;
+  --ui-surface: #111827;
+  --ui-surface-muted: #151f2e;
+  --ui-surface-strong: #1d2939;
+  --ui-text: #f1f5f9;
+  --ui-text-muted: #a9b5c7;
+  --ui-border: #2a3a50;
+  --ui-border-strong: #40536d;
+  --ui-primary: #6ea8fe;
+  --ui-primary-hover: #8bb9ff;
+  --ui-primary-soft: rgba(59, 130, 246, 0.15);
+  --ui-success: #6ce9a6;
+  --ui-success-soft: rgba(18, 183, 106, 0.13);
+  --ui-warning: #fec84b;
+  --ui-warning-soft: rgba(247, 144, 9, 0.13);
+  --ui-danger: #fda29b;
+  --ui-danger-soft: rgba(240, 68, 56, 0.13);
+  --ui-focus: rgba(110, 168, 254, 0.24);
+  --ui-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --ui-shadow-action: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+.app-shell-root,
+.app-shell-root * {
+  letter-spacing: 0 !important;
+}
+
+.app-shell-root {
+  background: var(--ui-bg) !important;
+  color: var(--ui-text);
+}
+
+.app-surface,
+.app-card,
+.app-stat-card {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: var(--ui-shadow) !important;
+  color: var(--ui-text);
+  min-width: 0;
+}
+
+.app-stat-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.app-stat-card::after {
+  background: var(--ui-primary);
+  content: "";
+  height: 0.2rem;
+  inset: auto 0 0 0;
+  position: absolute;
+  width: 100%;
+}
+
+.app-eyebrow {
+  color: var(--ui-primary) !important;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0 !important;
+  text-transform: uppercase;
+}
+
+.text-ink,
+.app-section-title {
+  color: var(--ui-text) !important;
+}
+
+.text-muted,
+.app-section-copy {
+  color: var(--ui-text-muted) !important;
+}
+
+.app-btn {
+  border-radius: 0.5rem !important;
+  min-height: 2.5rem;
+  padding-inline: 0.875rem;
+  transform: none !important;
+}
+
+.app-btn-primary,
+button.app-btn-primary,
+button[class*="bg-brand"] {
+  background: #155eef !important;
+  border-color: #155eef !important;
+  box-shadow: var(--ui-shadow-action) !important;
+  color: #ffffff !important;
+}
+
+.app-btn-primary:hover:not(:disabled),
+button.app-btn-primary:hover:not(:disabled),
+button[class*="bg-brand"]:hover:not(:disabled) {
+  background: #0b4fd8 !important;
+  border-color: #0b4fd8 !important;
+  box-shadow: 0 7px 16px rgba(21, 94, 239, 0.22) !important;
+  transform: translateY(-1px) !important;
+}
+
+.app-btn-secondary,
+button.app-btn-secondary {
+  background: var(--ui-surface) !important;
+  border-color: var(--ui-border-strong) !important;
+  box-shadow: var(--ui-shadow) !important;
+  color: var(--ui-text) !important;
+}
+
+.app-btn-secondary:hover:not(:disabled),
+button.app-btn-secondary:hover:not(:disabled) {
+  background: var(--ui-primary-soft) !important;
+  border-color: var(--ui-primary) !important;
+  color: var(--ui-primary) !important;
+  transform: translateY(-1px) !important;
+}
+
+.app-btn-danger,
+button.app-btn-danger {
+  background: var(--ui-danger-soft) !important;
+  border-color: color-mix(in srgb, var(--ui-danger) 38%, transparent) !important;
+  box-shadow: none !important;
+  color: var(--ui-danger) !important;
+}
+
+.app-btn-quiet,
+button.app-btn-quiet {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--ui-text-muted) !important;
+}
+
+.app-btn-quiet:hover:not(:disabled),
+button.app-btn-quiet:hover:not(:disabled) {
+  background: var(--ui-surface-strong) !important;
+  color: var(--ui-text) !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.app-input {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border-strong) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  color: var(--ui-text) !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):hover,
+select:hover,
+textarea:hover,
+.app-input:hover {
+  border-color: var(--ui-primary) !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus,
+.app-input:focus {
+  border-color: var(--ui-primary) !important;
+  box-shadow: 0 0 0 3px var(--ui-focus) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ui-text-muted) !important;
+  opacity: 0.82;
+}
+
+.app-status-badge {
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  cursor: default;
+}
+
+.app-status-neutral {
+  background: var(--ui-surface-muted) !important;
+  border-color: var(--ui-border) !important;
+  color: var(--ui-text-muted) !important;
+}
+
+.app-status-ok {
+  background: var(--ui-success-soft) !important;
+  border-color: color-mix(in srgb, var(--ui-success) 32%, transparent) !important;
+  color: var(--ui-success) !important;
+}
+
+.app-status-warn {
+  background: var(--ui-warning-soft) !important;
+  border-color: color-mix(in srgb, var(--ui-warning) 32%, transparent) !important;
+  color: var(--ui-warning) !important;
+}
+
+.app-status-danger {
+  background: var(--ui-danger-soft) !important;
+  border-color: color-mix(in srgb, var(--ui-danger) 32%, transparent) !important;
+  color: var(--ui-danger) !important;
+}
+
+.app-status-info {
+  background: var(--ui-primary-soft) !important;
+  border-color: color-mix(in srgb, var(--ui-primary) 32%, transparent) !important;
+  color: var(--ui-primary) !important;
+}
+
+.app-filter-bar,
+.app-empty-state {
+  background: var(--ui-surface-muted) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 0.5rem !important;
+  color: var(--ui-text-muted);
+}
+
+.app-empty-state {
+  border-style: dashed !important;
+}
+
+.app-filter-pill {
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+}
+
+.app-filter-pill-idle {
+  background: var(--ui-surface) !important;
+  border-color: var(--ui-border) !important;
+  color: var(--ui-text) !important;
+}
+
+.app-filter-pill-active {
+  background: var(--ui-primary-soft) !important;
+  border-color: var(--ui-primary) !important;
+  color: var(--ui-primary) !important;
+}
+
+.app-table-shell {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 0.5rem;
+}
+
+.app-table thead {
+  background: var(--ui-surface-muted) !important;
+  color: var(--ui-text-muted) !important;
+}
+
+.app-table tbody,
+.app-table tbody tr {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.app-table th,
+.app-table td {
+  border-color: var(--ui-border) !important;
+}
+
+.app-table tbody tr[class*="cursor-pointer"]:hover {
+  background: var(--ui-primary-soft) !important;
+  box-shadow: inset 3px 0 0 var(--ui-primary);
+}
+
+.app-action-card {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border-strong) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: var(--ui-shadow) !important;
+  color: var(--ui-text);
+}
+
+.app-action-card:hover {
+  background: var(--ui-primary-soft) !important;
+  border-color: var(--ui-primary) !important;
+  box-shadow: var(--ui-shadow-action) !important;
+  transform: translateY(-1px) !important;
+}
+
+.app-top-nav-button {
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+}
+
+.app-top-nav-button:not(.bg-brand) {
+  background: var(--ui-surface) !important;
+  border-color: var(--ui-border) !important;
+  color: var(--ui-text) !important;
+}
+
+.app-top-nav-button:not(.bg-brand):hover {
+  background: var(--ui-primary-soft) !important;
+  border-color: var(--ui-primary) !important;
+  color: var(--ui-primary) !important;
+}
+
+.app-top-nav-button.bg-brand {
+  background: #155eef !important;
+  border-color: #155eef !important;
+  color: #ffffff !important;
+}
+
+.dark .app-btn-primary,
+.dark button.app-btn-primary,
+.dark button[class*="bg-brand"],
+.dark .app-top-nav-button.bg-brand {
+  background: #2970ff !important;
+  border-color: #528bff !important;
+  color: #ffffff !important;
+}
+
+.dark .app-btn-primary:hover:not(:disabled),
+.dark button.app-btn-primary:hover:not(:disabled),
+.dark button[class*="bg-brand"]:hover:not(:disabled) {
+  background: #3f80ff !important;
+}
+
+.dark .bg-white,
+.dark .bg-panel,
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: var(--ui-surface) !important;
+}
+
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: var(--ui-text) !important;
+}
+
+.dark .border-line,
+.dark .border-slate-200,
+.dark .border-slate-300 {
+  border-color: var(--ui-border) !important;
+}
+
+@media (max-width: 640px) {
+  .app-desktop-logout {
+    display: none !important;
+  }
+
+  .app-surface,
+  .app-card,
+  .app-stat-card {
+    border-radius: 0.5rem !important;
+  }
+
+  .app-btn {
+    min-height: 2.75rem;
+  }
+}

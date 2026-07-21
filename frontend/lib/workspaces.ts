@@ -4,6 +4,12 @@ export type WorkspaceListItem = {
   username: string;
   licitacion: string;
   fecha_guardado: string;
+  renglones?: number;
+  objeto?: string;
+  entidad?: string;
+  fecha_cierre?: string;
+  empresa_sugerida?: string;
+  riesgo?: string;
 };
 
 export function listWorkspaces(username: string, allUsers = false) {
