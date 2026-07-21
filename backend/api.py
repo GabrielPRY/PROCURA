@@ -2819,6 +2819,8 @@ UPS_SERVICE_NAMES = {
     "65": "UPS Worldwide Saver",
 }
 _UPS_TOKEN_CACHE = {"environment": "", "access_token": "", "expires_at": 0.0}
+_GEOAPIFY_CACHE: Dict[str, Dict[str, Any]] = {}
+_GEOAPIFY_CACHE_LOCK = threading.Lock()
 
 
 def _carrier_decimal(value: Any, default: str = "0") -> Decimal:
@@ -3028,6 +3030,70 @@ def _normalize_schneider_quote(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _geoapify_suggestions(query: str) -> List[Dict[str, Any]]:
+    cache_key = re.sub(r"\s+", " ", str(query or "").strip().lower())
+    with _GEOAPIFY_CACHE_LOCK:
+        cached = _GEOAPIFY_CACHE.get(cache_key)
+        if cached and float(cached.get("expires_at") or 0) > time.time():
+            return list(cached.get("results") or [])
+
+    api_key = os.getenv("GEOAPIFY_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="El autocompletado de direcciones no esta configurado. Agrega GEOAPIFY_API_KEY en Railway.")
+    try:
+        response = requests.get(
+            "https://api.geoapify.com/v1/geocode/autocomplete",
+            params={
+                "text": str(query or "").strip(),
+                "format": "json",
+                "filter": "countrycode:us",
+                "limit": 5,
+                "lang": "en",
+                "apiKey": api_key,
+            },
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible consultar direcciones: {user_friendly_external_error(exc, 'Geoapify')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "Geoapify"))
+
+    normalized = []
+    for item in response.json().get("results", [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        country_code = str(item.get("country_code") or "").upper()
+        if country_code and country_code != "US":
+            continue
+        state_code = str(item.get("state_code") or "").upper()
+        if len(state_code) != 2:
+            state_code = ""
+        street = str(item.get("address_line1") or "").strip()
+        if not street:
+            house = str(item.get("housenumber") or "").strip()
+            road = str(item.get("street") or "").strip()
+            street = " ".join(part for part in [house, road] if part).strip()
+        normalized.append({
+            "id": str(item.get("place_id") or f"geo-{len(normalized) + 1}"),
+            "formatted": str(item.get("formatted") or item.get("address_line1") or "").strip(),
+            "address_line": street,
+            "city": str(item.get("city") or item.get("town") or item.get("village") or item.get("county") or "").strip(),
+            "state": state_code,
+            "postal_code": str(item.get("postcode") or "").strip(),
+            "country_code": "US",
+            "latitude": item.get("lat"),
+            "longitude": item.get("lon"),
+            "confidence": item.get("rank", {}).get("confidence") if isinstance(item.get("rank"), dict) else None,
+        })
+
+    with _GEOAPIFY_CACHE_LOCK:
+        if len(_GEOAPIFY_CACHE) >= 200:
+            oldest = min(_GEOAPIFY_CACHE, key=lambda key: float(_GEOAPIFY_CACHE[key].get("expires_at") or 0))
+            _GEOAPIFY_CACHE.pop(oldest, None)
+        _GEOAPIFY_CACHE[cache_key] = {"expires_at": time.time() + 86400, "results": normalized}
+    return normalized
+
+
 @app.get("/api/v1/logistics/carriers/status")
 def logistics_carriers_status(_token: str = Depends(verify_internal_token)):
     ups_ready = bool(os.getenv("UPS_CLIENT_ID", "").strip() and os.getenv("UPS_CLIENT_SECRET", "").strip())
@@ -3041,8 +3107,17 @@ def logistics_carriers_status(_token: str = Depends(verify_internal_token)):
         "carriers": {
             "ups": {"configured": ups_ready, "environment": _ups_environment(), "official": True},
             "schneider": {"configured": schneider_ready, "environment": os.getenv("SCHNEIDER_ENVIRONMENT", "production"), "official": True},
+            "address_autocomplete": {"configured": bool(os.getenv("GEOAPIFY_API_KEY", "").strip()), "environment": "Geoapify", "official": True},
         },
     }
+
+
+@app.get("/api/v1/logistics/addresses/autocomplete")
+def logistics_address_autocomplete(
+    q: str = Query(..., min_length=3, max_length=160),
+    _token: str = Depends(verify_internal_token),
+):
+    return {"status": "success", "provider": "Geoapify", "suggestions": _geoapify_suggestions(q)}
 
 
 @app.post("/api/v1/logistics/quotes/ups")

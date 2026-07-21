@@ -7,26 +7,30 @@ import {
   History,
   Loader2,
   MapPin,
+  MapPinned,
   PackagePlus,
   Pencil,
   Plus,
   Save,
+  Search,
   Settings2,
   ShieldCheck,
   Trash2,
   Truck,
   Warehouse
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type AuthUser } from "@/lib/auth";
 import {
   deleteLogisticsCalculation,
+  getAddressSuggestions,
   getLogisticsCalculations,
   getLogisticsCarriersStatus,
   getLogisticsSettings,
   getUpsQuotes,
   saveLogisticsCalculation,
   saveLogisticsForwarder,
+  type AddressSuggestion,
   type CarrierQuote,
   type Forwarder,
   type LogisticsAddress,
@@ -132,6 +136,118 @@ function Field({ label, children, className = "" }: { label: string; children: R
   );
 }
 
+function AddressAutocompleteInput({
+  value,
+  onChange,
+  enabled
+}: {
+  value: LogisticsAddress;
+  onChange: (next: LogisticsAddress) => void;
+  enabled: boolean;
+}) {
+  const [query, setQuery] = useState(value.address_line || "");
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const skipQuery = useRef("");
+
+  useEffect(() => {
+    if (!touched || (!open && value.address_line !== query)) setQuery(value.address_line || "");
+  }, [open, query, touched, value.address_line]);
+
+  useEffect(() => {
+    const clean = query.trim();
+    if (!enabled || !touched || clean.length < 3) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
+    }
+    if (skipQuery.current === clean) {
+      skipQuery.current = "";
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      getAddressSuggestions(clean)
+        .then((response) => {
+          if (!active) return;
+          setSuggestions(response.suggestions || []);
+          setOpen(true);
+        })
+        .catch(() => {
+          if (!active) return;
+          setSuggestions([]);
+          setOpen(false);
+        })
+        .finally(() => active && setSearching(false));
+    }, 450);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [enabled, query, touched]);
+
+  function selectSuggestion(suggestion: AddressSuggestion) {
+    const street = suggestion.address_line || suggestion.formatted;
+    skipQuery.current = street.trim();
+    setQuery(street);
+    setSuggestions([]);
+    setOpen(false);
+    setTouched(false);
+    onChange({
+      ...value,
+      address_line: street,
+      city: suggestion.city || value.city,
+      state: suggestion.state || value.state,
+      postal_code: suggestion.postal_code || value.postal_code,
+      country_code: "US"
+    });
+  }
+
+  return (
+    <div className="relative min-w-0">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+      <input
+        value={query}
+        onChange={(event) => {
+          const next = event.target.value;
+          setQuery(next);
+          setTouched(true);
+          onChange({ ...value, address_line: next });
+        }}
+        onFocus={() => suggestions.length && setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        className="app-input pl-9 pr-9"
+        placeholder={enabled ? "Buscar calle o dirección en USA" : "Calle y número"}
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && suggestions.length > 0}
+      />
+      {searching ? <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-brand" /> : null}
+      {open && suggestions.length ? (
+        <div className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-xl" role="listbox">
+          {suggestions.map((suggestion) => (
+            <button
+              key={suggestion.id}
+              type="button"
+              role="option"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectSuggestion(suggestion)}
+              className="flex w-full min-w-0 items-start gap-2 rounded-md px-3 py-2.5 text-left hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
+            >
+              <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+              <span className="min-w-0"><span className="block text-sm font-semibold leading-5 text-ink">{suggestion.address_line || suggestion.formatted}</span><span className="block truncate text-xs text-muted">{[suggestion.city, suggestion.state, suggestion.postal_code].filter(Boolean).join(", ")}</span></span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AddressFields({
   title,
   icon,
@@ -140,7 +256,8 @@ function AddressFields({
   forwarders,
   selectedForwarder,
   onForwarderChange,
-  showForwarders = false
+  showForwarders = false,
+  autocompleteEnabled = false
 }: {
   title: string;
   icon: ReactNode;
@@ -150,6 +267,7 @@ function AddressFields({
   selectedForwarder: string;
   onForwarderChange: (id: string) => void;
   showForwarders?: boolean;
+  autocompleteEnabled?: boolean;
 }) {
   return (
     <div className="min-w-0">
@@ -167,7 +285,7 @@ function AddressFields({
           <input value={value.name || ""} onChange={(event) => onChange({ ...value, name: event.target.value })} className="app-input" placeholder={showForwarders ? "Nombre del forwarder" : "Nombre del proveedor"} />
         </Field>
         <Field label="Dirección" className="sm:col-span-2">
-          <input value={value.address_line || ""} onChange={(event) => onChange({ ...value, address_line: event.target.value })} className="app-input" placeholder="Calle y número" />
+          <AddressAutocompleteInput value={value} onChange={onChange} enabled={autocompleteEnabled} />
         </Field>
         <Field label="Ciudad">
           <input required value={value.city} onChange={(event) => onChange({ ...value, city: event.target.value })} className="app-input" placeholder="Miami" />
@@ -459,8 +577,8 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
 
           <ModuleSection>
             <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:divide-x xl:divide-line">
-              <AddressFields title="Origen: proveedor" icon={<MapPin className="h-4 w-4 text-brand" />} value={origin} onChange={setOrigin} forwarders={forwarders} selectedForwarder="" onForwarderChange={() => undefined} />
-              <div className="xl:pl-6"><AddressFields title="Destino: forwarder" icon={<Warehouse className="h-4 w-4 text-brand" />} value={destination} onChange={setDestination} forwarders={forwarders} selectedForwarder={selectedForwarder} onForwarderChange={chooseForwarder} showForwarders /></div>
+              <AddressFields title="Origen: proveedor" icon={<MapPin className="h-4 w-4 text-brand" />} value={origin} onChange={setOrigin} forwarders={forwarders} selectedForwarder="" onForwarderChange={() => undefined} autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} />
+              <div className="xl:pl-6"><AddressFields title="Destino: forwarder" icon={<Warehouse className="h-4 w-4 text-brand" />} value={destination} onChange={setDestination} forwarders={forwarders} selectedForwarder={selectedForwarder} onForwarderChange={chooseForwarder} showForwarders autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} /></div>
             </div>
           </ModuleSection>
 
