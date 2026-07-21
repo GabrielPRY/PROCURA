@@ -53,12 +53,12 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
           <form className="space-y-4" onSubmit={handleSubmit}>
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">Usuario</span>
-              <div className="relative">
-                <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 transition hover:border-slate-300 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100">
+                <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-400"
                   placeholder="Usuario"
                   autoComplete="username"
                   autoFocus
@@ -68,12 +68,12 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
 
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">Contrasena</span>
-              <div className="relative">
-                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 transition hover:border-slate-300 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100">
+                <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-12 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-400"
                   placeholder="Contrasena"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
@@ -81,7 +81,7 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-100"
                   title={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -108,3 +108,4 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
     </main>
   );
 }
+
