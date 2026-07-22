@@ -97,6 +97,7 @@ export type AddressSuggestion = {
 
 export type LogisticsAddress = {
   name?: string;
+  phone?: string;
   address_line?: string;
   city: string;
   state: string;

@@ -59,6 +59,7 @@ type PackageRow = QuotePackage & {
 
 const EMPTY_ADDRESS: LogisticsAddress = {
   name: "",
+  phone: "",
   address_line: "",
   city: "",
   state: "",
@@ -291,8 +292,20 @@ function AddressFields({
             </select>
           </Field>
         ) : null}
-        <Field label={showForwarders ? "Nombre del forwarder" : "Proveedor / punto de recogida"} className="sm:col-span-2">
+        <Field label={showForwarders ? "Nombre del forwarder" : "Proveedor / punto de recogida"}>
           <input value={value.name || ""} onChange={(event) => onChange({ ...value, name: event.target.value })} className="app-input" placeholder={showForwarders ? "Nombre del forwarder" : "Nombre del proveedor"} />
+        </Field>
+        <Field label="Telefono de contacto">
+          <input
+            type="tel"
+            required
+            inputMode="tel"
+            autoComplete="tel"
+            value={value.phone || ""}
+            onChange={(event) => onChange({ ...value, phone: event.target.value })}
+            className="app-input"
+            placeholder="305 555 0123"
+          />
         </Field>
         <Field label="Dirección" className="sm:col-span-2">
           <AddressAutocompleteInput value={value} onChange={onChange} enabled={autocompleteEnabled} />

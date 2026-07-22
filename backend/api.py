@@ -1601,6 +1601,7 @@ class LogisticsForwarderRequest(BaseModel):
 
 class LogisticsAddressRequest(BaseModel):
     name: str = ""
+    phone: str = ""
     address_line: str = ""
     city: str = ""
     state: str = ""
@@ -2922,11 +2923,24 @@ def _shipstation_carriers() -> List[Dict[str, Any]]:
     return normalized
 
 
-def _shipstation_address_payload(address: LogisticsAddressRequest, fallback_name: str) -> Dict[str, Any]:
+def _normalize_us_phone(value: str, label: str) -> str:
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label}: ingresa un telefono valido de Estados Unidos de 10 digitos.",
+        )
+    return f"+1{digits}"
+
+
+def _shipstation_address_payload(address: LogisticsAddressRequest, fallback_name: str, label: str) -> Dict[str, Any]:
     name = str(address.name or fallback_name).strip()
     return {
         "name": name,
         "company_name": name,
+        "phone": _normalize_us_phone(address.phone, label),
         "address_line1": str(address.address_line or "").strip(),
         "city_locality": str(address.city or "").strip(),
         "state_province": str(address.state or "").strip().upper(),
@@ -3270,6 +3284,8 @@ def logistics_address_autocomplete(
 def logistics_quote_shipstation(req: ShipStationQuoteRequest, _token: str = Depends(verify_internal_token)):
     _validate_domestic_address(req.origin, "Origen")
     _validate_domestic_address(req.destination, "Destino")
+    _normalize_us_phone(req.origin.phone, "Origen")
+    _normalize_us_phone(req.destination.phone, "Destino")
     _validate_packages(req.packages)
     carriers = _shipstation_carriers()
     request_payload = {
@@ -3279,8 +3295,8 @@ def logistics_quote_shipstation(req: ShipStationQuoteRequest, _token: str = Depe
         "shipment": {
             "validate_address": "validate_and_clean",
             "ship_date": req.pickup_date or datetime.now().strftime("%Y-%m-%d"),
-            "ship_from": _shipstation_address_payload(req.origin, "Proveedor"),
-            "ship_to": _shipstation_address_payload(req.destination, "Forwarder"),
+            "ship_from": _shipstation_address_payload(req.origin, "Proveedor", "Origen"),
+            "ship_to": _shipstation_address_payload(req.destination, "Forwarder", "Destino"),
             "packages": _shipstation_packages(req.packages),
         },
     }
