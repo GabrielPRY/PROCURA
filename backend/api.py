@@ -1630,6 +1630,9 @@ class UpsQuoteRequest(BaseModel):
     licitacion: str = ""
     renglon: str = ""
 
+class ShipStationQuoteRequest(UpsQuoteRequest):
+    pass
+
 class SchneiderCommodityRequest(BaseModel):
     description: str = "General freight"
     quantity: int = 1
@@ -2821,6 +2824,8 @@ UPS_SERVICE_NAMES = {
 _UPS_TOKEN_CACHE = {"environment": "", "access_token": "", "expires_at": 0.0}
 _GEOAPIFY_CACHE: Dict[str, Dict[str, Any]] = {}
 _GEOAPIFY_CACHE_LOCK = threading.Lock()
+_SHIPSTATION_CARRIER_CACHE: Dict[str, Any] = {"expires_at": 0.0, "carriers": []}
+_SHIPSTATION_CARRIER_CACHE_LOCK = threading.Lock()
 
 
 def _carrier_decimal(value: Any, default: str = "0") -> Decimal:
@@ -2857,7 +2862,137 @@ def _carrier_error_message(response: requests.Response, carrier: str) -> str:
         )
     if carrier == "Geoapify" and ("apikey" in normalized or "unauthorized" in normalized or response.status_code in {401, 403}):
         return "Geoapify rechazo la API key. Verifica GEOAPIFY_API_KEY en el backend de Railway y reinicia el servicio."
+    if carrier == "ShipStation" and response.status_code in {401, 403}:
+        return "ShipStation rechazo la API key. Verifica SHIPSTATION_API_KEY en el backend de Railway y reinicia el servicio."
     return message or f"{carrier} rechazo la solicitud (HTTP {response.status_code})."
+
+
+def _shipstation_api_key() -> str:
+    api_key = os.getenv("SHIPSTATION_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ShipStation no esta configurado. Agrega SHIPSTATION_API_KEY en Railway.")
+    return api_key
+
+
+def _shipstation_base_url() -> str:
+    return os.getenv("SHIPSTATION_API_BASE_URL", "https://api.shipengine.com/v1").strip().rstrip("/")
+
+
+def _shipstation_environment() -> str:
+    return "sandbox" if _shipstation_api_key().upper().startswith("TEST_") else "production"
+
+
+def _shipstation_headers() -> Dict[str, str]:
+    return {"API-Key": _shipstation_api_key(), "Content-Type": "application/json"}
+
+
+def _shipstation_carriers() -> List[Dict[str, Any]]:
+    now = time.time()
+    with _SHIPSTATION_CARRIER_CACHE_LOCK:
+        cached = list(_SHIPSTATION_CARRIER_CACHE.get("carriers") or [])
+        if cached and float(_SHIPSTATION_CARRIER_CACHE.get("expires_at") or 0) > now:
+            return cached
+    try:
+        response = requests.get(
+            f"{_shipstation_base_url()}/carriers",
+            headers=_shipstation_headers(),
+            timeout=25,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible consultar transportistas en ShipStation: {user_friendly_external_error(exc, 'ShipStation')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "ShipStation"))
+    payload = response.json()
+    carriers = payload.get("carriers") if isinstance(payload, dict) else []
+    normalized = []
+    for carrier in carriers or []:
+        if not isinstance(carrier, dict) or not str(carrier.get("carrier_id") or "").strip():
+            continue
+        if str(carrier.get("connection_status") or "approved").lower() not in {"", "approved"}:
+            continue
+        normalized.append({
+            "carrier_id": str(carrier.get("carrier_id")),
+            "carrier_code": str(carrier.get("carrier_code") or ""),
+            "friendly_name": str(carrier.get("friendly_name") or carrier.get("nickname") or carrier.get("carrier_code") or "Transportista"),
+        })
+    if not normalized:
+        raise HTTPException(status_code=422, detail="ShipStation no tiene transportistas disponibles. Activa al menos un carrier en tu cuenta.")
+    with _SHIPSTATION_CARRIER_CACHE_LOCK:
+        _SHIPSTATION_CARRIER_CACHE.update({"expires_at": now + 600, "carriers": normalized})
+    return normalized
+
+
+def _shipstation_address_payload(address: LogisticsAddressRequest, fallback_name: str) -> Dict[str, Any]:
+    name = str(address.name or fallback_name).strip()
+    return {
+        "name": name,
+        "company_name": name,
+        "address_line1": str(address.address_line or "").strip(),
+        "city_locality": str(address.city or "").strip(),
+        "state_province": str(address.state or "").strip().upper(),
+        "postal_code": str(address.postal_code or "").strip(),
+        "country_code": "US",
+        "address_residential_indicator": "yes" if address.residential else "no",
+    }
+
+
+def _shipstation_packages(packages: List[LogisticsPackageRequest]) -> List[Dict[str, Any]]:
+    result = []
+    for package in packages:
+        payload = {
+            "package_code": "package",
+            "weight": {
+                "value": float(package.weight),
+                "unit": "kilogram" if str(package.weight_unit).upper() == "KGS" else "pound",
+            },
+            "dimensions": {
+                "unit": "centimeter" if str(package.dimension_unit).upper() == "CM" else "inch",
+                "length": float(package.length),
+                "width": float(package.width),
+                "height": float(package.height),
+            },
+        }
+        if package.description:
+            payload["label_messages"] = {"reference1": str(package.description)[:50]}
+        result.extend([dict(payload) for _ in range(max(1, int(package.quantity)))])
+    return result
+
+
+def _normalize_shipstation_quotes(payload: Dict[str, Any], carriers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    carrier_names = {str(item.get("carrier_id")): str(item.get("friendly_name") or "Transportista") for item in carriers}
+    response_node = payload.get("rate_response") if isinstance(payload, dict) else {}
+    rates = response_node.get("rates") if isinstance(response_node, dict) else []
+    quotes = []
+    for rate in rates or []:
+        if not isinstance(rate, dict):
+            continue
+        shipping = _carrier_decimal(rate.get("shipping_amount"))
+        insurance = _carrier_decimal(rate.get("insurance_amount"))
+        confirmation = _carrier_decimal(rate.get("confirmation_amount"))
+        other = _carrier_decimal(rate.get("other_amount"))
+        total = shipping + insurance + confirmation + other
+        if total <= 0:
+            continue
+        carrier_id = str(rate.get("carrier_id") or "")
+        attributes = rate.get("rate_attributes") or []
+        if isinstance(attributes, str):
+            attributes = [attributes]
+        quotes.append({
+            "id": str(rate.get("rate_id") or f"shipstation-{len(quotes) + 1}"),
+            "carrier": str(rate.get("carrier_friendly_name") or carrier_names.get(carrier_id) or rate.get("carrier_code") or "Transportista"),
+            "carrier_id": carrier_id,
+            "service_code": str(rate.get("service_code") or ""),
+            "service_name": str(rate.get("service_type") or rate.get("service_code") or "Servicio disponible"),
+            "total": float(total),
+            "currency": str((rate.get("shipping_amount") or {}).get("currency") or "USD").upper(),
+            "business_days": int(rate.get("delivery_days") or 0),
+            "delivery_date": str(rate.get("estimated_delivery_date") or ""),
+            "negotiated": str(rate.get("rate_type") or "").lower() not in {"", "retail"},
+            "attributes": [str(item) for item in attributes if item],
+            "shipping_amount": float(shipping),
+            "other_amount": float(insurance + confirmation + other),
+        })
+    return sorted(quotes, key=lambda item: (float(item.get("total") or 0), int(item.get("business_days") or 9999)))
 
 
 def _validate_domestic_address(address: LogisticsAddressRequest, label: str) -> None:
@@ -3106,6 +3241,7 @@ def _geoapify_suggestions(query: str) -> List[Dict[str, Any]]:
 @app.get("/api/v1/logistics/carriers/status")
 def logistics_carriers_status(_token: str = Depends(verify_internal_token)):
     ups_ready = bool(os.getenv("UPS_CLIENT_ID", "").strip() and os.getenv("UPS_CLIENT_SECRET", "").strip())
+    shipstation_key = os.getenv("SHIPSTATION_API_KEY", "").strip()
     schneider_ready = bool(
         os.getenv("SCHNEIDER_SUBSCRIPTION_KEY", "").strip()
         and (os.getenv("SCHNEIDER_BEARER_TOKEN", "").strip() or (os.getenv("SCHNEIDER_CLIENT_ID", "").strip() and os.getenv("SCHNEIDER_CLIENT_SECRET", "").strip()))
@@ -3114,6 +3250,7 @@ def logistics_carriers_status(_token: str = Depends(verify_internal_token)):
     return {
         "status": "success",
         "carriers": {
+            "shipstation": {"configured": bool(shipstation_key), "environment": "sandbox" if shipstation_key.upper().startswith("TEST_") else "production", "official": True},
             "ups": {"configured": ups_ready, "environment": _ups_environment(), "official": True},
             "schneider": {"configured": schneider_ready, "environment": os.getenv("SCHNEIDER_ENVIRONMENT", "production"), "official": True},
             "address_autocomplete": {"configured": bool(os.getenv("GEOAPIFY_API_KEY", "").strip()), "environment": "Geoapify", "official": True},
@@ -3127,6 +3264,55 @@ def logistics_address_autocomplete(
     _token: str = Depends(verify_internal_token),
 ):
     return {"status": "success", "provider": "Geoapify", "suggestions": _geoapify_suggestions(q)}
+
+
+@app.post("/api/v1/logistics/quotes/shipstation")
+def logistics_quote_shipstation(req: ShipStationQuoteRequest, _token: str = Depends(verify_internal_token)):
+    _validate_domestic_address(req.origin, "Origen")
+    _validate_domestic_address(req.destination, "Destino")
+    _validate_packages(req.packages)
+    carriers = _shipstation_carriers()
+    request_payload = {
+        "rate_options": {
+            "carrier_ids": [str(carrier["carrier_id"]) for carrier in carriers],
+        },
+        "shipment": {
+            "validate_address": "validate_and_clean",
+            "ship_date": req.pickup_date or datetime.now().strftime("%Y-%m-%d"),
+            "ship_from": _shipstation_address_payload(req.origin, "Proveedor"),
+            "ship_to": _shipstation_address_payload(req.destination, "Forwarder"),
+            "packages": _shipstation_packages(req.packages),
+        },
+    }
+    if req.declared_value > 0:
+        request_payload["shipment"]["insurance_provider"] = "carrier"
+        request_payload["shipment"]["packages"][0]["insured_value"] = {
+            "currency": "usd",
+            "amount": float(req.declared_value),
+        }
+    try:
+        response = requests.post(
+            f"{_shipstation_base_url()}/rates",
+            headers=_shipstation_headers(),
+            json=request_payload,
+            timeout=55,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"No fue posible conectar con ShipStation: {user_friendly_external_error(exc, 'ShipStation')}.")
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=_carrier_error_message(response, "ShipStation"))
+    quotes = _normalize_shipstation_quotes(response.json(), carriers)
+    if not quotes:
+        raise HTTPException(status_code=422, detail="ShipStation no devolvio tarifas para esta ruta. Revisa direcciones, medidas y transportistas activos.")
+    return {
+        "status": "success",
+        "provider": "ShipStation API",
+        "official": True,
+        "environment": _shipstation_environment(),
+        "quotes": quotes,
+        "carriers_consulted": len(carriers),
+        "read_only": True,
+    }
 
 
 @app.post("/api/v1/logistics/quotes/ups")
