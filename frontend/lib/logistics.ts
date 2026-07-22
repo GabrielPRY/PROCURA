@@ -77,7 +77,21 @@ export type LogisticsCarriersResponse = {
   carriers: {
     ups: CarrierStatus;
     schneider: CarrierStatus;
+    address_autocomplete: CarrierStatus;
   };
+};
+
+export type AddressSuggestion = {
+  id: string;
+  formatted: string;
+  address_line: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country_code: "US";
+  latitude?: number;
+  longitude?: number;
+  confidence?: number;
 };
 
 export type LogisticsAddress = {
@@ -137,6 +151,14 @@ export function getLogisticsSettings() {
 
 export function getLogisticsCarriersStatus() {
   return apiRequest<LogisticsCarriersResponse>("/logistics/carriers/status");
+}
+
+export function getAddressSuggestions(query: string) {
+  const params = new URLSearchParams({ q: query.trim() });
+  return apiRequest<{ status: string; provider: string; suggestions: AddressSuggestion[] }>(`/logistics/addresses/autocomplete?${params.toString()}`, {
+    timeoutMs: 25000,
+    retries: 0
+  });
 }
 
 export function getUpsQuotes(payload: Record<string, unknown>) {

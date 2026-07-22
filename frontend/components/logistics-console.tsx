@@ -150,6 +150,7 @@ function AddressAutocompleteInput({
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [autocompleteError, setAutocompleteError] = useState("");
   const skipQuery = useRef("");
 
   useEffect(() => {
@@ -161,6 +162,7 @@ function AddressAutocompleteInput({
     if (!enabled || !touched || clean.length < 3) {
       setSuggestions([]);
       setSearching(false);
+      setAutocompleteError("");
       return;
     }
     if (skipQuery.current === clean) {
@@ -170,16 +172,18 @@ function AddressAutocompleteInput({
     let active = true;
     const timer = window.setTimeout(() => {
       setSearching(true);
+      setAutocompleteError("");
       getAddressSuggestions(clean)
         .then((response) => {
           if (!active) return;
           setSuggestions(response.suggestions || []);
           setOpen(true);
         })
-        .catch(() => {
+        .catch((error) => {
           if (!active) return;
           setSuggestions([]);
           setOpen(false);
+          setAutocompleteError(error instanceof Error ? error.message : "No fue posible consultar direcciones.");
         })
         .finally(() => active && setSearching(false));
     }, 450);
@@ -207,43 +211,49 @@ function AddressAutocompleteInput({
   }
 
   return (
-    <div className="relative min-w-0">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-      <input
-        value={query}
-        onChange={(event) => {
-          const next = event.target.value;
-          setQuery(next);
-          setTouched(true);
-          onChange({ ...value, address_line: next });
-        }}
-        onFocus={() => suggestions.length && setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        className="app-input pl-9 pr-9"
-        placeholder={enabled ? "Buscar calle o dirección en USA" : "Calle y número"}
-        autoComplete="off"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open && suggestions.length > 0}
-      />
-      {searching ? <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-brand" /> : null}
-      {open && suggestions.length ? (
-        <div className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-xl" role="listbox">
-          {suggestions.map((suggestion) => (
-            <button
-              key={suggestion.id}
-              type="button"
-              role="option"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => selectSuggestion(suggestion)}
-              className="flex w-full min-w-0 items-start gap-2 rounded-md px-3 py-2.5 text-left hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
-            >
-              <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-              <span className="min-w-0"><span className="block text-sm font-semibold leading-5 text-ink">{suggestion.address_line || suggestion.formatted}</span><span className="block truncate text-xs text-muted">{[suggestion.city, suggestion.state, suggestion.postal_code].filter(Boolean).join(", ")}</span></span>
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <div className="min-w-0">
+      <div className="relative min-w-0">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          value={query}
+          onChange={(event) => {
+            const next = event.target.value;
+            setQuery(next);
+            setTouched(true);
+            setAutocompleteError("");
+            onChange({ ...value, address_line: next });
+          }}
+          onFocus={() => suggestions.length && setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          className="app-input pl-9 pr-9"
+          placeholder={enabled ? "Buscar calle o dirección en USA" : "Calle y número"}
+          autoComplete="off"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open && suggestions.length > 0}
+          aria-invalid={Boolean(autocompleteError)}
+        />
+        {searching ? <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-brand" /> : null}
+        {open && suggestions.length ? (
+          <div className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-xl" role="listbox">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.id}
+                type="button"
+                role="option"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectSuggestion(suggestion)}
+                className="flex w-full min-w-0 items-start gap-2 rounded-md px-3 py-2.5 text-left hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
+              >
+                <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <span className="min-w-0"><span className="block text-sm font-semibold leading-5 text-ink">{suggestion.address_line || suggestion.formatted}</span><span className="block truncate text-xs text-muted">{[suggestion.city, suggestion.state, suggestion.postal_code].filter(Boolean).join(", ")}</span></span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {autocompleteError ? <p className="mt-1.5 text-xs font-medium text-rose-700">Autocompletado: {autocompleteError}</p> : null}
+      {!enabled ? <p className="mt-1.5 text-xs text-amber-700">Autocompletado no disponible; puedes ingresar la dirección manualmente.</p> : null}
     </div>
   );
 }

@@ -2848,6 +2848,15 @@ def _carrier_error_message(response: requests.Response, carrier: str) -> str:
                 candidates.append(error.get("message") or error.get("Message") or error.get("description"))
         candidates.extend([payload.get("message"), payload.get("detail"), payload.get("title")])
     message = next((str(item).strip() for item in candidates if item), "")
+    normalized = re.sub(r"[^a-z0-9]+", "", message.lower())
+    if carrier == "UPS" and ("clientid" in normalized or "invalidclient" in normalized):
+        return (
+            "UPS rechazo el Client ID. Verifica que UPS_CLIENT_ID sea el Client ID OAuth de la "
+            "aplicacion creada en UPS Developer Portal, que UPS_CLIENT_SECRET corresponda a esa "
+            "misma aplicacion y que UPS_ENVIRONMENT sea sandbox o production segun corresponda."
+        )
+    if carrier == "Geoapify" and ("apikey" in normalized or "unauthorized" in normalized or response.status_code in {401, 403}):
+        return "Geoapify rechazo la API key. Verifica GEOAPIFY_API_KEY en el backend de Railway y reinicia el servicio."
     return message or f"{carrier} rechazo la solicitud (HTTP {response.status_code})."
 
 
