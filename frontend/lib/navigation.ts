@@ -38,7 +38,7 @@ export const navigationItems: NavigationItem[] = [
   { id: "auditor_empresas", label: "Auditor IA", description: "Riesgo comercial de proveedores.", icon: ShieldCheck, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "historico", label: "Historico", description: "Precios y participaciones pasadas.", icon: Database, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
   { id: "workspaces", label: "Espacios guardados", description: "Expedientes y analisis RFQ guardados.", icon: FolderOpen, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
-  { id: "logistica", label: "Logistica", description: "Cotizaciones UPS dentro de Estados Unidos.", icon: Truck, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
+  { id: "logistica", label: "Logistica", description: "Comparación de transportistas dentro de Estados Unidos.", icon: Truck, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
   { id: "metricas", label: "Metricas", description: "Consumo, errores y actividad.", icon: BarChart3, permissions: ["Gerencia", "Admin"] },
   { id: "admin", label: "Admin", description: "Usuarios, roles y configuracion.", icon: Settings, permissions: ["Admin"] }
 ];

@@ -27,7 +27,7 @@ import {
   getLogisticsCalculations,
   getLogisticsCarriersStatus,
   getLogisticsSettings,
-  getUpsQuotes,
+  getShipStationQuotes,
   saveLogisticsCalculation,
   saveLogisticsForwarder,
   type AddressSuggestion,
@@ -50,7 +50,7 @@ import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type ViewId = "ups" | "history" | "settings";
+type ViewId = "rates" | "history" | "settings";
 
 type PackageRow = QuotePackage & {
   id: number;
@@ -359,7 +359,7 @@ function CarrierState({ configured, environment, name }: { configured?: boolean;
 }
 
 export function LogisticsConsole({ user }: { user: AuthUser }) {
-  const [view, setView] = useState<ViewId>("ups");
+  const [view, setView] = useState<ViewId>("rates");
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [forwarders, setForwarders] = useState<Forwarder[]>([]);
@@ -434,12 +434,12 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     };
   }
 
-  async function quoteUps() {
+  async function quoteShipStation() {
     setError(null);
     setQuotes([]);
     setQuoting(true);
     try {
-      const response = await getUpsQuotes({
+      const response = await getShipStationQuotes({
         ...commonPayload(),
         pickup_date: pickupDate,
         declared_value: declaredValue,
@@ -449,7 +449,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       setSelectedQuoteId(response.quotes?.[0]?.id || "");
       setQuoteEnvironment(response.environment);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No fue posible cotizar con UPS.");
+      setError(err instanceof Error ? err.message : "No fue posible comparar tarifas en ShipStation.");
     } finally {
       setQuoting(false);
     }
@@ -521,7 +521,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
   }
 
   const tabs: { id: ViewId; label: string; icon: typeof Truck }[] = [
-    { id: "ups", label: "UPS", icon: PackagePlus },
+    { id: "rates", label: "Comparar tarifas", icon: PackagePlus },
     { id: "history", label: "Cotizaciones guardadas", icon: History },
     ...(canManageLogistics ? [{ id: "settings" as ViewId, label: "Forwarders", icon: Settings2 }] : [])
   ];
@@ -531,8 +531,8 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     return (
       <ModuleSection>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><h3 className="text-base font-semibold text-ink">Opciones disponibles</h3><p className="mt-1 text-sm text-muted">Precios recibidos directamente del transportista.</p></div>
-          <StatusBadge tone="ok"><ShieldCheck className="h-3.5 w-3.5" />Cotización oficial</StatusBadge>
+          <div><h3 className="text-base font-semibold text-ink">Opciones disponibles</h3><p className="mt-1 text-sm text-muted">Ordenadas desde el menor costo total disponible.</p></div>
+          <StatusBadge tone="ok"><ShieldCheck className="h-3.5 w-3.5" />Tarifas en vivo</StatusBadge>
         </div>
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
           {quotes.map((quote) => {
@@ -540,7 +540,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
             return (
               <button key={quote.id} type="button" onClick={() => setSelectedQuoteId(quote.id)} className={`min-w-0 rounded-lg border p-4 text-left transition ${active ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100" : "border-line bg-panel hover:border-blue-300"}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><div className="truncate text-sm font-semibold text-ink">{quote.service_name}</div><div className="mt-1 text-xs text-muted">{quote.service_code || quote.carrier}</div></div>
+                  <div className="min-w-0"><div className="truncate text-sm font-semibold text-ink">{quote.carrier}</div><div className="mt-1 truncate text-xs text-muted">{quote.service_name}{quote.service_code ? ` | ${quote.service_code}` : ""}</div></div>
                   {active ? <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-600 text-white"><Check className="h-4 w-4" /></span> : null}
                 </div>
                 <div className="mt-4 text-2xl font-bold text-ink">{money(quote.total, quote.currency)}</div>
@@ -548,6 +548,9 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
                   {(quote.business_days || quote.transit_days) ? <span className="rounded-full bg-slate-100 px-2 py-1">{quote.business_days || quote.transit_days} día(s) hábiles</span> : null}
                   {(quote.delivery_date || quote.delivery_at) ? <span className="rounded-full bg-slate-100 px-2 py-1">Entrega: {dateLabel(quote.delivery_date || quote.delivery_at)}</span> : null}
                   {quote.negotiated ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">Tarifa negociada</span> : null}
+                  {(quote.attributes || []).includes("cheapest") ? <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-800">Menor precio</span> : null}
+                  {(quote.attributes || []).includes("fastest") ? <span className="rounded-full bg-violet-100 px-2 py-1 text-violet-800">Más rápido</span> : null}
+                  {(quote.attributes || []).includes("best_value") ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">Mejor valor</span> : null}
                 </div>
                 {quote.carrier === "Schneider" ? <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-xs"><span>Base<br /><strong>{money(quote.line_haul || 0)}</strong></span><span>Combustible<br /><strong>{money(quote.fuel || 0)}</strong></span><span>Adicionales<br /><strong>{money(quote.accessorials || 0)}</strong></span></div> : null}
               </button>
@@ -575,12 +578,12 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       {error ? <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section> : null}
       {loading ? <section className="flex items-center gap-2 rounded-xl border border-line bg-panel p-4 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Cargando configuración logística...</section> : null}
 
-      {view === "ups" ? (
+      {view === "rates" ? (
         <>
           <ModuleSection>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><h3 className="text-base font-semibold text-ink">Cotización UPS</h3><p className="mt-1 text-sm text-muted">Ruta doméstica: proveedor en USA <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> forwarder en USA.</p></div>
-              <CarrierState name="UPS" configured={carrierStatus?.ups.configured} environment={carrierStatus?.ups.environment} />
+              <div><h3 className="text-base font-semibold text-ink">Comparativa de transportistas</h3><p className="mt-1 text-sm text-muted">Ruta doméstica: proveedor en USA <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> forwarder en USA.</p></div>
+              <CarrierState name="ShipStation API" configured={carrierStatus?.shipstation.configured} environment={carrierStatus?.shipstation.environment} />
             </div>
             {items.length ? <div className="mt-5"><Field label="Renglón relacionado"><select value={selectedIndex} onChange={(event) => setSelectedIndex(Number(event.target.value))} className="app-input">{items.map((item, index) => <option key={`${item.renglon}-${index}`} value={index}>{itemLabel(item, index)}</option>)}</select></Field></div> : null}
           </ModuleSection>
@@ -602,7 +605,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
               <Field label="Fecha de recogida"><input type="date" value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} className="app-input" /></Field>
               <Field label="Valor declarado (opcional)"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span><input type="number" min={0} step="any" value={declaredValue} onChange={(event) => setDeclaredValue(Number(event.target.value))} className="app-input pl-7" /></div></Field>
             </div>
-            <div className="mt-5 flex justify-end"><Button type="button" onClick={quoteUps} disabled={quoting || !carrierStatus?.ups.configured} variant="primary" size="lg">{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}{quoting ? "Consultando tarifa..." : "Obtener cotización UPS"}</Button></div>
+            <div className="mt-5 flex justify-end"><Button type="button" onClick={quoteShipStation} disabled={quoting || !carrierStatus?.shipstation.configured} variant="primary" size="lg">{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}{quoting ? "Consultando transportistas..." : "Comparar tarifas"}</Button></div>
           </ModuleSection>
           <QuoteResults />
         </>
@@ -610,7 +613,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
 
       {view === "history" ? (
         <ModuleSection>
-          <PageHeader title="Cotizaciones guardadas" copy="Registro de tarifas seleccionadas por el equipo." actions={<Button type="button" onClick={() => setView("ups")} variant="primary" size="md"><Plus className="h-4 w-4" />Nueva cotización</Button>} />
+          <PageHeader title="Cotizaciones guardadas" copy="Registro de tarifas seleccionadas por el equipo." actions={<Button type="button" onClick={() => setView("rates")} variant="primary" size="md"><Plus className="h-4 w-4" />Nueva cotización</Button>} />
           <div className="mt-5 overflow-hidden rounded-lg border border-line">
             {visibleCalculations.length ? <div className="divide-y divide-line">{visibleCalculations.map((item) => {
               const metadata = item.metadata as { official?: boolean; quote?: CarrierQuote; environment?: string } | undefined;

@@ -107,7 +107,7 @@ const moduleContent: Record<ModuleId, { eyebrow: string; subtitle: string; icon:
   workspaces: { eyebrow: "Workspaces", subtitle: "Recupera matrices RFQ guardadas por usuario o equipo.", icon: FileText, cards: [] },
   logistica: {
     eyebrow: "Modulo Logistica",
-    subtitle: "Cotizaciones UPS desde el proveedor hasta el forwarder dentro de Estados Unidos.",
+    subtitle: "Comparación de tarifas desde el proveedor hasta el forwarder dentro de Estados Unidos.",
     icon: Truck,
     cards: [
       { title: "UPS", copy: "Tarifas de paqueteria y tiempos de entrega desde la cuenta corporativa." },

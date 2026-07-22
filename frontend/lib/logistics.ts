@@ -75,6 +75,7 @@ export type CarrierStatus = {
 export type LogisticsCarriersResponse = {
   status: string;
   carriers: {
+    shipstation: CarrierStatus;
     ups: CarrierStatus;
     schneider: CarrierStatus;
     address_autocomplete: CarrierStatus;
@@ -135,6 +136,9 @@ export type CarrierQuote = {
   fuel?: number;
   accessorials?: number;
   accessorial_list?: unknown[];
+  attributes?: string[];
+  shipping_amount?: number;
+  other_amount?: number;
 };
 
 export type CarrierQuoteResponse = {
@@ -166,6 +170,14 @@ export function getUpsQuotes(payload: Record<string, unknown>) {
     method: "POST",
     body: JSON.stringify(payload),
     timeoutMs: 70000
+  });
+}
+
+export function getShipStationQuotes(payload: Record<string, unknown>) {
+  return apiRequest<CarrierQuoteResponse>("/logistics/quotes/shipstation", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 80000
   });
 }
 
