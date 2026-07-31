@@ -2,8 +2,11 @@
 
 import {
   AlertTriangle,
+  Building2,
   CheckCircle2,
   ExternalLink,
+  FileSearch,
+  GitCompareArrows,
   Globe2,
   History,
   Loader2,
@@ -11,6 +14,7 @@ import {
   RotateCcw,
   Search,
   SearchCheck,
+  Scale,
   ShieldAlert,
   ShieldCheck
 } from "lucide-react";
@@ -56,6 +60,14 @@ function confidenceTone(value?: string): BadgeTone {
   return "warn";
 }
 
+function verificationTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("inconsistente") || normalized.includes("coincidencia confirm") || normalized.includes("hallazgos oficiales")) return "danger";
+  if (normalized.includes("posible") || normalized.includes("parcial") || normalized.includes("no verific") || normalized.includes("no confirmado")) return "warn";
+  if (normalized.includes("verificada") || normalized.includes("coherente") || normalized.includes("sin coincid") || normalized.includes("sin hallazgos")) return "ok";
+  return "neutral";
+}
+
 function formatAuditDate(value?: string) {
   if (!value) return "N/D";
   const parsed = new Date(value);
@@ -97,6 +109,11 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("");
+  const [registrationId, setRegistrationId] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [declaredAddress, setDeclaredAddress] = useState("");
   const [productContext, setProductContext] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -132,6 +149,11 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
       setCompanyName(draft.company_name || "");
       setWebsite(draft.website || "");
       setCountry(draft.country || "");
+      setRegistrationId(draft.registration_id || "");
+      setTaxId(draft.tax_id || "");
+      setContactEmail(draft.contact_email || "");
+      setContactPhone(draft.contact_phone || "");
+      setDeclaredAddress(draft.declared_address || "");
       setProductContext(draft.product_context || "");
       setNotes(draft.notes || "");
       setDraftSource(draft.source === "proveedores" ? "Proveedor precargado desde el resultado de sourcing." : "");
@@ -177,6 +199,11 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
         company_name: companyName.trim(),
         website: website.trim(),
         country: country.trim(),
+        registration_id: registrationId.trim(),
+        tax_id: taxId.trim(),
+        contact_email: contactEmail.trim(),
+        contact_phone: contactPhone.trim(),
+        declared_address: declaredAddress.trim(),
         product_context: productContext.trim(),
         notes: notes.trim()
       });
@@ -194,6 +221,11 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
     setCompanyName(audit.company_name || "");
     setWebsite(audit.website || audit.domain || "");
     setCountry(audit.country || "");
+    setRegistrationId("");
+    setTaxId("");
+    setContactEmail("");
+    setContactPhone("");
+    setDeclaredAddress("");
     setProductContext("");
     setNotes("");
     setDraftSource(`Datos recuperados de la auditoría del ${formatAuditDate(audit.created_at)}.`);
@@ -211,6 +243,10 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
   const web = technical?.website;
   const score = typeof result?.score_final === "number" ? result.score_final : technical?.scorecard?.score;
   const grounded = result?.engine === "gemini_google_search";
+  const identity = result?.identidad_legal;
+  const sanctions = result?.sanciones;
+  const adverse = result?.reputacion_adversa;
+  const consistency = result?.coherencia_datos;
 
   return (
     <div className="space-y-5">
@@ -280,6 +316,30 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                     <span className="mb-2 block text-sm font-semibold text-ink">País o región esperada</span>
                     <input value={country} onChange={(event) => setCountry(event.target.value)} className="app-input" placeholder="Ej: Estados Unidos, China, Europa" />
                   </label>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-ink">Registro mercantil</span>
+                      <input value={registrationId} onChange={(event) => setRegistrationId(event.target.value)} className="app-input" placeholder="Número de registro, licencia o LEI" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-ink">Identificación fiscal</span>
+                      <input value={taxId} onChange={(event) => setTaxId(event.target.value)} className="app-input" placeholder="EIN, VAT, RUC u otro" />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-ink">Dirección declarada</span>
+                    <input value={declaredAddress} onChange={(event) => setDeclaredAddress(event.target.value)} className="app-input" placeholder="Dirección comercial indicada por el proveedor" autoComplete="street-address" />
+                  </label>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-ink">Correo de contacto</span>
+                      <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className="app-input" placeholder="ventas@empresa.com" autoComplete="email" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-ink">Teléfono de contacto</span>
+                      <input type="tel" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className="app-input" placeholder="Código de país y número" autoComplete="tel" />
+                    </label>
+                  </div>
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-ink">Producto o contexto comercial</span>
                     <textarea value={productContext} onChange={(event) => setProductContext(event.target.value)} rows={3} className="app-input min-h-24 resize-y py-3" placeholder="Producto, marca, código ACP o renglones que debe cotizar" />
@@ -356,6 +416,43 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
               </div>
             ) : null}
 
+            <ModuleSection>
+              <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <FileSearch className="h-4 w-4 text-brand" />
+                    <h3 className="text-base font-semibold text-ink">Informe de debida diligencia</h3>
+                  </div>
+                  <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink">
+                    {cleanValue(result.analisis_escrito, result.resumen || "No hay informe narrativo disponible.")}
+                  </p>
+                  <p className="mt-4 border-t border-line pt-3 text-xs leading-5 text-muted">
+                    {cleanValue(result.alcance, "Preauditoría operativa basada en fuentes públicas; requiere validación humana antes de efectuar pagos.")}
+                  </p>
+                </div>
+                <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-slate-50">
+                  {[
+                    [Building2, "Identidad legal", identity?.estado, identity?.detalle],
+                    [Scale, "Sanciones", sanctions?.estado, sanctions?.detalle],
+                    [FileSearch, "Reputación adversa", adverse?.estado, adverse?.detalle],
+                    [GitCompareArrows, "Coherencia de datos", consistency?.estado, consistency?.detalle]
+                  ].map(([Icon, label, state, detail]) => {
+                    const RowIcon = Icon as typeof Building2;
+                    return <div key={String(label)} className="flex min-w-0 gap-3 p-4">
+                      <RowIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-ink">{String(label)}</div>
+                          <StatusBadge tone={verificationTone(String(state || ""))}>{cleanValue(state, "No verificado")}</StatusBadge>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted">{cleanValue(detail, "Sin evidencia concluyente.")}</p>
+                      </div>
+                    </div>;
+                  })}
+                </div>
+              </div>
+            </ModuleSection>
+
             <div className="grid min-w-0 gap-5 xl:grid-cols-2">
               <ModuleSection>
                 <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" /><h3 className="text-sm font-semibold text-ink">Señales favorables</h3></div>
@@ -399,7 +496,24 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             <details className="app-surface p-5" open={false}>
               <summary className="cursor-pointer text-sm font-semibold text-ink">Fuentes y evidencia revisada ({result.evidence_count ?? 0})</summary>
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {(result.evidencia || []).map((item, index) => <div key={`${item.titulo}-${index}`} className="rounded-lg border border-line bg-slate-50 p-4"><div className="text-sm font-semibold text-ink">{cleanValue(item.titulo, `Evidencia ${index + 1}`)}</div><p className="mt-2 text-sm leading-6 text-muted">{cleanValue(item.detalle, "Sin detalle.")}</p>{item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand">Abrir fuente <ExternalLink className="h-3.5 w-3.5" /></a> : null}</div>)}
+                {(result.evidencia || []).map((item, index) => (
+                  <div key={`${item.titulo}-${index}`} className="rounded-lg border border-line bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="text-sm font-semibold text-ink">{cleanValue(item.titulo, `Evidencia ${index + 1}`)}</div>
+                      <StatusBadge tone={item.verificado ? "ok" : "neutral"}>
+                        {item.verificado ? "Comprobación directa" : cleanValue(item.nivel_fuente, "Fuente pública")}
+                      </StatusBadge>
+                    </div>
+                    <div className="mt-2 text-xs font-semibold text-brand">{cleanValue(item.categoria, "Investigación web")}</div>
+                    <p className="mt-2 text-sm leading-6 text-muted">{cleanValue(item.detalle, "Sin detalle.")}</p>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      {item.url
+                        ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-brand">Abrir fuente <ExternalLink className="h-3.5 w-3.5" /></a>
+                        : <span className="text-xs text-muted">Comprobación sin enlace externo</span>}
+                      <span className="text-xs text-muted">{formatAuditDate(item.fecha_consulta)}</span>
+                    </div>
+                  </div>
+                ))}
                 {!(result.evidencia || []).length ? <EmptyState icon={Search} title="Sin fuentes detalladas" copy="Valida manualmente la identidad y los documentos antes de comprar." className="lg:col-span-2" /> : null}
               </div>
             </details>

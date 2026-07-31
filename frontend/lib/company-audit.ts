@@ -6,12 +6,33 @@ export type CompanyAuditEvidence = {
   titulo?: string;
   detalle?: string;
   url?: string;
+  categoria?: string;
+  nivel_fuente?: string;
+  fecha_consulta?: string;
+  verificado?: boolean;
+};
+
+export type CompanyAuditCheck = {
+  estado?: string;
+  detalle?: string;
+  nombre_legal?: string;
+  numero_registro?: string;
+  registro_consultado?: string;
+  fuente_url?: string;
+  coincidencias?: string[];
+  inconsistencias?: string[];
+  hallazgos?: string[];
 };
 
 export type CompanyAuditDraft = {
   company_name?: string;
   website?: string;
   country?: string;
+  registration_id?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  declared_address?: string;
   product_context?: string;
   notes?: string;
   source?: "proveedores" | "manual";
@@ -67,6 +88,13 @@ export type CompanyAuditResponse = {
   status: string;
   audit_id?: number;
   resumen?: string;
+  analisis_escrito?: string;
+  fecha_consulta?: string;
+  alcance?: string;
+  identidad_legal?: CompanyAuditCheck;
+  sanciones?: CompanyAuditCheck;
+  reputacion_adversa?: CompanyAuditCheck;
+  coherencia_datos?: CompanyAuditCheck;
   riesgo?: "Bajo" | "Medio" | "Alto" | string;
   decision?: "Avanzar" | "Avanzar con cautela" | "Pedir validacion" | "Descartar" | string;
   confianza?: "Alta" | "Media" | "Baja" | string;
@@ -114,6 +142,11 @@ export function auditCompany(payload: {
   company_name: string;
   website?: string;
   country?: string;
+  registration_id?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  declared_address?: string;
   product_context?: string;
   notes?: string;
 }) {
