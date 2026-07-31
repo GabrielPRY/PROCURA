@@ -780,6 +780,7 @@ Extrae tambiÃƒÂ©n controles tÃƒÂ©cnicos crÃƒÂ­ticos para decidir par
 
 Para cada renglÃƒÂ³n extrae:
 - codigo_articulo: cÃƒÂ³digo ACP del renglÃƒÂ³n ÃƒÅ¡NICAMENTE si aparece con formato de 3 letras, guion, 3 letras, guion y 5 nÃƒÂºmeros, por ejemplo ABC-DEF-12345. No incluyas descripciones, nÃƒÂºmeros de parte, marcas ni texto adicional. Si el cÃƒÂ³digo no aparece con ese formato exacto, devuelve "".
+- El cÃƒÂ³digo ACP aparece al INICIO de la descripciÃƒÂ³n del renglÃƒÂ³n. Ejemplo: si el renglÃƒÂ³n comienza "PWR-BAT-00009 ...", devuelve codigo_articulo="PWR-BAT-00009". Si el renglÃƒÂ³n no comienza con ese patrÃƒÂ³n exacto, devuelve "". "S/C" significa sin cÃƒÂ³digo y nunca es un cÃƒÂ³digo ACP.
 - requiere_propuesta_tecnica: true si la propuesta tÃƒÂ©cnica aplica a ese renglÃƒÂ³n/lÃƒÂ­nea; false si no aplica.
 - requiere_ficha_tecnica: true SOLO si el pliego exige entregar/presentar/adjuntar ficha tÃƒÂ©cnica, catÃƒÂ¡logo, datasheet, plano, certificado, muestra, manual, ficha de seguridad o submittal tÃƒÂ©cnico junto con la oferta/propuesta. false si el texto solo describe especificaciones tÃƒÂ©cnicas, marca, modelo, nÃƒÂºmero de parte o cumplimiento tÃƒÂ©cnico sin pedir un documento entregable.
 - marca_modelo_requerido: marca, fabricante, modelo o nÃƒÂºmero de parte exigido para ese renglÃƒÂ³n. Si no hay, null.
@@ -810,14 +811,34 @@ DOCUMENTAL_KEYWORDS = [
     "muestra", "submittal", "hoja de seguridad", "ficha de seguridad", "msds",
 ]
 
-ACP_CODE_RE = re.compile(r"\b([A-Z]{3})-([A-Z]{3})-(\d{5})\b", re.IGNORECASE)
+ACP_CODE_RE = re.compile(r"([A-Z]{3})-([A-Z]{3})-(\d{5})", re.IGNORECASE)
+ACP_CODE_AT_ITEM_START_RE = re.compile(
+    r"^\s*([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
+    re.IGNORECASE,
+)
 
 def _normalize_acp_code(value):
     text = str(value or "").strip().upper()
-    match = ACP_CODE_RE.search(text)
+    match = ACP_CODE_RE.fullmatch(text)
     if not match:
         return ""
     return f"{match.group(1).upper()}-{match.group(2).upper()}-{match.group(3)}"
+
+def _extract_item_start_acp_code(item):
+    """Recupera el codigo solo desde campos que representan el inicio del renglÃ³n."""
+    if not isinstance(item, dict):
+        return ""
+
+    explicit_code = _normalize_acp_code(item.get("codigo_articulo"))
+    if explicit_code:
+        return explicit_code
+
+    for key in ["termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
+        text = str(item.get(key) or "").strip()
+        match = ACP_CODE_AT_ITEM_START_RE.match(text)
+        if match:
+            return match.group(1).upper()
+    return ""
 
 def _parse_rows_from_scope_text(value):
     rows = set()
@@ -878,7 +899,7 @@ def postprocess_technical_analysis(data: dict) -> dict:
     for item in items:
         if not isinstance(item, dict):
             continue
-        item["codigo_articulo"] = _normalize_acp_code(item.get("codigo_articulo"))
+        item["codigo_articulo"] = _extract_item_start_acp_code(item)
         requiere_propuesta = _to_bool(item.get("requiere_propuesta_tecnica"), default=False)
         item["requiere_propuesta_tecnica"] = requiere_propuesta
         if requiere_propuesta:
@@ -1691,6 +1712,11 @@ class CompanyAuditRequest(BaseModel):
     company_name: str
     website: str = ""
     country: str = ""
+    registration_id: str = ""
+    tax_id: str = ""
+    contact_email: str = ""
+    contact_phone: str = ""
+    declared_address: str = ""
     product_context: str = ""
     notes: str = ""
     gemini_key: Optional[str] = None
@@ -2501,7 +2527,181 @@ def _audit_collect_technical_signals(company_name: str, website: str):
     signals["scorecard"] = _audit_score_signals(signals)
     return signals
 
-def _audit_finalize_assessment(result: dict, technical_signals: dict):
+def _audit_grounding_sources(response):
+    sources = []
+    candidates = getattr(response, "candidates", None) or []
+    for candidate in candidates:
+        metadata = getattr(candidate, "grounding_metadata", None)
+        chunks = getattr(metadata, "grounding_chunks", None) if metadata else None
+        for chunk in chunks or []:
+            web = getattr(chunk, "web", None)
+            url = str(getattr(web, "uri", "") or "").strip() if web else ""
+            title = str(getattr(web, "title", "") or "").strip() if web else ""
+            if url.startswith(("http://", "https://")):
+                sources.append({"titulo": title or "Fuente localizada por Google Search", "url": url})
+    unique = []
+    seen = set()
+    for source in sources:
+        key = source.get("url", "").lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(source)
+    return unique[:30]
+
+def _audit_evidence_url(value):
+    url = str(value or "").strip()
+    return url if url.startswith(("http://", "https://")) else ""
+
+def _audit_normalize_check(value, default_status="No verificado"):
+    section = value if isinstance(value, dict) else {}
+    return {
+        "estado": str(section.get("estado") or default_status).strip(),
+        "detalle": str(section.get("detalle") or "No confirmado con la evidencia disponible.").strip(),
+        "nombre_legal": str(section.get("nombre_legal") or "").strip(),
+        "numero_registro": str(section.get("numero_registro") or "").strip(),
+        "registro_consultado": str(section.get("registro_consultado") or "").strip(),
+        "fuente_url": _audit_evidence_url(section.get("fuente_url")),
+        "coincidencias": [str(item).strip() for item in section.get("coincidencias", []) if str(item).strip()] if isinstance(section.get("coincidencias"), list) else [],
+        "inconsistencias": [str(item).strip() for item in section.get("inconsistencias", []) if str(item).strip()] if isinstance(section.get("inconsistencias"), list) else [],
+        "hallazgos": [str(item).strip() for item in section.get("hallazgos", []) if str(item).strip()] if isinstance(section.get("hallazgos"), list) else [],
+    }
+
+def _audit_normalize_ai_result(result: dict, grounded: bool, grounding_sources=None):
+    result = result if isinstance(result, dict) else {}
+    checked_at = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    result["fecha_consulta"] = checked_at
+    result["alcance"] = (
+        "Preauditoria operativa basada en fuentes publicas. No certifica legalidad, solvencia ni ausencia absoluta de fraude."
+    )
+    result["identidad_legal"] = _audit_normalize_check(result.get("identidad_legal"))
+    result["sanciones"] = _audit_normalize_check(result.get("sanciones"))
+    result["reputacion_adversa"] = _audit_normalize_check(result.get("reputacion_adversa"))
+    result["coherencia_datos"] = _audit_normalize_check(result.get("coherencia_datos"))
+
+    evidence = []
+    for item in result.get("evidencia", []) if isinstance(result.get("evidencia"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        evidence.append({
+            "titulo": str(item.get("titulo") or "Evidencia consultada").strip(),
+            "detalle": str(item.get("detalle") or "").strip(),
+            "url": _audit_evidence_url(item.get("url")),
+            "categoria": str(item.get("categoria") or "Investigacion web").strip(),
+            "nivel_fuente": str(item.get("nivel_fuente") or "Fuente publica").strip(),
+            "fecha_consulta": str(item.get("fecha_consulta") or checked_at).strip(),
+            "verificado": bool(item.get("verificado", False)),
+        })
+
+    existing_urls = {item.get("url", "").lower() for item in evidence if item.get("url")}
+    for source in grounding_sources or []:
+        url = _audit_evidence_url(source.get("url"))
+        if not url or url.lower() in existing_urls:
+            continue
+        existing_urls.add(url.lower())
+        evidence.append({
+            "titulo": str(source.get("titulo") or "Fuente localizada por Google Search"),
+            "detalle": "Fuente utilizada durante la investigacion web; abre el enlace para revisar el contexto completo.",
+            "url": url,
+            "categoria": "Busqueda web",
+            "nivel_fuente": "Fuente localizada por Google Search",
+            "fecha_consulta": checked_at,
+            "verificado": False,
+        })
+
+    for key, category in [
+        ("identidad_legal", "Registro empresarial"),
+        ("sanciones", "Sanciones"),
+        ("reputacion_adversa", "Reputacion y asuntos legales"),
+    ]:
+        section = result[key]
+        url = section.get("fuente_url", "")
+        if url and url.lower() not in existing_urls:
+            existing_urls.add(url.lower())
+            evidence.append({
+                "titulo": section.get("registro_consultado") or category,
+                "detalle": section.get("detalle", ""),
+                "url": url,
+                "categoria": category,
+                "nivel_fuente": "Fuente declarada por la investigacion",
+                "fecha_consulta": checked_at,
+                "verificado": True,
+            })
+
+    result["evidencia"] = evidence[:40]
+    if not grounded:
+        for key in ["identidad_legal", "sanciones", "reputacion_adversa"]:
+            result[key]["estado"] = "No verificado"
+            result[key]["detalle"] = "La busqueda web con fuentes no estuvo disponible; requiere validacion manual."
+        result["confianza"] = "Baja"
+
+    identity = result["identidad_legal"]
+    identity_status = identity.get("estado", "").lower()
+    if "verificad" in identity_status and "no verific" not in identity_status and not identity.get("fuente_url"):
+        identity["estado"] = "Parcial"
+        identity["detalle"] = f"{identity.get('detalle', '')} Falta una fuente registral enlazada."
+
+    sanctions = result["sanciones"]
+    sanctions_status = sanctions.get("estado", "").lower()
+    sanctions_evidence = any(
+        "ofac" in str(item.get("url", "")).lower()
+        or "sanction" in str(item.get("categoria", "")).lower()
+        or "sancion" in str(item.get("categoria", "")).lower()
+        for item in evidence
+    )
+    if ("sin coincid" in sanctions_status or "sin hallazgo" in sanctions_status) and not sanctions_evidence:
+        sanctions["estado"] = "No verificado"
+        sanctions["detalle"] = "No hay una fuente de sanciones enlazada que permita sostener una conclusion negativa."
+
+    written = str(result.get("analisis_escrito") or "").strip()
+    if not written:
+        written = str(result.get("resumen") or "La evidencia disponible requiere revision antes de operar con el proveedor.").strip()
+    result["analisis_escrito"] = written
+    return result
+
+def _audit_add_technical_evidence(result: dict, technical_signals: dict):
+    evidence = list(result.get("evidencia", []) or [])
+    existing_urls = {str(item.get("url", "")).lower() for item in evidence if isinstance(item, dict) and item.get("url")}
+    checked_at = result.get("fecha_consulta") or datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    rdap = technical_signals.get("rdap", {}) or {}
+    website = technical_signals.get("website", {}) or {}
+    ssl_info = technical_signals.get("ssl", {}) or {}
+
+    if rdap.get("available") and rdap.get("source") and str(rdap.get("source")).lower() not in existing_urls:
+        evidence.append({
+            "titulo": "Registro tecnico del dominio (RDAP)",
+            "detalle": f"Dominio consultado. Registrador: {rdap.get('registrar') or 'No confirmado'}.",
+            "url": rdap.get("source"),
+            "categoria": "Dominio",
+            "nivel_fuente": "Registro tecnico autoritativo",
+            "fecha_consulta": checked_at,
+            "verificado": True,
+        })
+    if website.get("available"):
+        website_url = _audit_evidence_url(website.get("final_url") or technical_signals.get("normalized_url"))
+        if website_url and website_url.lower() not in existing_urls:
+            evidence.append({
+                "titulo": "Sitio web corporativo observado",
+                "detalle": f"Sitio accesible durante la auditoria. HTTPS: {'Si' if website.get('https') else 'No'}.",
+                "url": website_url,
+                "categoria": "Identidad digital",
+                "nivel_fuente": "Fuente primaria de la empresa",
+                "fecha_consulta": checked_at,
+                "verificado": True,
+            })
+    if ssl_info.get("valid"):
+        evidence.append({
+            "titulo": "Certificado SSL/TLS validado",
+            "detalle": f"Emisor: {ssl_info.get('issuer') or 'No confirmado'}. La validacion tecnica no acredita identidad legal.",
+            "url": "",
+            "categoria": "Seguridad web",
+            "nivel_fuente": "Comprobacion tecnica directa",
+            "fecha_consulta": checked_at,
+            "verificado": True,
+        })
+    result["evidencia"] = evidence[:40]
+    return result
+
+def _audit_finalize_assessment(result: dict, technical_signals: dict, grounded=True):
     scorecard = technical_signals.get("scorecard", {}) or {}
     rdap = technical_signals.get("rdap", {}) or {}
     website = technical_signals.get("website", {}) or {}
@@ -2541,8 +2741,27 @@ def _audit_finalize_assessment(result: dict, technical_signals: dict):
     if "descartar" in model_decision:
         final_score = min(final_score, 39)
 
+    identity_status = str((result.get("identidad_legal") or {}).get("estado", "")).lower()
+    sanctions_status = str((result.get("sanciones") or {}).get("estado", "")).lower()
+    adverse_status = str((result.get("reputacion_adversa") or {}).get("estado", "")).lower()
+    if not grounded:
+        final_score = min(final_score, 55)
+        safeguards.append("La investigacion no tuvo busqueda web con fuentes; confianza limitada.")
+    if "no verific" in identity_status:
+        final_score = min(final_score, 59)
+        safeguards.append("Identidad legal no verificada en un registro oficial.")
+    if "posible coincid" in sanctions_status:
+        final_score = min(final_score, 29)
+        safeguards.append("Posible coincidencia en sanciones; detener y confirmar identidad manualmente.")
+    if "coincidencia confirm" in sanctions_status:
+        final_score = min(final_score, 10)
+        safeguards.append("La investigacion reporta una coincidencia de sanciones que requiere escalamiento inmediato.")
+    if "oficial" in adverse_status or "confirmad" in adverse_status:
+        final_score = min(final_score, 39)
+        safeguards.append("Se reportaron hallazgos adversos oficiales o confirmados.")
+
     risk = "Bajo" if final_score >= 75 else "Medio" if final_score >= 50 else "Alto"
-    decision = "Avanzar" if final_score >= 82 else "Avanzar con cautela" if final_score >= 65 else "Pedir validacion" if final_score >= 45 else "Descartar"
+    decision = "Avanzar" if final_score >= 82 else "Avanzar con cautela" if final_score >= 65 else "Pedir validacion" if final_score >= 30 else "Descartar"
     result["score_ia"] = ai_score
     result["score_tecnico"] = technical_score
     result["score_final"] = final_score
@@ -2550,6 +2769,12 @@ def _audit_finalize_assessment(result: dict, technical_signals: dict):
     result["decision"] = decision
     result["criterio_puntaje"] = "65% evidencia tecnica y 35% investigacion IA" if domain else "Puntaje limitado por falta de dominio verificable"
     result["reglas_seguridad_aplicadas"] = safeguards
+    confidence = str(result.get("confianza") or "Media").strip().title()
+    if not grounded:
+        confidence = "Baja"
+    elif "no verific" in identity_status and confidence == "Alta":
+        confidence = "Media"
+    result["confianza"] = confidence if confidence in {"Alta", "Media", "Baja"} else "Media"
     return result
 
 def _audit_company_with_gemini(gemini_key: str, payload: dict, use_google_search=True):
@@ -2566,6 +2791,15 @@ Objetivo:
 - Esto NO es aprobacion legal/financiera final; es una preauditoria operativa para procura.
 - Las senales tecnicas automaticas tienen prioridad como evidencia: RDAP/WHOIS, SSL/TLS, HTTPS, accesibilidad web, contacto corporativo y edad del dominio.
 - Si hay contradiccion entre una impresion general positiva y una senal tecnica fuerte de riesgo, conserva el riesgo y explica la validacion pendiente.
+- Nunca escribas que una empresa es "totalmente segura", "100% legal" o que "no tiene estafas". Usa formulaciones limitadas a las fuentes y fecha consultadas.
+
+Investigacion obligatoria:
+1. Identidad legal: busca la razon social exacta en un registro mercantil, fiscal, regulatorio o identificador LEI oficial del pais indicado. Distingue empresa registrada de marca comercial.
+2. Sanciones: busca el nombre legal y variantes en fuentes oficiales, priorizando OFAC y listas gubernamentales aplicables. Una coincidencia por nombre es POTENCIAL hasta confirmar pais, direccion y numero de registro.
+3. Reputacion adversa: busca fraude, estafa, scam, demanda, sancion regulatoria, quiebra, incumplimiento y alertas oficiales. Separa fuentes oficiales/noticias confiables de quejas o foros no confirmados.
+4. Coherencia: compara nombre, pais, direccion, telefono, correo, dominio, numero registral y actividad comercial declarada.
+5. Capacidad comercial: revisa si existe evidencia real de que vende o fabrica el producto indicado; no confundas presencia web con capacidad tecnica.
+6. Abre y cita las fuentes que sustentan cada hallazgo. Si no localizas una fuente oficial, marca el control como "No verificado".
 
 Datos entregados por el usuario:
 {json.dumps(payload, ensure_ascii=False, indent=2)}
@@ -2581,6 +2815,7 @@ Criterios minimos:
 Devuelve SOLO JSON valido:
 {{
   "resumen": "1 frase ejecutiva",
+  "analisis_escrito": "Informe de 2 a 4 parrafos: identidad observada, hallazgos de riesgo, limites de la investigacion y conclusion operativa. Cada afirmacion debe corresponder a una evidencia listada.",
   "riesgo": "Bajo/Medio/Alto",
   "decision": "Avanzar/Avanzar con cautela/Pedir validacion/Descartar",
   "confianza": "Alta/Media/Baja",
@@ -2588,6 +2823,35 @@ Devuelve SOLO JSON valido:
   "empresa": "Nombre normalizado",
   "website": "URL evaluada o No confirmado",
   "pais_region": "Pais/region observado o No confirmado",
+  "identidad_legal": {{
+    "estado": "Verificada/Parcial/No verificada",
+    "detalle": "Que registro se encontro y que datos coinciden o faltan",
+    "nombre_legal": "Razon social registrada o No confirmado",
+    "numero_registro": "Numero oficial o No confirmado",
+    "registro_consultado": "Nombre del registro oficial o No confirmado",
+    "fuente_url": "URL directa de la fuente oficial o vacio",
+    "coincidencias": ["dato que coincide"],
+    "inconsistencias": ["dato contradictorio"]
+  }},
+  "sanciones": {{
+    "estado": "Sin coincidencias/Posible coincidencia/Coincidencia confirmada/No verificado",
+    "detalle": "Resultado limitado a las fuentes consultadas",
+    "registro_consultado": "OFAC u otra lista oficial",
+    "fuente_url": "URL de la consulta o fuente oficial",
+    "hallazgos": ["coincidencia y elementos de identidad, si existen"]
+  }},
+  "reputacion_adversa": {{
+    "estado": "Sin hallazgos adversos/Hallazgos no confirmados/Hallazgos oficiales/No verificado",
+    "detalle": "Resumen sin convertir acusaciones no verificadas en hechos",
+    "fuente_url": "URL principal",
+    "hallazgos": ["hallazgo, fecha y naturaleza de la fuente"]
+  }},
+  "coherencia_datos": {{
+    "estado": "Coherente/Parcial/Inconsistente/No verificado",
+    "detalle": "Comparacion de datos declarados y observados",
+    "coincidencias": ["dato consistente"],
+    "inconsistencias": ["dato que debe aclararse"]
+  }},
   "senal_positiva": [
     "senal concreta favorable"
   ],
@@ -2604,7 +2868,11 @@ Devuelve SOLO JSON valido:
     {{
       "titulo": "fuente o evidencia",
       "detalle": "que se observo o por que importa",
-      "url": "URL si esta disponible"
+      "url": "URL directa si esta disponible",
+      "categoria": "Registro empresarial/Sanciones/Reputacion/Identidad digital/Capacidad comercial",
+      "nivel_fuente": "Oficial/Prensa confiable/Sitio corporativo/Queja no confirmada",
+      "fecha_consulta": "fecha ISO de la consulta",
+      "verificado": true
     }}
   ],
   "recomendacion_operativa": "Que debe hacer el analista ahora"
@@ -2640,6 +2908,11 @@ Devuelve SOLO JSON valido:
     data = json.loads(raw)
     if not isinstance(data, dict):
         raise ValueError("La respuesta de auditoria no tiene formato valido.")
+    data = _audit_normalize_ai_result(
+        data,
+        grounded=use_google_search,
+        grounding_sources=_audit_grounding_sources(response) if use_google_search else [],
+    )
     evidence = data.get("evidencia", [])
     evidence_count = len(evidence) if isinstance(evidence, list) else 0
     return data, evidence_count, used_model, getattr(response, "usage_metadata", None)
@@ -3753,6 +4026,11 @@ def audit_company(req: CompanyAuditRequest, _token: str = Depends(verify_interna
         "company_name": company_name,
         "website": str(req.website or "").strip(),
         "country": str(req.country or "").strip(),
+        "registration_id": str(req.registration_id or "").strip(),
+        "tax_id": str(req.tax_id or "").strip(),
+        "contact_email": str(req.contact_email or "").strip(),
+        "contact_phone": str(req.contact_phone or "").strip(),
+        "declared_address": str(req.declared_address or "").strip(),
         "product_context": str(req.product_context or "").strip(),
         "notes": str(req.notes or "").strip(),
     }
@@ -3774,7 +4052,8 @@ def audit_company(req: CompanyAuditRequest, _token: str = Depends(verify_interna
             technical_signals = _audit_collect_technical_signals(company_name, discovered_url)
 
         scorecard = technical_signals.get("scorecard", {}) or {}
-        result = _audit_finalize_assessment(result, technical_signals)
+        result = _audit_add_technical_evidence(result, technical_signals)
+        result = _audit_finalize_assessment(result, technical_signals, grounded=engine == "gemini_google_search")
         result["auditoria_tecnica"] = technical_signals
         result["riesgo_tecnico"] = scorecard.get("riesgo_tecnico")
         result["decision_tecnica"] = scorecard.get("decision_tecnica")
@@ -3786,6 +4065,7 @@ def audit_company(req: CompanyAuditRequest, _token: str = Depends(verify_interna
         result["senal_alerta"] = list(dict.fromkeys([*(result.get("senal_alerta") or []), *technical_alerts]))
         result["senal_positiva"] = list(dict.fromkeys([*(result.get("senal_positiva") or []), *technical_positives]))
 
+        evidence_count = len(result.get("evidencia", []) or [])
         tokens_input, tokens_output, tokens_total = db.extract_usage_counts(usage)
         db.log_usage_event(
             username=req.username,
