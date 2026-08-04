@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, ExternalLink, EyeOff, RefreshCcw, Search, ShieldCheck, XCircle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Clock, ExternalLink, RefreshCcw, Search, ShieldCheck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   ackRadarEnmienda,
@@ -476,66 +476,46 @@ export function RadarConsole({ user }: { user: AuthUser }) {
 
       <section className="rounded-xl border border-line bg-panel shadow-sm">
         <div className="border-b border-line p-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
             <label className="relative block flex-1">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">Filtro rapido tipo Excel</span>
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">Buscar en el Radar</span>
               <Search className="pointer-events-none absolute left-3 top-[2.65rem] h-4 w-4 text-slate-400" />
               <input
-                className="h-11 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-blue-100"
-                placeholder="Escribe RFQ, objeto, categoria, agente, enmienda o palabra clave..."
+                className="app-input h-11 w-full pl-9 pr-3"
+                placeholder="RFQ, objeto, categoría, agente o enmienda"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </label>
-            <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted xl:w-56">
+            <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
               Ordenar por
               <select
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
+                className="app-input h-11 text-sm font-medium normal-case tracking-normal"
                 value={sortMode}
                 onChange={(event) => setSortMode(event.target.value as SortMode)}
               >
-                <option value="publicacion">Publicacion mas reciente</option>
+                <option value="publicacion">Publicación más reciente</option>
                 <option value="cierre">Cierre mas cercano</option>
                 <option value="score">Score mas alto</option>
               </select>
             </label>
-            <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted xl:w-52">
-              Fecha a filtrar
-              <select
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                value={dateField}
-                onChange={(event) => setDateField(event.target.value as DateField)}
-              >
-                <option value="publicacion">Publicacion</option>
-                <option value="cierre">Cierre</option>
-              </select>
-            </label>
-            <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted xl:w-44">
-              Desde
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              />
-            </label>
-            <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted xl:w-44">
-              Hasta
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand"
-            >
-              Limpiar
-            </button>
           </div>
+          <details className="mt-3 rounded-lg border border-line bg-slate-50">
+            <summary className="flex min-h-10 list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-ink">
+              <span>Filtros avanzados</span>
+              <StatusBadge tone={activeFilterCount ? "info" : "neutral"}>{activeFilterCount} activos</StatusBadge>
+            </summary>
+            <div className="grid gap-3 border-t border-line p-3 sm:grid-cols-2 xl:grid-cols-[180px_170px_170px_minmax(0,1fr)_auto] xl:items-end">
+              <label className="grid gap-2 text-xs font-semibold uppercase text-muted">Fecha a filtrar<select className="app-input text-sm font-medium normal-case" value={dateField} onChange={(event) => setDateField(event.target.value as DateField)}><option value="publicacion">Publicación</option><option value="cierre">Cierre</option></select></label>
+              <label className="grid gap-2 text-xs font-semibold uppercase text-muted">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="app-input text-sm font-medium normal-case" /></label>
+              <label className="grid gap-2 text-xs font-semibold uppercase text-muted">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="app-input text-sm font-medium normal-case" /></label>
+              <div className="flex min-h-11 flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={hideDiscarded} onChange={(event) => setHideDiscarded(event.target.checked)} className="h-4 w-4 rounded border-line" />Ocultar descartadas</label>
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} className="h-4 w-4 rounded border-line" />Auto {scheduler?.interval_minutes || 25} min</label>
+              </div>
+              <Button type="button" onClick={clearFilters} variant="secondary" size="md">Limpiar filtros</Button>
+            </div>
+          </details>
         </div>
 
         <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -562,37 +542,18 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              {activeFilterCount} filtro(s)
-            </span>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={hideDiscarded}
-                onChange={(event) => setHideDiscarded(event.target.checked)}
-                className="h-4 w-4 rounded border-line"
-              />
-              Ocultar descartadas
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(event) => setAutoRefresh(event.target.checked)}
-                className="h-4 w-4 rounded border-line"
-              />
-              Auto {scheduler?.interval_minutes || 25} min
-            </label>
-            <button
+            <StatusBadge tone="neutral">{visibleRows.length} visibles</StatusBadge>
+            <Button
               onClick={() => {
                 void loadRadar();
                 void loadRadarHealth();
               }}
               disabled={loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-60"
+              variant="secondary"
+              size="md"
             >
-              Actualizar
-            </button>
+              <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Actualizar
+            </Button>
           </div>
         </div>
 
@@ -600,11 +561,35 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           <div className="m-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
         ) : null}
 
-        <div className="overflow-hidden">
+        <div className="grid gap-2 p-3 lg:hidden">
+          {loading ? <div className="app-empty min-h-32">Cargando licitaciones del SLI...</div> : null}
+          {!loading && !visibleRows.length ? <div className="app-empty min-h-32">No hay licitaciones con los filtros seleccionados.</div> : null}
+          {!loading ? visibleRows.map((row) => {
+            const selected = isSameRow(selectedRow, row);
+            const hasAmendmentAlert = radarFlag(row.enmienda_alerta);
+            const closeSoon = isClosingSoon(row);
+            return (
+              <button key={row.id} type="button" onClick={() => setSelectedRow(row)} className={`app-row-button p-3 text-left ${selected ? "app-row-selected" : ""}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><div className="text-sm font-semibold text-brand">RFQ {row.numero_licitacion}</div><div className="mt-1 line-clamp-2 text-sm font-semibold text-ink">{row.objeto || "Sin objeto"}</div></div>
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-brand" />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {hasAmendmentAlert ? <StatusBadge tone="warn"><AlertTriangle className="h-3.5 w-3.5" />Enmienda</StatusBadge> : null}
+                  {closeSoon ? <StatusBadge tone="danger"><Clock className="h-3.5 w-3.5" />{closeLabel(row)}</StatusBadge> : null}
+                  <StatusBadge tone={row.estado_radar === "en_seguimiento" ? "info" : row.estado_radar === "descartada" ? "danger" : "neutral"}>{estadoLabel[String(row.estado_radar || "nueva")] || "Nueva"}</StatusBadge>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted"><span>Publicación<br /><strong className="text-ink">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</strong></span><span>Cierre<br /><strong className="text-ink">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</strong></span></div>
+              </button>
+            );
+          }) : null}
+        </div>
+
+        <div className="hidden overflow-hidden lg:block">
           <table className="app-table">
             <thead>
               <tr>
-                {["Prioridad", "Licitacion", "Objeto / categoria", "Publicacion", "Cierre", "Enmienda", "Score", "Estado", "Acciones"].map((heading) => (
+                {["Licitación / objeto", "Publicación", "Cierre", "Señales", "Score", "Estado"].map((heading) => (
                   <th key={heading}>{heading}</th>
                 ))}
               </tr>
@@ -612,13 +597,13 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted">
                     Cargando licitaciones del SLI...
                   </td>
                 </tr>
               ) : visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted">
                     No hay licitaciones con los filtros seleccionados.
                   </td>
                 </tr>
@@ -630,55 +615,25 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     <tr
                       key={row.id}
                       onClick={() => setSelectedRow(row)}
-                      className={`cursor-pointer hover:bg-slate-50/80 ${rowVisualTone(row, isSameRow(selectedRow, row))}`}
+                      className={`cursor-pointer hover:bg-slate-50/80 ${isSameRow(selectedRow, row) ? "app-row-selected" : rowVisualTone(row, false)}`}
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1.5">
-                          {hasAmendmentAlert ? (
-                            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                              Enmienda
-                            </span>
-                          ) : null}
-                          {closeSoon ? (
-                            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                              <Clock className="h-3.5 w-3.5" />
-                              {closeLabel(row)}
-                            </span>
-                          ) : null}
-                          {!hasAmendmentAlert && !closeSoon ? (
-                            <span className="inline-flex w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                              Normal
-                            </span>
-                          ) : null}
-                        </div>
+                      <td className="max-w-[460px] px-4 py-3">
+                        <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="font-semibold text-brand">RFQ {row.numero_licitacion}</div><div className="mt-1 line-clamp-2 font-medium text-ink">{row.objeto || "Sin objeto"}</div><div className="mt-1 truncate text-xs text-muted">{row.categoria || "Categoría no clasificada"}</div></div><ChevronRight className="mt-1 h-4 w-4 shrink-0 text-brand" /></div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-brand">{row.numero_licitacion}</div>
-                        <div className="mt-1 text-xs text-muted">ID interno {row.id}</div>
-                      </td>
-                      <td className="max-w-[360px] px-4 py-3">
-                        <div className="font-medium text-slate-900">{row.objeto || "Sin objeto"}</div>
-                        <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-                          <span className="text-muted">{row.categoria || "Categoria no clasificada"}</span>
-                          {hasAmendmentAlert && row.estado_radar === "descartada" ? (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
-                              Reabrir revision
-                            </span>
-                          ) : null}
-                        </div>
+                        <div className="font-semibold text-ink">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</div>
+                        <div className="mt-1 text-xs text-muted">Publicación</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</div>
-                        <div className="mt-1 text-xs text-muted">Fecha de publicacion</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</div>
+                        <div className="font-semibold text-ink">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</div>
                         <div className={`mt-1 text-xs font-semibold ${closeSoon ? "text-rose-700" : "text-muted"}`}>{closeLabel(row)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{row.numero_enmienda || "-"}</div>
-                        {hasAmendmentAlert ? <div className="mt-1 text-xs font-semibold text-amber-700">Nueva sin revisar</div> : null}
+                        <div className="flex flex-wrap gap-1.5">
+                          {hasAmendmentAlert ? <StatusBadge tone="warn"><AlertTriangle className="h-3.5 w-3.5" />Enmienda {row.numero_enmienda || "nueva"}</StatusBadge> : null}
+                          {closeSoon ? <StatusBadge tone="danger"><Clock className="h-3.5 w-3.5" />{closeLabel(row)}</StatusBadge> : null}
+                          {!hasAmendmentAlert && !closeSoon ? <StatusBadge tone="neutral">Sin alertas</StatusBadge> : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${scoreTone(row.score_interes)}`}>
@@ -686,89 +641,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone(row.estado_radar)}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone(row.estado_radar)}`}>
                           {estadoLabel[String(row.estado_radar || "nueva")] || row.estado_radar || "Nueva"}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {row.link_sli ? (
-                            <a
-                              href={row.link_sli}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              className="app-btn-mini"
-                            >
-                              SLI <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedRow(row);
-                              setSelectedSliRfq(String(row.numero_licitacion || ""));
-                            }}
-                            className="app-btn-mini"
-                          >
-                            <Search className="h-3.5 w-3.5" />
-                            RFQ
-                          </button>
-                          {hasAmendmentAlert ? (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void handleAck(row.id);
-                              }}
-                              disabled={busy}
-                              className="app-btn-mini border-amber-200 text-amber-800"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Revisada
-                            </button>
-                          ) : null}
-                          {row.estado_radar !== "en_seguimiento" ? (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedRow(row);
-                                void handleEnviarSeguimiento(row, row.notas || "");
-                              }}
-                              disabled={busy}
-                              className="app-btn-mini border-blue-200 text-blue-700"
-                            >
-                              <RefreshCcw className="h-3.5 w-3.5" />
-                              Seguir
-                            </button>
-                          ) : null}
-                          {row.estado_radar !== "revisada" ? (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void handleEstado(row.id, "revisada");
-                              }}
-                              disabled={busy}
-                              className="app-btn-mini border-emerald-200 text-emerald-700"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              OK
-                            </button>
-                          ) : null}
-                          {row.estado_radar !== "descartada" ? (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void handleEstado(row.id, "descartada");
-                              }}
-                              disabled={busy}
-                              className="app-btn-mini app-btn-danger"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Descartar
-                            </button>
-                          ) : null}
-                        </div>
                       </td>
                     </tr>
                   );
@@ -901,58 +776,34 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   />
                 </label>
                 <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-dark"
-                  >
-                    Consultar detalle SLI/RFQ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleEnviarSeguimiento(selectedRow)}
-                    disabled={busy || selectedRow.estado_radar === "en_seguimiento"}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                  >
-                    Enviar a seguimiento
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleEstado(selectedRow.id, (selectedRow.estado_radar as RadarEstado) || "nueva")}
-                    disabled={busy}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand disabled:opacity-50"
-                  >
-                    Guardar comentario
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleEstado(selectedRow.id, "descartada")}
-                    disabled={busy || selectedRow.estado_radar === "descartada"}
-                    className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-50"
-                  >
-                    Descartar del radar operativo
-                  </button>
+                  <Button type="button" onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))} variant="primary" size="md" className="w-full"><Search className="h-4 w-4" />Consultar detalle SLI/RFQ</Button>
+                  {selectedRow.link_sli ? <a href={selectedRow.link_sli} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 w-full items-center justify-center gap-2 px-3 text-sm font-semibold">Abrir portal SLI<ExternalLink className="h-4 w-4" /></a> : null}
+                  <Button type="button" onClick={() => handleEnviarSeguimiento(selectedRow)} disabled={busy || selectedRow.estado_radar === "en_seguimiento"} variant="secondary" size="md" className="w-full"><RefreshCcw className="h-4 w-4" />Enviar a seguimiento</Button>
+                  <Button type="button" onClick={() => handleEstado(selectedRow.id, (selectedRow.estado_radar as RadarEstado) || "nueva")} disabled={busy} variant="ghost" size="md" className="w-full">Guardar comentario</Button>
+                  <Button type="button" onClick={() => handleEstado(selectedRow.id, "descartada")} disabled={busy || selectedRow.estado_radar === "descartada"} variant="danger" size="md" className="w-full">Descartar del radar operativo</Button>
                   {radarFlag(selectedRow.enmienda_alerta) ? (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => handleAck(selectedRow.id)}
                       disabled={busy}
-                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-50"
+                      variant="secondary"
+                      size="md"
+                      className="w-full border-amber-200 text-amber-800"
                     >
                       Marcar enmienda revisada
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-line bg-white p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <details className="mt-4 rounded-xl border border-line bg-white">
+              <summary className="flex list-none flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-brand">Antecedentes historicos</div>
-                  <div className="mt-1 text-base font-semibold text-slate-900">Comparacion contra licitaciones pasadas</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-brand">Antecedentes históricos</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">Comparación contra licitaciones pasadas</div>
                   <p className="mt-1 text-sm text-muted">
-                    Coincidencias por numero, codigo ACP detectado y palabras del objeto. Sirve como primera senal para decidir si conviene revisar.
+                    Abre esta sección para consultar códigos ACP, precios y resultados anteriores.
                   </p>
                 </div>
                 {loadingHistorico ? (
@@ -962,7 +813,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     Mejor match: {numberValue(historicoMatch?.summary?.mejor_match).toFixed(0)}
                   </span>
                 )}
-              </div>
+              </summary>
+
+              <div className="border-t border-line p-4">
 
               <div className="mt-4 grid gap-3 md:grid-cols-4">
                 {[
@@ -1101,7 +954,8 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   </tbody>
                 </table>
               </div>
-            </div>
+              </div>
+            </details>
           </div>
         ) : null}
 

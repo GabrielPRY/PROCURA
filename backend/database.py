@@ -130,6 +130,8 @@ def init_db():
         fecha_registro TEXT
     )''')
     c.execute("ALTER TABLE seguimiento_licitaciones ADD COLUMN IF NOT EXISTS owner_username TEXT")
+    c.execute("ALTER TABLE seguimiento_licitaciones ADD COLUMN IF NOT EXISTS sli_snapshot_json TEXT")
+    c.execute("ALTER TABLE seguimiento_licitaciones ADD COLUMN IF NOT EXISTS sli_checked_at TEXT")
     c.execute("""
         UPDATE seguimiento_licitaciones
         SET owner_username = COALESCE(NULLIF(owner_username, ''), NULLIF(responsable, ''), 'Sistema')
@@ -1733,6 +1735,23 @@ def actualizar_estado(licitacion_id, nuevo_estado, nota, registrado_por):
                  VALUES (%s, %s, %s, %s, %s)""", (licitacion_id, fecha, nuevo_estado, nota_limpia, registrado_por))
     conn.commit()
     conn.close()
+
+def guardar_snapshot_sli(licitacion_id, snapshot):
+    conn = get_connection()
+    c = conn.cursor()
+    checked_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = json.dumps(snapshot or {}, ensure_ascii=False, default=str)
+    c.execute(
+        """UPDATE seguimiento_licitaciones
+           SET sli_snapshot_json=%s, sli_checked_at=%s
+           WHERE id=%s
+           RETURNING id""",
+        (payload, checked_at, licitacion_id),
+    )
+    row = c.fetchone()
+    conn.commit()
+    conn.close()
+    return {"id": row[0], "sli_checked_at": checked_at} if row else None
 
 def get_historial_seguimiento(licitacion_id):
     conn = get_connection()

@@ -1,232 +1,165 @@
-﻿"use client";
+"use client";
 
-import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, FileText, FolderOpen, PackageSearch, Radar, RefreshCw, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModuleSection } from "@/components/ui/module-section";
+import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { getAllowedModules, type ModuleId } from "@/lib/navigation";
 import { getRadarStats } from "@/lib/radar";
+import { getLogisticsCalculations, getLogisticsCarriersStatus, getLogisticsSettings } from "@/lib/logistics";
 
 type DashboardAction = {
   module: ModuleId;
   title: string;
   copy: string;
   icon: LucideIcon;
-  primary?: boolean;
 };
 
-const quickActions: DashboardAction[] = [
-  { module: "rfq", title: "Analizar RFQ", copy: "Cargar pliego, anexos y matriz tecnica.", icon: FileText, primary: true },
-  { module: "costos", title: "Comparar costos", copy: "Historico y referencia de precio.", icon: BarChart3 },
-  { module: "proveedores", title: "Buscar proveedores", copy: "Sourcing global por renglon.", icon: PackageSearch },
-  { module: "seguimiento", title: "Seguimiento", copy: "Estados SLI y comentarios operativos.", icon: ClipboardList },
-  { module: "logistica", title: "Calcular logistica", copy: "Peso, dimensiones, forwarder e incoterm.", icon: Truck },
-  { module: "radar", title: "Revisar Radar", copy: "Licitaciones abiertas y enmiendas.", icon: Radar },
-  { module: "auditor_empresas", title: "Auditar proveedor", copy: "Validar riesgo comercial.", icon: ShieldCheck },
-  { module: "historico", title: "Consultar historico", copy: "Precios y participaciones corporativas.", icon: BarChart3 },
-  { module: "workspaces", title: "Abrir workspace", copy: "Recuperar analisis guardados.", icon: FolderOpen }
-];
+const actions: Record<ModuleId, DashboardAction> = {
+  dashboard: { module: "dashboard", title: "Dashboard", copy: "Resumen de trabajo.", icon: BarChart3 },
+  rfq: { module: "rfq", title: "Analizar RFQ", copy: "Carga el pliego y revisa sus renglones.", icon: FileText },
+  evaluacion: { module: "evaluacion", title: "Evaluación", copy: "Compara propuestas.", icon: ShieldCheck },
+  rfq_email: { module: "rfq_email", title: "Preparar correo", copy: "Genera la solicitud de cotización.", icon: Mail },
+  ai_command: { module: "ai_command", title: "Centro IA", copy: "Consulta de procura.", icon: ShieldCheck },
+  costos: { module: "costos", title: "Comparar costos", copy: "Revisa precios y participaciones anteriores.", icon: BarChart3 },
+  fichas: { module: "fichas", title: "Fichas", copy: "Documentación técnica.", icon: FileText },
+  radar: { module: "radar", title: "Revisar Radar", copy: "Prioriza aperturas, cierres y enmiendas.", icon: Radar },
+  seguimiento: { module: "seguimiento", title: "Abrir seguimiento", copy: "Consulta cambios del SLI y comentarios.", icon: ClipboardList },
+  proveedores: { module: "proveedores", title: "Buscar proveedores", copy: "Encuentra candidatos para los renglones activos.", icon: PackageSearch },
+  auditor_empresas: { module: "auditor_empresas", title: "Auditar proveedor", copy: "Valida identidad y riesgo comercial.", icon: ShieldCheck },
+  historico: { module: "historico", title: "Consultar histórico", copy: "Busca productos y licitaciones anteriores.", icon: BarChart3 },
+  workspaces: { module: "workspaces", title: "Espacios guardados", copy: "Recupera expedientes de trabajo.", icon: FolderOpen },
+  logistica: { module: "logistica", title: "Calcular logística", copy: "Cotiza el tránsito doméstico en Estados Unidos.", icon: Truck },
+  metricas: { module: "metricas", title: "Métricas", copy: "Actividad y consumo.", icon: BarChart3 },
+  admin: { module: "admin", title: "Administración", copy: "Usuarios, APIs y sistema.", icon: ShieldCheck }
+};
 
-function roleIntro(role: string) {
-  if (role === "Supervisor") {
-    return {
-      title: "Centro supervisor",
-      subtitle: "Prioriza licitaciones abiertas, revisa enmiendas y entra rapido al flujo de analisis."
-    };
-  }
-  if (role === "Gerencia") {
-    return {
-      title: "Vista gerencial",
-      subtitle: "Resumen para decidir carga operativa, oportunidades, costos y salud del sistema."
-    };
-  }
-  if (role === "Logistica") {
-    return {
-      title: "Mesa logistica",
-      subtitle: "Administra calculos, forwarders, dimensiones y referencias historicas."
-    };
-  }
-  return {
-    title: "Mesa de analisis",
-    subtitle: "Empieza por el RFQ, revisa costos, busca proveedores y deja seguimiento claro."
-  };
-}
-
-function roleWorkflow(role: string) {
-  if (role === "Logistica") {
-    return [
-      { title: "Mantener tarifas", copy: "Actualiza forwarders y costos que utilizará todo el equipo." },
-      { title: "Calcular embarque", copy: "Registra bultos, peso y dimensiones para obtener el costo estimado." },
-      { title: "Consultar referencias", copy: "Revisa cálculos guardados e histórico antes de confirmar." }
-    ];
-  }
-  if (role === "Supervisor" || role === "Gerencia") {
-    return [
-      { title: "Priorizar oportunidades", copy: "Revisa Radar, enmiendas y cierres próximos." },
-      { title: "Validar el análisis", copy: "Abre el RFQ y confirma requisitos técnicos y comerciales." },
-      { title: "Dar seguimiento", copy: "Consulta el estado real del SLI y los comentarios del equipo." }
-    ];
-  }
-  return [
-    { title: "Analizar RFQ", copy: "Carga el pliego y confirma requisitos por renglón." },
-    { title: "Comparar costos", copy: "Consulta referencias históricas antes de definir el precio." },
-    { title: "Buscar y contactar", copy: "Localiza proveedores y prepara el correo de cotización." },
-    { title: "Dar seguimiento", copy: "Mantén visible el estado del proceso después de participar." }
-  ];
+function dashboardDefinition(role: string) {
+  if (role === "Supervisor") return { title: "Prioridades del equipo", copy: "Revisa oportunidades, cambios del SLI y procesos que requieren atención.", primary: "radar" as ModuleId, shortcuts: ["rfq", "seguimiento", "costos", "proveedores"] as ModuleId[] };
+  if (role === "Gerencia") return { title: "Resumen gerencial", copy: "Consulta oportunidades, actividad y referencias para decidir con rapidez.", primary: "radar" as ModuleId, shortcuts: ["seguimiento", "costos", "historico", "metricas"] as ModuleId[] };
+  if (role === "Logistica") return { title: "Mesa logística", copy: "Cotiza transportes y consulta referencias guardadas por el equipo.", primary: "logistica" as ModuleId, shortcuts: ["historico", "workspaces"] as ModuleId[] };
+  return { title: "Tu jornada de procura", copy: "Analiza el RFQ y continúa con costos, proveedores y seguimiento.", primary: "rfq" as ModuleId, shortcuts: ["costos", "proveedores", "seguimiento", "rfq_email"] as ModuleId[] };
 }
 
 export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
   const role = normalizeRole(user.role);
-  const intro = roleIntro(role);
-  const workflow = roleWorkflow(role);
-  const allowedModules = useMemo(() => getAllowedModules(user).map((item) => item.id), [user]);
-  const allowed = useMemo(() => new Set(allowedModules), [allowedModules]);
+  const definition = dashboardDefinition(role);
+  const allowed = useMemo(() => new Set(getAllowedModules(user).map((item) => item.id)), [user]);
   const [radarStats, setRadarStats] = useState({ total: 0, alertas: 0, seguimiento: 0, cierre72h: 0 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(allowed.has("radar"));
+  const [logisticsStats, setLogisticsStats] = useState({ calculations: 0, forwarders: 0, carrierReady: false });
+  const [loadingLogistics, setLoadingLogistics] = useState(role === "Logistica");
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    const tasks: Array<Promise<unknown>> = [];
-
-    if (allowed.has("radar")) {
-      tasks.push(
-        getRadarStats()
-          .then((response) => {
-            if (!mounted) return;
-            setRadarStats({
-              total: response.total ?? 0,
-              alertas: response.alertas ?? 0,
-              seguimiento: response.en_seguimiento ?? 0,
-              cierre72h: response.cierre_72h ?? 0,
-            });
-          })
-          .catch(() => {
-            if (mounted) setRadarStats({ total: 0, alertas: 0, seguimiento: 0, cierre72h: 0 });
-          })
-      );
+    if (!allowed.has("radar")) {
+      setLoading(false);
+      return () => { mounted = false; };
     }
-
-    Promise.allSettled(tasks).finally(() => {
-      if (mounted) setLoading(false);
-    });
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    getRadarStats()
+      .then((response) => {
+        if (!mounted) return;
+        setRadarStats({
+          total: response.total ?? 0,
+          alertas: response.alertas ?? 0,
+          seguimiento: response.en_seguimiento ?? 0,
+          cierre72h: response.cierre_72h ?? 0
+        });
+      })
+      .catch(() => {
+        if (mounted) setRadarStats({ total: 0, alertas: 0, seguimiento: 0, cierre72h: 0 });
+      })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, [allowed]);
 
-  const filteredActions = quickActions.filter((action) => allowed.has(action.module));
-  const defaultPrimary = filteredActions.find((action) => action.primary) || filteredActions[0];
-  const primaryAction = role === "Logistica" && defaultPrimary?.module === "logistica"
-    ? { ...defaultPrimary, title: "Gestionar logística", copy: "Tarifas globales y calculadora." }
-    : defaultPrimary;
-  const secondaryActions = filteredActions.filter((action) => action.module !== primaryAction?.module);
-  const PrimaryIcon = primaryAction?.icon;
-  const dashboardStats = allowed.has("radar")
-    ? [
-        { label: "Licitaciones abiertas", value: radarStats.total, hint: `${radarStats.cierre72h} cierran en 72 horas`, icon: Radar },
-        { label: "En seguimiento", value: radarStats.seguimiento, hint: "Procesos activos del equipo", icon: ClipboardList },
-        { label: "Enmiendas pendientes", value: radarStats.alertas, hint: "Cambios detectados por SLI", icon: AlertTriangle }
-      ]
-    : [];
+  useEffect(() => {
+    let mounted = true;
+    if (role !== "Logistica") {
+      setLoadingLogistics(false);
+      return () => { mounted = false; };
+    }
+    setLoadingLogistics(true);
+    Promise.all([getLogisticsCalculations(100), getLogisticsSettings(), getLogisticsCarriersStatus()])
+      .then(([history, settings, carriers]) => {
+        if (!mounted) return;
+        setLogisticsStats({
+          calculations: history.calculations?.length || 0,
+          forwarders: (settings.forwarders || []).filter((item) => item.activo !== false).length,
+          carrierReady: Boolean(carriers.carriers?.shipstation?.configured)
+        });
+      })
+      .catch(() => {
+        if (mounted) setLogisticsStats({ calculations: 0, forwarders: 0, carrierReady: false });
+      })
+      .finally(() => { if (mounted) setLoadingLogistics(false); });
+    return () => { mounted = false; };
+  }, [role]);
+
+  const primary = allowed.has(definition.primary) ? actions[definition.primary] : actions[[...allowed][0] as ModuleId];
+  const shortcuts = definition.shortcuts.filter((id) => allowed.has(id)).map((id) => actions[id]);
+  const PrimaryIcon = primary?.icon;
 
   return (
     <div className="space-y-5">
-      <ModuleSection className="app-dashboard-intro">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone="info">Dashboard | {role}</StatusBadge>
-              <StatusBadge tone={loading ? "warn" : "ok"}>
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "Actualizando" : "Listo"}
-              </StatusBadge>
-            </div>
-            <h2 className="mt-4 text-2xl font-semibold text-ink">{intro.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{intro.subtitle}</p>
-          </div>
-          {primaryAction && PrimaryIcon ? (
-            <Button variant="primary" size="lg" onClick={() => onModuleChange?.(primaryAction.module)}>
+      <ModuleSection>
+        <PageHeader
+          eyebrow={`${role} · ${user.username}`}
+          title={definition.title}
+          copy={definition.copy}
+          actions={primary && PrimaryIcon ? (
+            <Button variant="primary" size="lg" onClick={() => onModuleChange?.(primary.module)}>
               <PrimaryIcon className="h-4 w-4" />
-              {primaryAction.title}
+              {primary.title}
             </Button>
           ) : null}
-        </div>
+        />
       </ModuleSection>
 
-      {dashboardStats.length ? (
+      {allowed.has("radar") ? (
         <section className="grid gap-3 sm:grid-cols-3">
-          {dashboardStats.map((stat) => (
-            <StatCard key={stat.label} loading={loading} label={stat.label} value={stat.value} hint={stat.hint} icon={stat.icon} />
-          ))}
+          <StatCard loading={loading} label="Licitaciones abiertas" value={radarStats.total} hint={`${radarStats.cierre72h} cierran en 72 horas`} icon={Radar} />
+          <StatCard loading={loading} label="En seguimiento" value={radarStats.seguimiento} hint="Procesos activos del equipo" icon={ClipboardList} />
+          <StatCard loading={loading} label="Cambios detectados" value={radarStats.alertas} hint="Enmiendas o revisiones" icon={AlertTriangle} />
         </section>
       ) : null}
 
-      {allowed.has("radar") && (radarStats.alertas || radarStats.cierre72h) ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <div className="font-semibold">Atencion del Radar</div>
-              <p className="mt-1 leading-6">
-                Hay {radarStats.alertas} alerta(s) de enmienda y {radarStats.cierre72h} licitacion(es) cerrando en 72 horas.
-              </p>
-            </div>
-          </div>
+      {role === "Logistica" ? (
+        <section className="grid gap-3 sm:grid-cols-3">
+          <StatCard loading={loadingLogistics} label="Cotizaciones guardadas" value={logisticsStats.calculations} hint="Referencias disponibles" icon={Truck} />
+          <StatCard loading={loadingLogistics} label="Forwarders activos" value={logisticsStats.forwarders} hint="Destinos compartidos" icon={FolderOpen} />
+          <StatCard loading={loadingLogistics} label="Transportista" value={logisticsStats.carrierReady ? "Conectado" : "Pendiente"} hint="Estado de tarifas en vivo" icon={ShieldCheck} />
+        </section>
+      ) : null}
+
+      {allowed.has("radar") && !loading && (radarStats.alertas > 0 || radarStats.cierre72h > 0) ? (
+        <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span><strong>Requiere atención:</strong> {radarStats.alertas} cambio(s) detectado(s) y {radarStats.cierre72h} cierre(s) dentro de 72 horas.</span>
         </div>
       ) : null}
 
-      <ModuleSection>
-        <div className="text-sm font-semibold text-ink">Ruta de trabajo</div>
-        <p className="mt-1 text-sm text-muted">Un orden simple para completar el proceso sin saltar pasos importantes.</p>
-        <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {workflow.map((step, index) => (
-            <li key={step.title} className="flex min-w-0 gap-3 border-l-2 border-blue-200 py-1 pl-3 dark:border-blue-500/40">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-brand dark:bg-blue-500/15">{index + 1}</span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-ink">{step.title}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted">{step.copy}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </ModuleSection>
-
-      <section>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {shortcuts.length ? (
+        <ModuleSection>
           <div>
-            <div className="text-sm font-semibold text-ink">Herramientas disponibles</div>
-            <p className="mt-1 text-sm text-muted">Selecciona una herramienta para continuar.</p>
+            <h2 className="text-base font-semibold text-ink">Accesos de trabajo</h2>
+            <p className="mt-1 text-sm text-muted">Continúa directamente con las tareas más utilizadas.</p>
           </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {secondaryActions.map((action) => (
-            <button
-              key={action.module}
-              type="button"
-              onClick={() => onModuleChange?.(action.module)}
-              className="app-action-card group relative w-full overflow-hidden p-4 text-left focus-visible:outline-none"
-            >
-              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-brand transition group-hover:bg-brand group-hover:text-white">
-                Abrir <ArrowRight className="h-3 w-3" />
-              </span>
-              <div className="flex items-start gap-3 pr-16">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand transition group-hover:bg-brand group-hover:text-white">
-                  <action.icon className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-base font-semibold text-ink">{action.title}</span>
-                  <span className="mt-1 block text-sm leading-5 text-muted">{action.copy}</span>
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {shortcuts.map((action) => (
+              <button key={action.module} type="button" onClick={() => onModuleChange?.(action.module)} className="app-action-card flex min-h-28 w-full items-start gap-3 p-4 text-left">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand dark:bg-blue-500/10"><action.icon className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{action.title}</span><span className="mt-1 block text-xs leading-5 text-muted">{action.copy}</span></span>
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-brand" />
+              </button>
+            ))}
+          </div>
+        </ModuleSection>
+      ) : null}
     </div>
   );
 }
-

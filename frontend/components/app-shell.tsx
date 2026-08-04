@@ -1,19 +1,25 @@
-﻿"use client";
+"use client";
 
-import { CheckCircle2, ChevronDown, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Moon, MoreHorizontal, Sun, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/ui/cn";
-import { getAllowedModules, getModuleLabel, type ModuleId } from "@/lib/navigation";
-import { cleanValue, loadLastRfq } from "@/lib/rfq";
+import { getAllowedModules, type ModuleId } from "@/lib/navigation";
 
-function shellCopy(role: string) {
-  if (role === "Admin") return { eyebrow: "Procura AI Control", title: "Admin Console", environment: "Consola administrativa" };
-  if (role === "Logistica") return { eyebrow: "Procura AI", title: "Logistics Desk", environment: "Beta interna" };
-  return { eyebrow: "Procura AI", title: "Sourcing Console", environment: "Beta interna" };
+const primaryByRole: Record<string, ModuleId[]> = {
+  Analista: ["dashboard", "rfq", "costos", "proveedores", "seguimiento"],
+  Supervisor: ["dashboard", "radar", "rfq", "costos", "seguimiento", "proveedores"],
+  Gerencia: ["dashboard", "radar", "rfq", "costos", "seguimiento", "proveedores"],
+  Logistica: ["dashboard", "logistica", "historico", "workspaces"],
+  Admin: ["admin", "metricas"]
+};
+
+function productName(role: string) {
+  if (role === "Admin") return "Administración";
+  if (role === "Logistica") return "Logística";
+  return "Sourcing Console";
 }
 
 export function AppShell({
@@ -31,11 +37,13 @@ export function AppShell({
 }) {
   const role = normalizeRole(user.role);
   const visibleItems = useMemo(() => getAllowedModules(user), [user]);
-  const activeItem = visibleItems.find((item) => item.id === activeModule);
+  const preferred = primaryByRole[role] || [];
+  const primaryItems = visibleItems.filter((item) => preferred.includes(item.id));
+  const moreItems = visibleItems.filter((item) => !preferred.includes(item.id));
+  const activeInMore = moreItems.some((item) => item.id === activeModule);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [navOpen, setNavOpen] = useState(true);
-  const [activeRfqLabel, setActiveRfqLabel] = useState("");
-  const shell = shellCopy(role);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -43,13 +51,6 @@ export function AppShell({
       if (saved === "dark" || saved === "light") setTheme(saved);
     } catch {
       setTheme("light");
-    }
-    try {
-      const savedNav = window.localStorage.getItem("procura_nav_open");
-      // Default open; only collapse if explicitly saved as closed
-      if (savedNav === "false") setNavOpen(false);
-    } catch {
-      // keep default open
     }
   }, []);
 
@@ -60,24 +61,9 @@ export function AppShell({
   }, [activeModule, onModuleChange, visibleItems]);
 
   useEffect(() => {
-    if (role === "Admin") {
-      setActiveRfqLabel("");
-      return;
-    }
-    try {
-      const saved = loadLastRfq(user.username);
-      if (!saved) {
-        setActiveRfqLabel("");
-        return;
-      }
-      const cg = (saved.condiciones_generales || {}) as Record<string, unknown>;
-      const number = cleanValue(cg.numero_licitacion || cg.licitacion || cg.rfq_id, "RFQ sin numero");
-      const count = saved.items?.length || 0;
-      setActiveRfqLabel(`${number} | ${count} renglon(es)`);
-    } catch {
-      setActiveRfqLabel("");
-    }
-  }, [activeModule, role, user.username]);
+    setMobileOpen(false);
+    setMoreOpen(false);
+  }, [activeModule]);
 
   function toggleTheme() {
     setTheme((current) => {
@@ -85,127 +71,98 @@ export function AppShell({
       try {
         window.localStorage.setItem("procura_theme", next);
       } catch {
-        // Theme still changes for this session.
+        // The theme remains active for the current session.
       }
       return next;
     });
   }
 
-  function toggleNav() {
-    setNavOpen((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem("procura_nav_open", String(next));
-      } catch {
-        // Nav still toggles for this session.
-      }
-      return next;
-    });
+  function navButton(item: (typeof visibleItems)[number], mobile = false) {
+    const active = item.id === activeModule;
+    const Icon = item.icon;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => onModuleChange(item.id)}
+        title={item.description}
+        className={cn(
+          "app-top-nav-button inline-flex min-w-0 items-center gap-2 border text-sm font-semibold",
+          mobile ? "h-11 w-full justify-start px-3" : "h-10 justify-center px-3",
+          active && "app-top-nav-button-active"
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{item.label}</span>
+      </button>
+    );
   }
 
   return (
     <div className={cn("app-shell-root min-h-screen", theme === "dark" && "dark")}>
-      <header className="sticky top-0 z-40 border-b border-line bg-white/95 shadow-sm backdrop-blur dark:bg-slate-950/95">
-        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-4 py-3 sm:px-5 xl:px-7">
+      <header className="app-header sticky top-0 z-40 border-b border-line">
+        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center justify-between gap-4 px-4 sm:px-5 xl:px-7">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-sm">PA</div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand text-xs font-black text-white">PA</div>
             <div className="min-w-0">
-              <div className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-brand">{shell.eyebrow}</div>
-              <div className="truncate text-lg font-semibold text-slate-950 dark:text-white">{shell.title}</div>
-            </div>
-            <div className="hidden items-center gap-2 border-l border-line pl-3 lg:flex">
-              <StatusBadge tone="info">{role}</StatusBadge>
-              <StatusBadge tone="ok">Beta</StatusBadge>
+              <div className="truncate text-[11px] font-bold uppercase text-brand">Procura AI</div>
+              <div className="truncate text-base font-semibold text-ink">{productName(role)}</div>
             </div>
           </div>
 
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <div className="hidden max-w-[14rem] items-center rounded-full border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-100 md:inline-flex">
-              <span className="truncate">{user.username}</span>
-            </div>
-            <StatusBadge tone="ok" className="hidden sm:inline-flex">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Sistema
-            </StatusBadge>
-            <Button type="button" onClick={toggleTheme} variant="secondary" size="icon" title={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="hidden max-w-48 truncate px-2 text-sm font-semibold text-ink sm:block">{user.username}</span>
+            <Button type="button" onClick={toggleTheme} variant="ghost" size="icon" title={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"} aria-label={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            
-            <button
-              type="button"
-              onClick={toggleNav}
-              aria-expanded={navOpen}
-              aria-controls="app-main-nav"
-              title={navOpen ? "Ocultar menu" : "Mostrar menu"}
-              className="app-nav-toggle-btn inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-brand focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-95 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              {navOpen ? <X className="h-4 w-4 shrink-0" /> : <Menu className="h-4 w-4 shrink-0" />}
-              <span className="hidden sm:inline">{navOpen ? "Menu" : "Menu"}</span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-300 ${
-                  navOpen ? "rotate-180" : "rotate-0"
-                }`}
-              />
-            </button>
-            <Button onClick={onLogout} variant="secondary" className="app-desktop-logout hidden sm:inline-flex">
+            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="lg:hidden" title="Abrir navegación" aria-label="Abrir navegación" aria-expanded={mobileOpen}>
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+            <Button onClick={onLogout} variant="ghost" size="icon" title="Cerrar sesión" aria-label="Cerrar sesión">
               <LogOut className="h-4 w-4" />
-              Salir
             </Button>
           </div>
         </div>
 
-        <div
-          id="app-main-nav"
-          className="mx-auto w-full max-w-[1800px] overflow-hidden px-4 sm:px-5 xl:px-7"
-          style={{
-            maxHeight: navOpen ? "32rem" : "0px",
-            paddingBottom: navOpen ? "0.75rem" : "0px",
-            transition: "max-height 0.28s cubic-bezier(0.4,0,0.2,1), padding-bottom 0.28s cubic-bezier(0.4,0,0.2,1)",
-          }}
-        >
-          <div className="mb-2 flex min-w-0 flex-wrap items-end justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted">{shell.environment}</div>
-              <h1 className="mt-0.5 truncate text-xl font-semibold text-slate-950 dark:text-white">{getModuleLabel(activeModule)}</h1>
-              {activeItem?.description ? <p className="mt-0.5 hidden truncate text-xs text-muted md:block">{activeItem.description}</p> : null}
-            </div>
-            {activeRfqLabel ? (
-              <div className="max-w-full truncate rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand dark:border-blue-500/40 dark:bg-blue-500/10">
-                RFQ activo: {activeRfqLabel}
+        <div className="hidden border-t border-line lg:block">
+          <nav className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-2 px-4 sm:px-5 xl:px-7" aria-label="Navegación principal">
+            {primaryItems.map((item) => navButton(item))}
+            {moreItems.length ? (
+              <div className="relative ml-auto">
+                <button
+                  type="button"
+                  className={cn("app-top-nav-button inline-flex h-10 items-center gap-2 border px-3 text-sm font-semibold", activeInMore && "app-top-nav-button-active")}
+                  onClick={() => setMoreOpen((current) => !current)}
+                  aria-expanded={moreOpen}
+                  aria-haspopup="menu"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  Más
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
+                </button>
+                {moreOpen ? (
+                  <div className="app-nav-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 border border-line p-2 shadow-lg" role="menu">
+                    {moreItems.map((item) => (
+                      <button key={item.id} type="button" role="menuitem" onClick={() => onModuleChange(item.id)} className={cn("flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800", item.id === activeModule && "bg-blue-50 dark:bg-slate-800")}>
+                        <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                        <span className="min-w-0"><span className="block text-sm font-semibold text-ink">{item.label}</span><span className="mt-0.5 block text-xs leading-5 text-muted">{item.description}</span></span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-          </div>
-
-          <nav className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" aria-label="Navegacion principal">
-            {visibleItems.map((item) => {
-              const active = item.id === activeModule;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onModuleChange(item.id)}
-                  title={`${item.label}: ${item.description}`}
-                  className={cn(
-                    "app-top-nav-button inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border px-2.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-300 sm:justify-start lg:px-3 xl:text-sm",
-                    active
-                      ? "border-blue-200 bg-brand text-white shadow-sm shadow-blue-950/10"
-                      : "border-line bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-brand dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
           </nav>
         </div>
+
+        {mobileOpen ? (
+          <nav className="grid gap-2 border-t border-line p-3 lg:hidden" aria-label="Navegación móvil">
+            {visibleItems.map((item) => navButton(item, true))}
+          </nav>
+        ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-[1800px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">{children}</main>
+      <main className="app-content mx-auto w-full max-w-[1680px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">{children}</main>
     </div>
   );
 }
-
-
-

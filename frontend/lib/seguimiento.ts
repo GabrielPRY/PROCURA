@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api";
+import { type SliLookupResult } from "@/lib/sli";
 
 export type Seguimiento = {
   id: number;
@@ -14,6 +15,8 @@ export type Seguimiento = {
   notas?: string;
   responsable?: string;
   fecha_registro?: string;
+  sli_snapshot?: SliLookupResult | null;
+  sli_checked_at?: string;
 };
 
 export type SeguimientoHistorial = {
@@ -39,6 +42,13 @@ export function createSeguimiento(payload: Partial<Seguimiento>) {
 
 export function getSeguimientoHistorial(id: number) {
   return apiRequest<{ status: string; historial: SeguimientoHistorial[] }>(`/seguimiento/${id}/historial`);
+}
+
+export function saveSeguimientoSliSnapshot(id: number, snapshot: SliLookupResult) {
+  return apiRequest<{ status: string; id: number; sli_checked_at: string }>(`/seguimiento/${id}/sli-snapshot`, {
+    method: "POST",
+    body: JSON.stringify({ snapshot })
+  });
 }
 
 export function updateSeguimientoEstado(id: number, payload: { estado: string; nota: string; registrado_por: string }) {

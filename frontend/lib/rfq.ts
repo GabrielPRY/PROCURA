@@ -38,7 +38,7 @@ export type RfqAnalysisResponse = {
 
 const RFQ_SESSION_PREFIX = "procura_last_rfq_";
 const RFQ_ACTIVE_CONTEXT_PREFIX = "procura_active_rfq_context_";
-const USER_CONFIG_TTL_MS = 5_000;
+const USER_CONFIG_TTL_MS = 5 * 60_000;
 const userConfigCache = new Map<string, { expiresAt: number; promise: Promise<UserConfigResponse> }>();
 
 export type ActiveRfqItemContext = {

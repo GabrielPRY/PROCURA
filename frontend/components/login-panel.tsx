@@ -20,7 +20,7 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
     setError(null);
 
     if (!username.trim() || !password) {
-      setError("Ingresa usuario y contrasena.");
+      setError("Ingresa usuario y contraseña.");
       return;
     }
 
@@ -67,14 +67,14 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">Contrasena</span>
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Contraseña</span>
               <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 transition hover:border-slate-300 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100">
                 <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-400"
-                  placeholder="Contrasena"
+                  placeholder="Contraseña"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                 />
@@ -82,7 +82,8 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-100"
-                  title={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                  title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -100,7 +101,7 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
               type="submit"
               className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Validando..." : "Iniciar sesion"}
+              {loading ? "Validando..." : "Iniciar sesión"}
             </button>
           </form>
         </section>

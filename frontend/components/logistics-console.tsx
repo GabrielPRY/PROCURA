@@ -51,6 +51,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 type ViewId = "rates" | "history" | "settings";
+type RateStep = "route" | "cargo" | "review";
 
 type PackageRow = QuotePackage & {
   id: number;
@@ -295,7 +296,7 @@ function AddressFields({
         <Field label={showForwarders ? "Nombre del forwarder" : "Proveedor / punto de recogida"}>
           <input value={value.name || ""} onChange={(event) => onChange({ ...value, name: event.target.value })} className="app-input" placeholder={showForwarders ? "Nombre del forwarder" : "Nombre del proveedor"} />
         </Field>
-        <Field label="Telefono de contacto">
+        <Field label="Teléfono de contacto (requerido)">
           <input
             type="tel"
             required
@@ -373,6 +374,7 @@ function CarrierState({ configured, environment, name }: { configured?: boolean;
 
 export function LogisticsConsole({ user }: { user: AuthUser }) {
   const [view, setView] = useState<ViewId>("rates");
+  const [rateStep, setRateStep] = useState<RateStep>("route");
   const [rfq, setRfq] = useState<RfqAnalysisResponse | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [forwarders, setForwarders] = useState<Forwarder[]>([]);
@@ -539,6 +541,18 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     ...(canManageLogistics ? [{ id: "settings" as ViewId, label: "Forwarders", icon: Settings2 }] : [])
   ];
 
+  const routeReady = [origin.name, origin.phone, origin.address_line, origin.city, origin.state, origin.postal_code,
+    destination.name, destination.phone, destination.address_line, destination.city, destination.state, destination.postal_code]
+    .every((value) => String(value || "").trim());
+  const cargoReady = packages.length > 0 && packages.every((row) =>
+    row.quantity > 0 && row.weight > 0 && row.length > 0 && row.width > 0 && row.height > 0
+  );
+  const rateSteps: { id: RateStep; label: string; detail: string }[] = [
+    { id: "route", label: "Ruta", detail: "Origen y destino" },
+    { id: "cargo", label: "Carga", detail: "Peso y dimensiones" },
+    { id: "review", label: "Confirmar", detail: "Fecha y tarifa" }
+  ];
+
   function QuoteResults() {
     if (!quotes.length) return null;
     return (
@@ -595,30 +609,55 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
         <>
           <ModuleSection>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><h3 className="text-base font-semibold text-ink">Comparativa de transportistas</h3><p className="mt-1 text-sm text-muted">Ruta doméstica: proveedor en USA <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> forwarder en USA.</p></div>
+              <div><h3 className="text-base font-semibold text-ink">Nueva cotización</h3><p className="mt-1 text-sm text-muted">Completa la ruta, describe la carga y confirma antes de consultar.</p></div>
               <CarrierState name="ShipStation API" configured={carrierStatus?.shipstation.configured} environment={carrierStatus?.shipstation.environment} />
             </div>
             {items.length ? <div className="mt-5"><Field label="Renglón relacionado"><select value={selectedIndex} onChange={(event) => setSelectedIndex(Number(event.target.value))} className="app-input">{items.map((item, index) => <option key={`${item.renglon}-${index}`} value={index}>{itemLabel(item, index)}</option>)}</select></Field></div> : null}
-          </ModuleSection>
 
-          <ModuleSection>
-            <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:divide-x xl:divide-line">
-              <AddressFields title="Origen: proveedor" icon={<MapPin className="h-4 w-4 text-brand" />} value={origin} onChange={setOrigin} forwarders={forwarders} selectedForwarder="" onForwarderChange={() => undefined} autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} />
-              <div className="xl:pl-6"><AddressFields title="Destino: forwarder" icon={<Warehouse className="h-4 w-4 text-brand" />} value={destination} onChange={setDestination} forwarders={forwarders} selectedForwarder={selectedForwarder} onForwarderChange={chooseForwarder} showForwarders autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} /></div>
+            <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line" aria-label="Pasos de la cotización">
+              {rateSteps.map((step, index) => {
+                const active = rateStep === step.id;
+                const complete = (step.id === "route" && routeReady) || (step.id === "cargo" && routeReady && cargoReady) || (step.id === "review" && quotes.length > 0);
+                const disabled = (step.id === "cargo" && !routeReady) || (step.id === "review" && (!routeReady || !cargoReady));
+                return (
+                  <button key={step.id} type="button" disabled={disabled} onClick={() => setRateStep(step.id)} className={`app-logistics-step ${active ? "app-logistics-step-active" : ""}`} aria-current={active ? "step" : undefined}>
+                    <span className={`app-logistics-step-index ${complete ? "app-logistics-step-complete" : ""}`}>{complete ? <Check className="h-3.5 w-3.5" /> : index + 1}</span>
+                    <span className="min-w-0 text-left"><span className="block text-sm font-semibold">{step.label}</span><span className="hidden text-xs text-muted sm:block">{step.detail}</span></span>
+                  </button>
+                );
+              })}
             </div>
-          </ModuleSection>
 
-          <ModuleSection>
-            <div className="flex items-center justify-between gap-3"><div><h3 className="text-base font-semibold text-ink">Carga</h3><p className="mt-1 text-sm text-muted">Peso y dimensiones por cada tipo de unidad.</p></div><StatusBadge tone="neutral">{packages.reduce((sum, row) => sum + row.quantity, 0)} pieza(s)</StatusBadge></div>
-            <div className="mt-4"><PackagesEditor packages={packages} onChange={setPackages} /></div>
-          </ModuleSection>
+            {rateStep === "route" ? (
+              <div className="mt-6">
+                <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:divide-x xl:divide-line">
+                  <AddressFields title="Recoger en el proveedor" icon={<MapPin className="h-4 w-4 text-brand" />} value={origin} onChange={setOrigin} forwarders={forwarders} selectedForwarder="" onForwarderChange={() => undefined} autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} />
+                  <div className="xl:pl-6"><AddressFields title="Entregar en el forwarder" icon={<Warehouse className="h-4 w-4 text-brand" />} value={destination} onChange={setDestination} forwarders={forwarders} selectedForwarder={selectedForwarder} onForwarderChange={chooseForwarder} showForwarders autocompleteEnabled={Boolean(carrierStatus?.address_autocomplete.configured)} /></div>
+                </div>
+                <div className="mt-6 flex justify-end"><Button type="button" onClick={() => setRateStep("cargo")} disabled={!routeReady} variant="primary" size="lg">Continuar a carga<ArrowRight className="h-4 w-4" /></Button></div>
+              </div>
+            ) : null}
 
-          <ModuleSection>
-            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Field label="Fecha de recogida"><input type="date" value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} className="app-input" /></Field>
-              <Field label="Valor declarado (opcional)"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span><input type="number" min={0} step="any" value={declaredValue} onChange={(event) => setDeclaredValue(Number(event.target.value))} className="app-input pl-7" /></div></Field>
-            </div>
-            <div className="mt-5 flex justify-end"><Button type="button" onClick={quoteShipStation} disabled={quoting || !carrierStatus?.shipstation.configured} variant="primary" size="lg">{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}{quoting ? "Consultando transportistas..." : "Comparar tarifas"}</Button></div>
+            {rateStep === "cargo" ? (
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-3"><div><h3 className="text-base font-semibold text-ink">Describe la carga</h3><p className="mt-1 text-sm text-muted">Indica peso y dimensiones por unidad de manejo.</p></div><StatusBadge tone="neutral">{packages.reduce((sum, row) => sum + row.quantity, 0)} pieza(s)</StatusBadge></div>
+                <div className="mt-4"><PackagesEditor packages={packages} onChange={setPackages} /></div>
+                <div className="mt-6 flex flex-wrap justify-between gap-3"><Button type="button" onClick={() => setRateStep("route")} variant="ghost" size="lg">Volver a ruta</Button><Button type="button" onClick={() => setRateStep("review")} disabled={!cargoReady} variant="primary" size="lg">Revisar cotización<ArrowRight className="h-4 w-4" /></Button></div>
+              </div>
+            ) : null}
+
+            {rateStep === "review" ? (
+              <div className="mt-6">
+                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <div className="rounded-lg border border-line bg-slate-50 p-4"><div className="text-xs font-semibold uppercase text-muted">Ruta</div><div className="mt-2 flex items-center gap-2 text-sm font-semibold text-ink"><span className="truncate">{origin.city || "Origen"}, {origin.state || "--"}</span><ArrowRight className="h-4 w-4 shrink-0 text-brand" /><span className="truncate">{destination.city || "Destino"}, {destination.state || "--"}</span></div><div className="mt-2 text-xs text-muted">{packages.reduce((sum, row) => sum + row.quantity, 0)} pieza(s) · {packages.reduce((sum, row) => sum + row.quantity * row.weight, 0)} {packages[0]?.weight_unit === "KGS" ? "kg" : "lb"}</div></div>
+                  <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                    <Field label="Fecha de recogida"><input type="date" value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} className="app-input" /></Field>
+                    <Field label="Valor declarado (opcional)"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span><input type="number" min={0} step="any" value={declaredValue} onChange={(event) => setDeclaredValue(Number(event.target.value))} className="app-input pl-7" /></div></Field>
+                  </div>
+                </div>
+                <div className="mt-6 flex flex-wrap justify-between gap-3"><Button type="button" onClick={() => setRateStep("cargo")} variant="ghost" size="lg">Volver a carga</Button><Button type="button" onClick={quoteShipStation} disabled={quoting || !carrierStatus?.shipstation.configured || !routeReady || !cargoReady} variant="primary" size="lg">{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}{quoting ? "Consultando transportistas..." : "Comparar tarifas"}</Button></div>
+              </div>
+            ) : null}
           </ModuleSection>
           <QuoteResults />
         </>

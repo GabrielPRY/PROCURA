@@ -19,6 +19,9 @@ RADAR_AUTO_SCAN_ENABLED=true
 RADAR_AUTO_SCAN_INTERVAL_MINUTES=25
 RADAR_AUTO_SCAN_ON_STARTUP=false
 BRAVE_SEARCH_API_KEY=
+GEOAPIFY_API_KEY=PEGAR_API_KEY_DE_GEOAPIFY
+SHIPSTATION_API_KEY=PEGAR_API_KEY_DE_SHIPSTATION
+SHIPSTATION_API_BASE_URL=https://api.shipengine.com/v1
 ```
 
 Notas:
@@ -27,6 +30,9 @@ Notas:
 - `ENCRYPTION_KEY` debe ser exactamente la misma para que Railway pueda descifrar llaves/API keys ya guardadas en la base.
 - `FRONTEND_ORIGIN` se completa despues de desplegar el frontend y generar su dominio publico.
 - `BRAVE_SEARCH_API_KEY` puede quedar vacio por ahora.
+- `GEOAPIFY_API_KEY` habilita el autocompletado de direcciones de Estados Unidos.
+- `SHIPSTATION_API_KEY` habilita la comparación de tarifas. Usa primero una clave sandbox con prefijo `TEST_`.
+- Las claves de Geoapify y ShipStation pertenecen solo al backend; no deben agregarse al frontend ni subirse a GitHub.
 
 ## Frontend service
 

@@ -1738,6 +1738,9 @@ class SeguimientoEstadoRequest(BaseModel):
     nota: str = ""
     registrado_por: str = ""
 
+class SeguimientoSliSnapshotRequest(BaseModel):
+    snapshot: Dict[str, Any] = {}
+
 class RfqEmailRequest(BaseModel):
     username: str
     cg: Dict[str, Any] = {}
@@ -2552,6 +2555,39 @@ def _audit_evidence_url(value):
     url = str(value or "").strip()
     return url if url.startswith(("http://", "https://")) else ""
 
+def _audit_source_host(value):
+    try:
+        return (urlparse(_audit_evidence_url(value)).hostname or "").lower().strip(".")
+    except Exception:
+        return ""
+
+def _audit_is_official_source(value):
+    host = _audit_source_host(value)
+    if not host:
+        return False
+    return (
+        host.endswith((".gov", ".gov.uk", ".gov.cn", ".gob.pa", ".gob.mx", ".gob.es", ".europa.eu"))
+        or host in {
+            "gov.uk",
+            "europa.eu",
+            "gleif.org",
+            "www.gleif.org",
+            "company-information.service.gov.uk",
+            "developer.company-information.service.gov.uk",
+            "sec.gov",
+            "www.sec.gov",
+            "ofac.treasury.gov",
+            "sanctionssearch.ofac.treas.gov",
+        }
+    )
+
+def _audit_is_sanctions_source(value):
+    url = _audit_evidence_url(value).lower()
+    host = _audit_source_host(url)
+    if host in {"ofac.treasury.gov", "sanctionssearch.ofac.treas.gov"}:
+        return True
+    return _audit_is_official_source(url) and any(term in url for term in ["sanction", "sancion", "restrictive-measures"])
+
 def _audit_normalize_check(value, default_status="No verificado"):
     section = value if isinstance(value, dict) else {}
     return {
@@ -2582,14 +2618,15 @@ def _audit_normalize_ai_result(result: dict, grounded: bool, grounding_sources=N
     for item in result.get("evidencia", []) if isinstance(result.get("evidencia"), list) else []:
         if not isinstance(item, dict):
             continue
+        source_url = _audit_evidence_url(item.get("url"))
         evidence.append({
             "titulo": str(item.get("titulo") or "Evidencia consultada").strip(),
             "detalle": str(item.get("detalle") or "").strip(),
-            "url": _audit_evidence_url(item.get("url")),
+            "url": source_url,
             "categoria": str(item.get("categoria") or "Investigacion web").strip(),
             "nivel_fuente": str(item.get("nivel_fuente") or "Fuente publica").strip(),
             "fecha_consulta": str(item.get("fecha_consulta") or checked_at).strip(),
-            "verificado": bool(item.get("verificado", False)),
+            "verificado": bool(item.get("verificado", False)) and _audit_is_official_source(source_url),
         })
 
     existing_urls = {item.get("url", "").lower() for item in evidence if item.get("url")}
@@ -2624,7 +2661,7 @@ def _audit_normalize_ai_result(result: dict, grounded: bool, grounding_sources=N
                 "categoria": category,
                 "nivel_fuente": "Fuente declarada por la investigacion",
                 "fecha_consulta": checked_at,
-                "verificado": True,
+                "verificado": _audit_is_official_source(url),
             })
 
     result["evidencia"] = evidence[:40]
@@ -2636,18 +2673,13 @@ def _audit_normalize_ai_result(result: dict, grounded: bool, grounding_sources=N
 
     identity = result["identidad_legal"]
     identity_status = identity.get("estado", "").lower()
-    if "verificad" in identity_status and "no verific" not in identity_status and not identity.get("fuente_url"):
+    if "verificad" in identity_status and "no verific" not in identity_status and not _audit_is_official_source(identity.get("fuente_url")):
         identity["estado"] = "Parcial"
-        identity["detalle"] = f"{identity.get('detalle', '')} Falta una fuente registral enlazada."
+        identity["detalle"] = f"{identity.get('detalle', '')} Falta una fuente registral oficial enlazada."
 
     sanctions = result["sanciones"]
     sanctions_status = sanctions.get("estado", "").lower()
-    sanctions_evidence = any(
-        "ofac" in str(item.get("url", "")).lower()
-        or "sanction" in str(item.get("categoria", "")).lower()
-        or "sancion" in str(item.get("categoria", "")).lower()
-        for item in evidence
-    )
+    sanctions_evidence = any(_audit_is_sanctions_source(item.get("url")) for item in evidence)
     if ("sin coincid" in sanctions_status or "sin hallazgo" in sanctions_status) and not sanctions_evidence:
         sanctions["estado"] = "No verificado"
         sanctions["detalle"] = "No hay una fuente de sanciones enlazada que permita sostener una conclusion negativa."
@@ -4219,7 +4251,17 @@ def seguimiento_list(
     if role == "Admin":
         return {"status": "success", "seguimientos": []}
     df = db.get_seguimientos(username=username, role=role)
-    return {"status": "success", "seguimientos": _json_records(df)}
+    records = _json_records(df)
+    for record in records:
+        raw_snapshot = record.pop("sli_snapshot_json", "")
+        if isinstance(raw_snapshot, dict):
+            record["sli_snapshot"] = raw_snapshot
+        else:
+            try:
+                record["sli_snapshot"] = json.loads(raw_snapshot) if raw_snapshot else None
+            except (TypeError, ValueError, json.JSONDecodeError):
+                record["sli_snapshot"] = None
+    return {"status": "success", "seguimientos": records}
 
 @app.post("/api/v1/seguimiento")
 def seguimiento_create(req: SeguimientoCreateRequest, _token: str = Depends(verify_internal_token)):
@@ -4241,6 +4283,20 @@ def seguimiento_create(req: SeguimientoCreateRequest, _token: str = Depends(veri
     if not seguimiento:
         raise HTTPException(status_code=500, detail="No se pudo crear el seguimiento.")
     return {"status": "success", "seguimiento": seguimiento}
+
+@app.post("/api/v1/seguimiento/{licitacion_id}/sli-snapshot")
+def seguimiento_save_sli_snapshot(
+    licitacion_id: int,
+    req: SeguimientoSliSnapshotRequest,
+    _token: str = Depends(verify_internal_token),
+):
+    serialized = json.dumps(req.snapshot or {}, ensure_ascii=False, default=str)
+    if len(serialized) > 250_000:
+        raise HTTPException(status_code=413, detail="La respuesta del SLI excede el tamaño permitido.")
+    saved = db.guardar_snapshot_sli(licitacion_id, req.snapshot)
+    if not saved:
+        raise HTTPException(status_code=404, detail="El seguimiento no existe.")
+    return {"status": "success", **saved}
 
 @app.get("/api/v1/seguimiento/{licitacion_id}/historial")
 def seguimiento_historial(licitacion_id: int, _token: str = Depends(verify_internal_token)):
@@ -4439,7 +4495,7 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
         )
 
     SLI_HOME_URL = "https://apps.pancanal.com/sli/LicitacionesBusqueda/Welcome"
-    SLI_URL = f"https://apps.pancanal.com/sli/Licitaciones/LicitacionHeaderrfqId={rfq_id}"
+    SLI_URL = f"https://apps.pancanal.com/sli/Licitaciones/LicitacionHeader?rfqId={rfq_id}"
 
     def extraer_resumen_acta(texto_acta, acta_url):
         texto_acta = re.sub(r"\s+", " ", texto_acta or "").strip()
@@ -4481,7 +4537,7 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
             "rechaz", "descalific", "no acept", "aclaracion", "aclaraciÃƒÂ³n"
         ]
 
-        partes = re.split(r"(<=[.!])\s+|\n+", texto_acta)
+        partes = re.split(r"(?<=[.!])\s+|\n+", texto_acta)
         hallazgos = []
 
         for parte in partes:

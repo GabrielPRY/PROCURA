@@ -20,6 +20,7 @@ import {
   deleteSeguimiento,
   getSeguimientoHistorial,
   getSeguimientos,
+  saveSeguimientoSliSnapshot,
   updateSeguimientoEstado,
   type Seguimiento,
   type SeguimientoHistorial
@@ -110,6 +111,10 @@ function normalizeStatus(value?: string | null) {
 }
 
 function suggestedEstadoFromSli(result?: SliLookupResult | null, current = "En Preparacion") {
+  const acta = result?.resumen_acta;
+  if (acta?.posible_adjudicacion_propia) return "Adjudicada";
+  if (acta?.cumplimiento_tecnico === "no_cumple") return "No Cumple Tecnicamente";
+  if (acta?.cumplimiento_tecnico === "cumple") return "Cumple Tecnicamente";
   const status = normalizeStatus(result?.estatus);
   if (status.includes("no adjudicada") || status.includes("no adjudicado")) return "No Adjudicada";
   if (status.includes("adjudicada") || status.includes("adjudicado")) return "Adjudicada";
@@ -180,7 +185,15 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     try {
       const response = await getSeguimientos({ username: user.username, role: user.role });
       const nextItems = response.seguimientos || [];
+      const persistedResults: Record<number, SliLookupResult> = {};
+      const persistedMeta: Record<number, { checkedAt: string; changed?: boolean }> = {};
+      nextItems.forEach((item) => {
+        if (item.sli_snapshot) persistedResults[item.id] = item.sli_snapshot;
+        if (item.sli_checked_at) persistedMeta[item.id] = { checkedAt: item.sli_checked_at, changed: false };
+      });
       setItems(nextItems);
+      setSliResults((current) => ({ ...persistedResults, ...current }));
+      setSyncMeta((current) => ({ ...persistedMeta, ...current }));
       setSelected((current) => current ? nextItems.find((item) => item.id === current.id) || null : current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar seguimiento.");
@@ -270,11 +283,15 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     try {
       const result = await consultarSli(rfq);
       const suggested = suggestedEstadoFromSli(result, item.estado || "En Preparacion");
+      const persisted = await saveSeguimientoSliSnapshot(item.id, result);
+      const snapshotUpdated = { ...item, sli_snapshot: result, sli_checked_at: persisted.sli_checked_at };
       setSliResults((current) => ({ ...current, [item.id]: result }));
       setSyncMeta((current) => ({
         ...current,
-        [item.id]: { checkedAt: new Date().toISOString(), changed: Boolean(suggested && suggested !== item.estado) }
+        [item.id]: { checkedAt: persisted.sli_checked_at, changed: Boolean(suggested && suggested !== item.estado) }
       }));
+      setItems((current) => current.map((row) => row.id === item.id ? snapshotUpdated : row));
+      setSelected((current) => current?.id === item.id ? snapshotUpdated : current);
       if (result.error) setSliErrors((current) => ({ ...current, [item.id]: result.error || "SLI respondió con advertencia." }));
 
       if (syncStatus && suggested && suggested !== item.estado) {
@@ -285,7 +302,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
           result.resumen_acta?.resumen || ""
         ].filter(Boolean).join(" ");
         await updateSeguimientoEstado(item.id, { estado: suggested, nota: notes, registrado_por: "Sistema SLI" });
-        const updated = { ...item, estado: suggested };
+        const updated = { ...snapshotUpdated, estado: suggested };
         setItems((current) => current.map((row) => row.id === item.id ? updated : row));
         setSelected((current) => current?.id === item.id ? updated : current);
         if (selected?.id === item.id) await loadHistory(item.id);
@@ -452,7 +469,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
               <h2 className="text-base font-semibold text-ink">Procesos</h2>
               <p className="mt-1 text-sm text-muted">{filteredItems.length} de {items.length} visibles</p>
             </div>
-            <StatusBadge tone="neutral">Cada 25 min con la app abierta</StatusBadge>
+            <StatusBadge tone="neutral">Lecturas SLI guardadas</StatusBadge>
           </div>
 
           {loading && !items.length ? (
