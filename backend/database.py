@@ -341,6 +341,19 @@ def init_db():
         nuevas INTEGER DEFAULT 0,
         errores TEXT
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS radar_document_analyses (
+        radar_id INTEGER PRIMARY KEY,
+        numero_licitacion TEXT NOT NULL,
+        numero_enmienda TEXT DEFAULT '',
+        document_fingerprint TEXT DEFAULT '',
+        status TEXT DEFAULT 'completed',
+        result_json JSONB DEFAULT '{}'::jsonb,
+        error TEXT DEFAULT '',
+        analyzed_at TIMESTAMPTZ DEFAULT NOW(),
+        analyzed_by TEXT DEFAULT ''
+    )''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_radar_document_analyses_numero ON radar_document_analyses(numero_licitacion)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_radar_document_analyses_date ON radar_document_analyses(analyzed_at DESC)")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS numero_enmienda TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS enmienda_anterior TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS enmienda_alerta BOOLEAN DEFAULT FALSE")
@@ -749,6 +762,104 @@ def _radar_supervisor_recommendation(total=0, ganadas=0, mejor_match=0, has_code
         "motivo": "No hay historial fuerte por codigo o participacion anterior."
     }
 
+def get_radar_document_analysis(radar_id):
+    """Devuelve el ultimo analisis profundo y marca si una enmienda lo dejo obsoleto."""
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT r.numero_licitacion, COALESCE(r.numero_enmienda, ''),
+                   a.numero_enmienda, a.document_fingerprint, a.status,
+                   a.result_json, a.error, a.analyzed_at, a.analyzed_by
+            FROM radar_licitaciones r
+            LEFT JOIN radar_document_analyses a ON a.radar_id = r.id
+            WHERE r.id = %s
+            """,
+            (int(radar_id),),
+        )
+        row = c.fetchone()
+        if not row:
+            return None
+
+        numero, current_amendment, cached_amendment, fingerprint, status, result, error, analyzed_at, analyzed_by = row
+        if cached_amendment is None:
+            return {
+                "available": False,
+                "stale": False,
+                "numero_licitacion": numero,
+                "numero_enmienda_actual": current_amendment or "",
+                "result": None,
+            }
+
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except (TypeError, ValueError):
+                result = {}
+        result = result if isinstance(result, dict) else {}
+        return {
+            "available": True,
+            "stale": str(cached_amendment or "") != str(current_amendment or ""),
+            "numero_licitacion": numero,
+            "numero_enmienda_actual": current_amendment or "",
+            "numero_enmienda_analizada": cached_amendment or "",
+            "document_fingerprint": fingerprint or "",
+            "status": status or "completed",
+            "error": error or "",
+            "analyzed_at": analyzed_at.isoformat() if hasattr(analyzed_at, "isoformat") else str(analyzed_at or ""),
+            "analyzed_by": analyzed_by or "",
+            "result": result,
+        }
+    finally:
+        conn.close()
+
+def save_radar_document_analysis(radar_id, result, analyzed_by=""):
+    """Guarda un analisis verificable sin persistir los archivos RFQ descargados."""
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT numero_licitacion, COALESCE(numero_enmienda, '') FROM radar_licitaciones WHERE id=%s",
+            (int(radar_id),),
+        )
+        radar = c.fetchone()
+        if not radar:
+            return False
+        numero, amendment = radar
+        payload = result if isinstance(result, dict) else {}
+        c.execute(
+            """
+            INSERT INTO radar_document_analyses
+                (radar_id, numero_licitacion, numero_enmienda, document_fingerprint,
+                 status, result_json, error, analyzed_at, analyzed_by)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), %s)
+            ON CONFLICT (radar_id) DO UPDATE SET
+                numero_licitacion = EXCLUDED.numero_licitacion,
+                numero_enmienda = EXCLUDED.numero_enmienda,
+                document_fingerprint = EXCLUDED.document_fingerprint,
+                status = EXCLUDED.status,
+                result_json = EXCLUDED.result_json,
+                error = EXCLUDED.error,
+                analyzed_at = NOW(),
+                analyzed_by = EXCLUDED.analyzed_by
+            """,
+            (
+                int(radar_id),
+                str(numero or ""),
+                str(amendment or ""),
+                str(payload.get("document_fingerprint") or ""),
+                str(payload.get("status") or ("completed" if payload.get("consultado") else "error")),
+                json.dumps(payload, ensure_ascii=False, default=str),
+                str(payload.get("error") or ""),
+                str(analyzed_by or ""),
+            ),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
 def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
     conn = get_connection()
     try:
@@ -782,16 +893,33 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
             " ".join(str(code or "") for code in sli_codes),
             " ".join(str(part or "") for part in sli_text_parts),
         ])
-        codigo_matches = [
-            _clean_codigo_match(match)
-            for match in re.findall(r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b|\b[A-Z]{6}\d{5}\b", str(text_blob).upper())
-        ]
+        if sli_detail:
+            strict_codes = [str(code or "").upper() for code in sli_codes]
+            for item in sli_items if isinstance(sli_items, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                code = item.get("codigo_acp") or item.get("codigo_articulo")
+                if code and str(item.get("estado_codigo") or "confirmado") == "confirmado":
+                    strict_codes.append(str(code).upper())
+            codigo_matches = [
+                _clean_codigo_match(code)
+                for code in strict_codes
+                if re.fullmatch(r"[A-Z]{3}-[A-Z]{3}-\d{5}", code)
+            ]
+        else:
+            codigo_matches = [
+                _clean_codigo_match(match)
+                for match in re.findall(r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b|\b[A-Z]{6}\d{5}\b", str(text_blob).upper())
+            ]
         codigo_matches = [code for code in list(dict.fromkeys(codigo_matches)) if code][:12]
         keywords = _history_keywords(text_blob)
         sli_consultado = bool(sli_detail.get("consultado"))
         sli_error = sli_detail.get("error") or ""
         renglones_count = len(sli_items) if isinstance(sli_items, list) else 0
         pdfs_consultados = sli_detail.get("pdfs_consultados") or []
+        documentos_consultados = sli_detail.get("documentos") or []
+        requiere_ocr = bool(sli_detail.get("requiere_ocr"))
+        analizado_en = sli_detail.get("analizado_en") or ""
 
         params = []
         filters = []
@@ -836,6 +964,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
                     "error": sli_error,
                     "renglones_detectados": sli_items[:12] if isinstance(sli_items, list) else [],
                     "pdfs_consultados": pdfs_consultados[:3] if isinstance(pdfs_consultados, list) else [],
+                    "documentos": documentos_consultados[:8] if isinstance(documentos_consultados, list) else [],
+                    "requiere_ocr": requiere_ocr,
+                    "analizado_en": analizado_en,
                 },
                 "matches": [],
                 "summary": empty_summary,
@@ -908,6 +1039,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
                 "error": sli_error,
                 "renglones_detectados": sli_items[:12] if isinstance(sli_items, list) else [],
                 "pdfs_consultados": pdfs_consultados[:3] if isinstance(pdfs_consultados, list) else [],
+                "documentos": documentos_consultados[:8] if isinstance(documentos_consultados, list) else [],
+                "requiere_ocr": requiere_ocr,
+                "analizado_en": analizado_en,
             },
             "matches": rows,
             "summary": {

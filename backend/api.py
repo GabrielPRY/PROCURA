@@ -423,6 +423,22 @@ def _extract_acp_codes_from_text(text):
     pattern = r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b"
     return list(dict.fromkeys(re.findall(pattern, str(text or "").upper())))
 
+RADAR_ACP_ITEM_START_RE = re.compile(
+    r"^\s*(?:[\u2022\-*]\s*)?(?:(?:rengl[oó]n|l[ií]nea|item|[ií]tem)\s*(?:n[oº°.]*)?\s*#?\s*\d{1,4}\s*[:.\-)\u2013]?\s*|\d{1,4}\s*[.\-):|]\s*)?"
+    r"([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
+    re.IGNORECASE,
+)
+RADAR_ROW_MARKER_RE = re.compile(
+    r"^\s*(?:[\u2022\-*]\s*)?(?:rengl[oó]n|l[ií]nea|item|[ií]tem)\s*(?:n[oº°.]*)?\s*#?\s*(\d{1,4})\s*[:.\-)\u2013]?\s*(.*)$",
+    re.IGNORECASE,
+)
+
+def _extract_radar_item_start_code(value):
+    """Acepta un codigo ACP solo al inicio semantico de un renglón."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    match = RADAR_ACP_ITEM_START_RE.match(text)
+    return match.group(1).upper() if match else ""
+
 def _clean_sli_fragment(value):
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     text = re.sub(r"\s*[:;]\s*$", "", text)
@@ -454,103 +470,80 @@ def _looks_like_sli_label(value):
     }
     return text in labels or text.endswith(":")
 
-def _extract_sli_visible_items(text, limit=80):
-    tokens = [
-        _clean_sli_fragment(token)
-        for token in re.split(r"\|+|\n+", str(text or ""))
-        if _clean_sli_fragment(token)
-    ]
+def _extract_radar_items_from_documents(documents, limit=80):
+    """Extrae renglones con evidencia de documento/pagina sin inferir codigos."""
     items = []
     seen = set()
+    synthetic_row = 0
+    for document in documents or []:
+        document_name = str(document.get("nombre") or "Detalle SLI")
+        document_url = str(document.get("url") or "")
+        document_type = str(document.get("tipo") or ("rfq_pdf" if document_url else "sli_visible"))
+        for page_data in document.get("paginas") or []:
+            page_number = int(page_data.get("pagina") or 0) or None
+            raw_text = str(page_data.get("texto") or "")
+            lines = [
+                _clean_sli_fragment(line)
+                for line in re.split(r"\n+|\|+", raw_text)
+                if _clean_sli_fragment(line)
+            ]
+            for index, line in enumerate(lines):
+                row_match = RADAR_ROW_MARKER_RE.match(line)
+                row_number = row_match.group(1) if row_match else ""
+                candidate = (row_match.group(2) or "").strip() if row_match else line
 
-    def row_match(token):
-        return re.search(r"\b(:rengl.n|l.nea|item)\s*#\s*(\d{1,3})\b", token, flags=re.IGNORECASE)
+                if row_match and not candidate:
+                    for next_line in lines[index + 1:index + 4]:
+                        if not _looks_like_sli_label(next_line):
+                            candidate = next_line
+                            break
 
-    def row_from_window(index):
-        start = max(0, index - 5)
-        end = min(len(tokens), index + 3)
-        for token in tokens[start:end]:
-            match = row_match(token)
-            if match:
-                return f"Renglon {match.group(1)}"
-        return f"Renglon {len(items) + 1}"
+                code = _extract_radar_item_start_code(candidate if row_match else line)
+                if not row_match and not code:
+                    continue
+                if not candidate or _looks_like_sli_label(candidate):
+                    continue
 
-    def description_from_window(index):
-        start = index
-        while start > 0 and not row_match(tokens[start]):
-            if index - start >= 6:
-                break
-            start -= 1
-        end = index + 1
-        while end < len(tokens) and not row_match(tokens[end]):
-            if end - index >= 6:
-                break
-            end += 1
-        parts = []
-        for token in tokens[start:end]:
-            if _looks_like_sli_label(token):
-                continue
-            if re.fullmatch(r"\d{1,3}", token):
-                continue
-            if re.search(r"\b\d{1,2}-[a-z]{3}-\d{4}\b", token, flags=re.IGNORECASE):
-                continue
-            parts.append(token)
-        description = " ".join(parts)
-        description = re.sub(r"\s+", " ", description).strip(" -|")
-        return description[:450]
+                synthetic_row += 1
+                row_label = f"Renglon {row_number}" if row_number else f"Renglon detectado {synthetic_row}"
+                description = candidate
+                if code:
+                    description = RADAR_ACP_ITEM_START_RE.sub("", candidate, count=1).strip(" -:;|")
+                    if len(description) < 8:
+                        for next_line in lines[index + 1:index + 3]:
+                            if not _looks_like_sli_label(next_line) and not RADAR_ROW_MARKER_RE.match(next_line):
+                                description = f"{description} {next_line}".strip()
+                                break
+                description = re.sub(r"\s+", " ", description).strip(" -|")[:450]
+                if not description and not code:
+                    continue
 
-    for index, token in enumerate(tokens):
-        codes = _extract_acp_codes_from_text(token)
-        if not codes:
-            continue
-        row_label = row_from_window(index)
-        description = description_from_window(index)
-        for code in codes:
-            key = (row_label, code)
-            if key in seen:
-                continue
-            seen.add(key)
-            items.append({
-                "renglon": row_label,
-                "codigo_articulo": code,
-                "descripcion": description or "No especificado en el detalle visible del SLI.",
-                "fuente": "sli_visible"
-            })
-            if len(items) >= limit:
-                return items
-
-    for index, token in enumerate(tokens):
-        match = row_match(token)
-        if not match:
-            continue
-        window = tokens[index:min(len(tokens), index + 8)]
-        code_candidates = _extract_acp_codes_from_text(" ".join(window))
-        description = ""
-        for candidate in window[1:]:
-            if _looks_like_sli_label(candidate):
-                continue
-            if _extract_acp_codes_from_text(candidate):
-                continue
-            if len(candidate) >= 8:
-                description = candidate[:450]
-                break
-        if not description and not code_candidates:
-            continue
-        row_label = f"Renglon {match.group(1)}"
-        key = (row_label, code_candidates[0] if code_candidates else description[:80])
-        if key in seen:
-            continue
-        seen.add(key)
-        items.append({
-            "renglon": row_label,
-            "codigo_articulo": code_candidates[0] if code_candidates else None,
-            "descripcion": description or "No especificado en el detalle visible del SLI.",
-            "fuente": "sli_visible"
-        })
-        if len(items) >= limit:
-            break
-
+                key = (row_label, code or "S/C", description[:100])
+                if key in seen:
+                    continue
+                seen.add(key)
+                evidence = line[:500]
+                items.append({
+                    "renglon": row_label,
+                    "codigo_articulo": code or None,
+                    "codigo_acp": code or None,
+                    "estado_codigo": "confirmado" if code else "sin_codigo",
+                    "descripcion": description or "Descripcion no especificada en el documento.",
+                    "fuente": document_type,
+                    "documento": document_name,
+                    "documento_url": document_url or None,
+                    "pagina": page_number,
+                    "evidencia": evidence,
+                })
+                if len(items) >= limit:
+                    return items
     return items
+
+def _extract_sli_visible_items(text, limit=80):
+    return _extract_radar_items_from_documents(
+        [{"nombre": "Detalle visible SLI", "url": "", "paginas": [{"pagina": 1, "texto": str(text or "")}]}],
+        limit=limit,
+    )
 
 @app.get("/api/v1/radar/licitaciones")
 def radar_licitaciones(
@@ -605,7 +598,7 @@ def radar_ack_enmienda(licitacion_id: int, _token: str = Depends(verify_internal
 
 
 def _consultar_sli_visible_detail_for_radar(rfq_id: str):
-    """Consulta ligera del detalle SLI para enriquecer Radar con codigos/renglones visibles."""
+    """Lee bajo demanda el detalle SLI y los PDF RFQ, sin guardar archivos fisicos."""
     rfq_id = "".join(filter(str.isdigit, str(rfq_id or "")))
     if not rfq_id:
         return {"consultado": False, "error": "Numero de licitacion invalido.", "codigos_acp_detectados": [], "renglones_detectados": []}
@@ -623,11 +616,14 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
                 headless=True,
                 args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
             )
-            page = browser.new_page()
+            context = browser.new_context(
+                ignore_https_errors=True,
+                extra_http_headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124"
+                },
+            )
+            page = context.new_page()
             page.set_default_timeout(10000)
-            page.set_extra_http_headers({
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124"
-            })
             page.goto(SLI_HOME_URL, wait_until="domcontentloaded", timeout=20000)
             page.wait_for_selector("#rfqId", timeout=10000)
             page.fill("#rfqId", rfq_id)
@@ -647,25 +643,41 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
             content = page.content()
             soup = BeautifulSoup(content, "html.parser")
             texto_sli = soup.get_text(separator="|", strip=True)
-            pdf_texts = []
+            fingerprint = hashlib.sha256(content.encode("utf-8", errors="ignore"))
             pdf_urls = []
+            documents = [{
+                "nombre": "Detalle visible SLI",
+                "url": page.url,
+                "paginas": [{"pagina": 0, "texto": texto_sli}],
+                "tipo": "sli_visible",
+            }]
+            requiere_ocr = False
             try:
-                candidate_urls = page.evaluate(
+                candidate_links = page.evaluate(
                     """() => Array.from(document.querySelectorAll('a[href]'))
-                        .map(a => ({ href: a.href, text: (a.textContent || '').toLowerCase() }))
+                        .map(a => ({ href: a.href, text: (a.textContent || '').trim() }))
                         .filter(a => a.href && (
                             a.href.toLowerCase().includes('.pdf') ||
                             a.href.toLowerCase().includes('impresion') ||
-                            a.text.includes('pdf') ||
-                            a.text.includes('pliego') ||
-                            a.text.includes('rfq') ||
-                            a.text.includes('documento')
+                            a.text.toLowerCase().includes('pdf') ||
+                            a.text.toLowerCase().includes('pliego') ||
+                            a.text.toLowerCase().includes('rfq') ||
+                            a.text.toLowerCase().includes('documento') ||
+                            a.text.toLowerCase().includes('anexo') ||
+                            a.text.toLowerCase().includes('enmienda')
                         ))
-                        .map(a => a.href)"""
+                        """
                 ) or []
                 seen_pdf = set()
-                for href in candidate_urls:
-                    if href in seen_pdf or len(pdf_urls) >= 3:
+                max_pdfs = max(1, min(12, int(os.getenv("RADAR_RFQ_MAX_PDFS", "8") or 8)))
+                max_pages = max(1, min(80, int(os.getenv("RADAR_RFQ_MAX_PAGES", "40") or 40)))
+                max_bytes = max(1_000_000, int(os.getenv("RADAR_RFQ_MAX_BYTES", "15000000") or 15_000_000))
+                for candidate in candidate_links:
+                    href = str((candidate or {}).get("href") or "")
+                    label = _clean_sli_fragment((candidate or {}).get("text") or "")
+                    if not href or href in seen_pdf or len(pdf_urls) >= max_pdfs:
+                        continue
+                    if urlparse(href).scheme.lower() not in {"http", "https"}:
                         continue
                     seen_pdf.add(href)
                     try:
@@ -674,37 +686,74 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
                         content_type = (response_pdf.headers.get("content-type") or "").lower()
                         if not ("pdf" in content_type or body[:4] == b"%PDF"):
                             continue
-                        if len(body) > 8_000_000:
+                        if len(body) > max_bytes:
+                            logger.warning(f"Radar historico: PDF omitido por tamano ({len(body)} bytes) {href}")
                             continue
                         from pypdf import PdfReader
                         reader = PdfReader(io.BytesIO(body))
-                        extracted = "\n".join((pdf_page.extract_text() or "") for pdf_page in reader.pages[:8])
-                        if extracted.strip():
-                            pdf_urls.append(href)
-                            pdf_texts.append(extracted[:15000])
+                        pages = []
+                        for page_number, pdf_page in enumerate(reader.pages[:max_pages], start=1):
+                            extracted = pdf_page.extract_text() or ""
+                            if extracted.strip():
+                                pages.append({"pagina": page_number, "texto": extracted[:24000]})
+                        if not pages:
+                            requiere_ocr = True
+                            continue
+                        fingerprint.update(body)
+                        pdf_urls.append(href)
+                        fallback_name = os.path.basename(urlparse(href).path) or f"Documento RFQ {len(pdf_urls)}"
+                        documents.append({
+                            "nombre": label or fallback_name,
+                            "url": href,
+                            "paginas": pages,
+                            "tipo": "rfq_pdf",
+                        })
                     except Exception as pdf_exc:
                         logger.warning(f"Radar historico: no se pudo leer PDF SLI {rfq_id}: {pdf_exc}")
             except Exception as link_exc:
                 logger.warning(f"Radar historico: no se pudieron listar PDFs SLI {rfq_id}: {link_exc}")
 
-            texto_total = "|".join([texto_sli, *pdf_texts])
-            codigos = _extract_acp_codes_from_text(texto_total)
-            renglones = _extract_sli_visible_items(texto_total, limit=60)
+            renglones = _extract_radar_items_from_documents(documents, limit=80)
+            codigos = list(dict.fromkeys(
+                str(item.get("codigo_articulo") or "").upper()
+                for item in renglones
+                if item.get("codigo_articulo")
+            ))
+            texto_total = "|".join(
+                str(page_data.get("texto") or "")
+                for document in documents
+                for page_data in (document.get("paginas") or [])
+            )
+            document_summary = [
+                {
+                    "nombre": document.get("nombre"),
+                    "url": document.get("url"),
+                    "tipo": document.get("tipo"),
+                    "paginas_leidas": len(document.get("paginas") or []),
+                }
+                for document in documents
+                if document.get("tipo") == "rfq_pdf"
+            ]
             return {
                 "consultado": True,
+                "status": "completed",
                 "url": page.url,
                 "pdfs_consultados": pdf_urls,
+                "documentos": document_summary,
                 "codigos_acp_detectados": codigos,
                 "renglones_detectados": renglones,
-                "texto_visible": texto_total[:16000],
+                "texto_visible": texto_total[:24000],
+                "document_fingerprint": fingerprint.hexdigest(),
+                "requiere_ocr": requiere_ocr,
+                "analizado_en": datetime.now().isoformat(),
                 "error": None,
             }
     except (PlaywrightError, PlaywrightTimeoutError) as exc:
         logger.warning(f"Radar historico: no se pudo consultar detalle SLI {rfq_id}: {exc}")
-        return {"consultado": False, "error": str(exc)[:300], "codigos_acp_detectados": [], "renglones_detectados": []}
+        return {"consultado": False, "status": "error", "error": str(exc)[:300], "codigos_acp_detectados": [], "renglones_detectados": []}
     except Exception as exc:
         logger.warning(f"Radar historico: error inesperado consultando SLI {rfq_id}: {exc}")
-        return {"consultado": False, "error": str(exc)[:300], "codigos_acp_detectados": [], "renglones_detectados": []}
+        return {"consultado": False, "status": "error", "error": str(exc)[:300], "codigos_acp_detectados": [], "renglones_detectados": []}
     finally:
         if browser:
             try:
@@ -715,7 +764,7 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
 def radar_historico_matches(
     licitacion_id: int,
     limit: int = Query(12, ge=1, le=50),
-    scan_sli: bool = Query(True),
+    scan_sli: bool = Query(False),
     _token: str = Depends(verify_internal_token)
 ):
     initial = db.get_radar_historico_matches(licitacion_id, limit=limit)
@@ -723,14 +772,61 @@ def radar_historico_matches(
         raise HTTPException(status_code=404, detail="Licitacion del radar no encontrada.")
 
     numero = (initial.get("radar") or {}).get("numero_licitacion")
-    needs_sli = scan_sli and numero and not (initial.get("codigo_matches") or [])
-    if needs_sli:
+    cache = db.get_radar_document_analysis(licitacion_id)
+    if scan_sli and numero:
         sli_detail = _consultar_sli_visible_detail_for_radar(str(numero))
+        db.save_radar_document_analysis(licitacion_id, sli_detail, analyzed_by="legacy_get")
+        cache = db.get_radar_document_analysis(licitacion_id)
         result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=sli_detail)
+    elif cache and cache.get("available") and isinstance(cache.get("result"), dict):
+        result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=cache.get("result"))
     else:
         result = initial
-        if scan_sli and numero:
-            result["sli_detail"] = result.get("sli_detail") or {"consultado": False, "renglones_detectados": [], "error": None}
+
+    cache_meta = {key: value for key, value in (cache or {}).items() if key != "result"}
+    result["cache_meta"] = cache_meta or {
+        "available": False,
+        "stale": False,
+        "numero_licitacion": numero,
+    }
+
+    return {"status": "success", **_radar_json_safe(result)}
+
+@app.post("/api/v1/radar/{licitacion_id}/analizar-rfq")
+def radar_analizar_rfq_historico(
+    licitacion_id: int,
+    limit: int = Query(12, ge=1, le=50),
+    force: bool = Query(False),
+    _token: str = Depends(verify_internal_token),
+    session: Dict[str, Any] = Depends(verify_session_token),
+):
+    role = str(session.get("r") or "").strip()
+    if role not in {"Supervisor", "Gerencia", "Analista"}:
+        raise HTTPException(status_code=403, detail="Tu rol no tiene acceso al analisis profundo del Radar.")
+
+    initial = db.get_radar_historico_matches(licitacion_id, limit=limit)
+    if initial is None:
+        raise HTTPException(status_code=404, detail="Licitacion del radar no encontrada.")
+    numero = (initial.get("radar") or {}).get("numero_licitacion")
+    if not numero:
+        raise HTTPException(status_code=400, detail="La licitacion no tiene un numero SLI valido.")
+
+    cache = db.get_radar_document_analysis(licitacion_id)
+    if cache and cache.get("available") and not cache.get("stale") and not force:
+        result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=cache.get("result") or {})
+    else:
+        sli_detail = _consultar_sli_visible_detail_for_radar(str(numero))
+        db.save_radar_document_analysis(
+            licitacion_id,
+            sli_detail,
+            analyzed_by=str(session.get("u") or "frontend"),
+        )
+        cache = db.get_radar_document_analysis(licitacion_id)
+        result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=sli_detail)
+
+    result["cache_meta"] = {
+        key: value for key, value in (cache or {}).items() if key != "result"
+    }
 
     return {"status": "success", **_radar_json_safe(result)}
 

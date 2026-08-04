@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Clock, Extern
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ackRadarEnmienda,
+  analyzeRadarRfq,
   getRadarEscaneos,
   getRadarHistorico,
   getRadarLicitaciones,
@@ -163,6 +164,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const [selectedRow, setSelectedRow] = useState<RadarLicitacion | null>(null);
   const [historicoMatch, setHistoricoMatch] = useState<RadarHistoricoResponse | null>(null);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [historicoError, setHistoricoError] = useState<string | null>(null);
   const [scheduler, setScheduler] = useState<RadarSchedulerStatus | null>(null);
   const [scanLogs, setScanLogs] = useState<RadarScanLog[]>([]);
   const [filtersHydrated, setFiltersHydrated] = useState(false);
@@ -219,6 +221,20 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     } catch {
       setScheduler(null);
       setScanLogs([]);
+    }
+  }
+
+  async function handleAnalyzeRfq(force = false) {
+    if (!selectedRow?.id) return;
+    setLoadingHistorico(true);
+    setHistoricoError(null);
+    try {
+      const response = await analyzeRadarRfq(selectedRow.id, 12, force);
+      setHistoricoMatch(response);
+    } catch (err) {
+      setHistoricoError(err instanceof Error ? err.message : "No se pudo analizar el RFQ seleccionado.");
+    } finally {
+      setLoadingHistorico(false);
     }
   }
 
@@ -283,15 +299,18 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     let mounted = true;
     if (!selectedRow?.id) {
       setHistoricoMatch(null);
+      setHistoricoError(null);
       return;
     }
     setLoadingHistorico(true);
-    getRadarHistorico(selectedRow.id)
+    setHistoricoError(null);
+    getRadarHistorico(selectedRow.id, 12, false)
       .then((response) => {
         if (mounted) setHistoricoMatch(response);
       })
-      .catch(() => {
+      .catch((err) => {
         if (mounted) setHistoricoMatch(null);
+        if (mounted) setHistoricoError(err instanceof Error ? err.message : "No se pudo consultar el análisis guardado.");
       })
       .finally(() => {
         if (mounted) setLoadingHistorico(false);
@@ -332,6 +351,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const closingSoonCount = rows.filter(isClosingSoon).length;
   const lastScan = scanLogs[0];
   const amendmentPriorityRows = rows.filter((row) => radarFlag(row.enmienda_alerta) && ["descartada", "en_seguimiento", "revisada"].includes(String(row.estado_radar || "")));
+  const deepAnalysisAvailable = Boolean(historicoMatch?.cache_meta?.available);
+  const deepAnalysisStale = Boolean(historicoMatch?.cache_meta?.stale);
+  const deepAnalysisFailed = deepAnalysisAvailable && historicoMatch?.cache_meta?.status === "error";
   const activeFilterCount = [
     search.trim(),
     filterMode !== "todas",
@@ -682,42 +704,58 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   ))}
                 </div>
                 <div className={`mt-4 rounded-xl border p-4 ${
-                  historicoMatch?.summary?.total
-                    ? "border-emerald-200 bg-emerald-50/70"
-                    : historicoMatch?.summary?.requiere_revision_rfq
-                      ? "border-amber-200 bg-amber-50/70"
+                  deepAnalysisStale || deepAnalysisFailed
+                    ? "border-amber-200 bg-amber-50/70"
+                    : deepAnalysisAvailable && historicoMatch?.summary?.total
+                      ? "border-emerald-200 bg-emerald-50/70"
                       : "border-blue-100 bg-blue-50/60"
                 }`}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-semibold uppercase tracking-wide text-brand">Cruce historico ACP</div>
                       <div className="mt-1 text-base font-semibold text-slate-900">
                         {loadingHistorico
-                          ? "Leyendo SLI/RFQ y comparando..."
-                          : historicoMatch?.summary?.total
-                            ? `${historicoMatch.summary.total} antecedente(s) encontrado(s)`
-                            : "Sin antecedente historico claro"}
+                          ? "Leyendo RFQ y comparando..."
+                          : deepAnalysisStale
+                            ? "Hay una enmienda pendiente de analizar"
+                            : deepAnalysisFailed
+                              ? "No se pudo completar la lectura del RFQ"
+                            : deepAnalysisAvailable && historicoMatch?.summary?.total
+                              ? `${historicoMatch.summary.total} antecedente(s) encontrado(s)`
+                              : deepAnalysisAvailable
+                                ? "Análisis terminado sin antecedentes claros"
+                                : "RFQ todavía no analizado"}
                       </div>
                       <p className="mt-1 text-sm leading-6 text-slate-700">
-                        {historicoMatch?.summary?.nota || "Al seleccionar una licitacion, el Radar intenta leer SLI/RFQ y cruzar codigos ACP contra el historico."}
+                        {deepAnalysisStale
+                          ? `Se analizó la enmienda ${historicoMatch?.cache_meta?.numero_enmienda_analizada || "anterior"}. Revisa ahora la versión ${historicoMatch?.cache_meta?.numero_enmienda_actual || "actual"}.`
+                          : deepAnalysisFailed
+                            ? historicoMatch?.summary?.sli_error || "El portal o los documentos no respondieron correctamente. Puedes reintentar sin afectar el Radar."
+                          : deepAnalysisAvailable
+                            ? historicoMatch?.summary?.nota
+                            : "Pulsa el botón para abrir únicamente esta licitación, leer sus documentos y comparar sus códigos ACP con el histórico."}
                       </p>
                     </div>
-                    <StatusBadge tone={historicoMatch?.summary?.total ? "ok" : "neutral"}>{historicoMatch?.summary?.total ? "Con historial" : "Sin historial"}</StatusBadge>
+                    <StatusBadge tone={deepAnalysisStale || deepAnalysisFailed ? "warn" : deepAnalysisAvailable ? (historicoMatch?.summary?.total ? "ok" : "neutral") : "info"}>
+                      {deepAnalysisStale ? "Enmienda nueva" : deepAnalysisFailed ? "Reintentar" : deepAnalysisAvailable ? (historicoMatch?.summary?.total ? "Con historial" : "Analizado") : "Bajo demanda"}
+                    </StatusBadge>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                    {[
-                      ["Codigos", String(historicoMatch?.codigo_matches?.length || 0)],
-                      ["Renglones", String(historicoMatch?.summary?.renglones_detectados_count || 0)],
-                      ["PDFs leidos", String(historicoMatch?.summary?.pdfs_consultados_count || 0)],
-                      ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
-                      ["Precio min.", moneyValue(historicoMatch?.summary?.precio_min)]
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-lg border border-white/80 bg-white/80 p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
-                        <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
-                      </div>
-                    ))}
-                  </div>
+                  {deepAnalysisAvailable ? (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      {[
+                        ["Códigos", String(historicoMatch?.codigo_matches?.length || 0)],
+                        ["Renglones", String(historicoMatch?.summary?.renglones_detectados_count || 0)],
+                        ["PDF leídos", String(historicoMatch?.summary?.pdfs_consultados_count || 0)],
+                        ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
+                        ["Precio mín.", moneyValue(historicoMatch?.summary?.precio_min)]
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-lg border border-white/80 bg-white/80 p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {historicoMatch?.codigo_matches?.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {historicoMatch.codigo_matches.slice(0, 6).map((code) => (
@@ -725,6 +763,14 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                       ))}
                     </div>
                   ) : null}
+                  {historicoError ? <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{historicoError}</div> : null}
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Button type="button" onClick={() => handleAnalyzeRfq(deepAnalysisAvailable)} disabled={loadingHistorico} variant="primary" size="md">
+                      {loadingHistorico ? <RefreshCcw className="h-4 w-4 animate-spin" /> : deepAnalysisAvailable ? <RefreshCcw className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                      {loadingHistorico ? "Analizando documentos..." : deepAnalysisStale ? "Analizar enmienda" : deepAnalysisFailed ? "Reintentar análisis" : deepAnalysisAvailable ? "Actualizar análisis" : "Analizar RFQ e histórico"}
+                    </Button>
+                    {deepAnalysisAvailable && historicoMatch?.cache_meta?.analyzed_at ? <span className="text-xs text-muted">Último análisis: {formatDate(historicoMatch.cache_meta.analyzed_at)}</span> : null}
+                  </div>
                 </div>
                 {radarFlag(selectedRow.enmienda_alerta) ? (
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -796,7 +842,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
               </div>
             </div>
 
-            <details className="mt-4 rounded-xl border border-line bg-white">
+            {deepAnalysisAvailable ? <details className="mt-4 rounded-xl border border-line bg-white">
               <summary className="flex list-none flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-brand">Antecedentes históricos</div>
@@ -824,7 +870,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   },
                   {
                     label: "2. Detalle SLI/RFQ",
-                    value: historicoMatch?.summary?.sli_consultado ? "Consultado automaticamente" : "Sin consulta automatica",
+                    value: historicoMatch?.summary?.sli_consultado ? "Consultado bajo demanda" : "Consulta incompleta",
                     done: Boolean(historicoMatch?.summary?.sli_consultado),
                     active: loadingHistorico
                   },
@@ -878,21 +924,32 @@ export function RadarConsole({ user }: { user: AuthUser }) {
               ) : null}
               {historicoMatch?.summary?.sli_error ? (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  No se pudo leer automaticamente el detalle SLI. La comparacion queda preliminar: {historicoMatch.summary.sli_error}
+                  No se pudo completar la lectura del SLI. La comparación queda preliminar: {historicoMatch.summary.sli_error}
+                </div>
+              ) : null}
+              {historicoMatch?.sli_detail?.requiere_ocr ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Uno o más documentos parecen escaneados y no contienen texto seleccionable. Revisa esos PDF manualmente antes de tomar una decisión.
                 </div>
               ) : null}
 
               {historicoMatch?.sli_detail?.renglones_detectados?.length ? (
                 <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglones detectados en SLI/RFQ visible</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglones detectados en los documentos</div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {historicoMatch.sli_detail.renglones_detectados.slice(0, 6).map((item, index) => (
                       <div key={`${item.renglon}-${item.codigo_articulo}-${index}`} className="rounded-lg border border-blue-100 bg-white p-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-brand">
-                          <span>{item.renglon || `Renglon ${index + 1}`}</span>
-                          {item.codigo_articulo || item.codigo_acp ? <span className="rounded-full bg-blue-50 px-2 py-0.5">{item.codigo_articulo || item.codigo_acp}</span> : null}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-brand">
+                          <span>{item.renglon || `Renglón ${index + 1}`}</span>
+                          {item.codigo_articulo || item.codigo_acp
+                            ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">ACP {item.codigo_articulo || item.codigo_acp}</span>
+                            : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">S/C</span>}
                         </div>
-                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-700">{item.descripcion || "Descripcion no especificada en SLI."}</p>
+                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-700">{item.descripcion || "Descripción no especificada en el documento."}</p>
+                        <div className="mt-2 text-xs text-muted">
+                          {item.documento || "Detalle SLI"}{item.pagina ? ` | Página ${item.pagina}` : ""}
+                        </div>
+                        {item.evidencia ? <div className="mt-2 line-clamp-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs leading-5 text-slate-600">{item.evidencia}</div> : null}
                       </div>
                     ))}
                   </div>
@@ -947,7 +1004,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 </table>
               </div>
               </div>
-            </details>
+            </details> : null}
           </div>
         ) : null}
 

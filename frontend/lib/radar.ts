@@ -78,6 +78,12 @@ export type RadarSliItem = {
   codigo_articulo?: string | null;
   descripcion?: string | null;
   cantidad?: string | number | null;
+  estado_codigo?: "confirmado" | "sin_codigo" | string | null;
+  fuente?: string | null;
+  documento?: string | null;
+  documento_url?: string | null;
+  pagina?: number | string | null;
+  evidencia?: string | null;
 };
 
 export type RadarHistoricoResponse = {
@@ -94,6 +100,26 @@ export type RadarHistoricoResponse = {
     error?: string | null;
     renglones_detectados?: RadarSliItem[];
     pdfs_consultados?: string[];
+    documentos?: Array<{
+      nombre?: string | null;
+      url?: string | null;
+      tipo?: string | null;
+      paginas_leidas?: number | string | null;
+    }>;
+    requiere_ocr?: boolean;
+    analizado_en?: string | null;
+  };
+  cache_meta?: {
+    available?: boolean;
+    stale?: boolean;
+    numero_licitacion?: string | null;
+    numero_enmienda_actual?: string | null;
+    numero_enmienda_analizada?: string | null;
+    document_fingerprint?: string | null;
+    status?: string | null;
+    error?: string | null;
+    analyzed_at?: string | null;
+    analyzed_by?: string | null;
   };
   matches: RadarHistoricoMatch[];
   summary: {
@@ -179,8 +205,15 @@ export function ackRadarEnmienda(id: number) {
   });
 }
 
-export function getRadarHistorico(id: number, limit = 12, scanSli = true) {
+export function getRadarHistorico(id: number, limit = 12, scanSli = false) {
   return apiRequest<RadarHistoricoResponse>(`/radar/${id}/historico?limit=${limit}&scan_sli=${scanSli ? "true" : "false"}`);
+}
+
+export function analyzeRadarRfq(id: number, limit = 12, force = false) {
+  return apiRequest<RadarHistoricoResponse>(`/radar/${id}/analizar-rfq?limit=${limit}&force=${force ? "true" : "false"}`, {
+    method: "POST",
+    timeoutMs: 180000
+  });
 }
 
 export function radarFlag(value: unknown) {
