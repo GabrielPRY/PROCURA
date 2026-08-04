@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Clock, ExternalLink, RefreshCcw, Search, ShieldCheck, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ackRadarEnmienda,
   getRadarEscaneos,
@@ -26,7 +26,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 type FilterMode = "todas" | "nuevas" | "alertas" | "seguimiento" | "cierre72" | "descartadas" | "hoy";
-type SortMode = "publicacion" | "cierre" | "score";
+type SortMode = "publicacion" | "cierre";
 type DateField = "publicacion" | "cierre";
 
 const RADAR_FILTERS_KEY = "procura_radar_filters_v1";
@@ -88,7 +88,6 @@ function getRowTime(row: RadarLicitacion, field: DateField) {
 
 function sortRows(rows: RadarLicitacion[], mode: SortMode) {
   return [...rows].sort((a, b) => {
-    if (mode === "score") return Number(b.score_interes || 0) - Number(a.score_interes || 0);
     const field = mode === "cierre" ? "fecha_cierre_iso" : "fecha_apertura_iso";
     const aTime = a[field] ? new Date(String(a[field])).getTime() : 0;
     const bTime = b[field] ? new Date(String(b[field])).getTime() : 0;
@@ -105,13 +104,6 @@ function moneyValue(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return "N/D";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(parsed);
-}
-
-function scoreTone(score: unknown) {
-  const value = numberValue(score);
-  if (value >= 75) return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  if (value >= 45) return "bg-amber-50 text-amber-700 ring-amber-200";
-  return "bg-slate-100 text-slate-700 ring-slate-200";
 }
 
 function recommendationTone(tone?: string) {
@@ -175,6 +167,14 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const [scanLogs, setScanLogs] = useState<RadarScanLog[]>([]);
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [supervisorNote, setSupervisorNote] = useState("");
+  const detailPanelRef = useRef<HTMLDivElement>(null);
+
+  function selectRadarRow(row: RadarLicitacion) {
+    setSelectedRow(row);
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      window.setTimeout(() => detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    }
+  }
 
   function clearFilters() {
     setDateFrom("");
@@ -238,7 +238,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
         };
         if (typeof parsed.search === "string") setSearch(parsed.search);
         if (parsed.filterMode) setFilterMode(parsed.filterMode);
-        if (parsed.sortMode) setSortMode(parsed.sortMode);
+        if (parsed.sortMode === "publicacion" || parsed.sortMode === "cierre") setSortMode(parsed.sortMode);
         if (parsed.dateField) setDateField(parsed.dateField);
         if (typeof parsed.dateFrom === "string") setDateFrom(parsed.dateFrom);
         if (typeof parsed.dateTo === "string") setDateTo(parsed.dateTo);
@@ -496,7 +496,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
               >
                 <option value="publicacion">Publicación más reciente</option>
                 <option value="cierre">Cierre mas cercano</option>
-                <option value="score">Score mas alto</option>
               </select>
             </label>
           </div>
@@ -561,6 +560,8 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           <div className="m-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
         ) : null}
 
+        <div className="grid min-h-[34rem] xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
+          <div className="min-w-0 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:border-r xl:border-line">
         <div className="grid gap-2 p-3 lg:hidden">
           {loading ? <div className="app-empty min-h-32">Cargando licitaciones del SLI...</div> : null}
           {!loading && !visibleRows.length ? <div className="app-empty min-h-32">No hay licitaciones con los filtros seleccionados.</div> : null}
@@ -569,7 +570,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             const hasAmendmentAlert = radarFlag(row.enmienda_alerta);
             const closeSoon = isClosingSoon(row);
             return (
-              <button key={row.id} type="button" onClick={() => setSelectedRow(row)} className={`app-row-button p-3 text-left ${selected ? "app-row-selected" : ""}`}>
+              <button key={row.id} type="button" onClick={() => selectRadarRow(row)} className={`app-row-button p-3 text-left ${selected ? "app-row-selected" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0"><div className="text-sm font-semibold text-brand">RFQ {row.numero_licitacion}</div><div className="mt-1 line-clamp-2 text-sm font-semibold text-ink">{row.objeto || "Sin objeto"}</div></div>
                   <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-brand" />
@@ -589,7 +590,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           <table className="app-table">
             <thead>
               <tr>
-                {["Licitación / objeto", "Publicación", "Cierre", "Señales", "Score", "Estado"].map((heading) => (
+                {["Licitación / objeto", "Publicación", "Cierre", "Señales", "Estado"].map((heading) => (
                   <th key={heading}>{heading}</th>
                 ))}
               </tr>
@@ -597,13 +598,13 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted">
                     Cargando licitaciones del SLI...
                   </td>
                 </tr>
               ) : visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted">
                     No hay licitaciones con los filtros seleccionados.
                   </td>
                 </tr>
@@ -614,7 +615,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   return (
                     <tr
                       key={row.id}
-                      onClick={() => setSelectedRow(row)}
+                      onClick={() => selectRadarRow(row)}
                       className={`cursor-pointer hover:bg-slate-50/80 ${isSameRow(selectedRow, row) ? "app-row-selected" : rowVisualTone(row, false)}`}
                     >
                       <td className="max-w-[460px] px-4 py-3">
@@ -636,11 +637,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${scoreTone(row.score_interes)}`}>
-                          {Number(row.score_interes || 0).toFixed(0)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone(row.estado_radar)}`}>
                           {estadoLabel[String(row.estado_radar || "nueva")] || row.estado_radar || "Nueva"}
                         </span>
@@ -653,9 +649,14 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           </table>
         </div>
 
+          </div>
+          <div ref={detailPanelRef} className={`${selectedRow ? "order-first" : "order-last"} min-w-0 scroll-mt-32 bg-slate-50/40 xl:order-none xl:sticky xl:top-32 xl:max-h-[calc(100vh-9rem)] xl:self-start xl:overflow-y-auto`}>
+
+        {selectedRow ? <div className="border-b border-line p-3 xl:hidden"><Button type="button" onClick={() => setSelectedRow(null)} variant="secondary" size="md">Volver al listado</Button></div> : null}
+
         {selectedRow ? (
-          <div className="border-t border-line p-4">
-            <div className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
+          <div className="p-4">
+            <div className="grid gap-4 2xl:grid-cols-[1fr_0.8fr]">
               <div className="rounded-xl border border-line bg-white p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -701,9 +702,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                         {historicoMatch?.summary?.nota || "Al seleccionar una licitacion, el Radar intenta leer SLI/RFQ y cruzar codigos ACP contra el historico."}
                       </p>
                     </div>
-                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ring-1 ${scoreTone(historicoMatch?.summary?.mejor_match)}`}>
-                      Match {numberValue(historicoMatch?.summary?.mejor_match).toFixed(0)}
-                    </span>
+                    <StatusBadge tone={historicoMatch?.summary?.total ? "ok" : "neutral"}>{historicoMatch?.summary?.total ? "Con historial" : "Sin historial"}</StatusBadge>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                     {[
@@ -776,9 +775,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   />
                 </label>
                 <div className="mt-3 grid gap-2">
-                  <Button type="button" onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))} variant="primary" size="md" className="w-full"><Search className="h-4 w-4" />Consultar detalle SLI/RFQ</Button>
+                  <Button type="button" onClick={() => handleEnviarSeguimiento(selectedRow)} disabled={busy || selectedRow.estado_radar === "en_seguimiento"} variant="primary" size="md" className="w-full">{selectedRow.estado_radar === "en_seguimiento" ? <CheckCircle2 className="h-4 w-4" /> : <RefreshCcw className="h-4 w-4" />}{selectedRow.estado_radar === "en_seguimiento" ? "Ya está en seguimiento" : "Poner en seguimiento"}</Button>
+                  <Button type="button" onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))} variant="secondary" size="md" className="w-full"><Search className="h-4 w-4" />Consultar detalle SLI/RFQ</Button>
                   {selectedRow.link_sli ? <a href={selectedRow.link_sli} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 w-full items-center justify-center gap-2 px-3 text-sm font-semibold">Abrir portal SLI<ExternalLink className="h-4 w-4" /></a> : null}
-                  <Button type="button" onClick={() => handleEnviarSeguimiento(selectedRow)} disabled={busy || selectedRow.estado_radar === "en_seguimiento"} variant="secondary" size="md" className="w-full"><RefreshCcw className="h-4 w-4" />Enviar a seguimiento</Button>
                   <Button type="button" onClick={() => handleEstado(selectedRow.id, (selectedRow.estado_radar as RadarEstado) || "nueva")} disabled={busy} variant="ghost" size="md" className="w-full">Guardar comentario</Button>
                   <Button type="button" onClick={() => handleEstado(selectedRow.id, "descartada")} disabled={busy || selectedRow.estado_radar === "descartada"} variant="danger" size="md" className="w-full">Descartar del radar operativo</Button>
                   {radarFlag(selectedRow.enmienda_alerta) ? (
@@ -809,9 +808,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 {loadingHistorico ? (
                   <RefreshCcw className="h-4 w-4 animate-spin text-brand" />
                 ) : (
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${scoreTone(historicoMatch?.summary?.mejor_match)}`}>
-                    Mejor match: {numberValue(historicoMatch?.summary?.mejor_match).toFixed(0)}
-                  </span>
+                  <StatusBadge tone={historicoMatch?.summary?.total ? "ok" : "neutral"}>{historicoMatch?.summary?.total || 0} antecedente(s)</StatusBadge>
                 )}
               </summary>
 
@@ -917,7 +914,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 <table className="app-table">
                   <thead>
                     <tr>
-                      {["Match", "Licitacion", "Anio", "Codigo ACP", "Cantidad", "Precio Proyelec", "Competencia", "Resultado", "Motivo"].map((heading) => (
+                      {["Licitación", "Año", "Código ACP", "Cantidad", "Precio Proyelec", "Competencia", "Resultado", "Motivo"].map((heading) => (
                         <th key={heading} className="border-b border-line px-3 py-3">{heading}</th>
                       ))}
                     </tr>
@@ -926,11 +923,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     {historicoMatch?.matches?.length ? (
                       historicoMatch.matches.map((match, index) => (
                         <tr key={`${match.numero_licitacion}-${match.codigo_acp}-${index}`} className="hover:bg-slate-50">
-                          <td className="px-3 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${scoreTone(match.match_score)}`}>
-                              {numberValue(match.match_score).toFixed(0)}
-                            </span>
-                          </td>
                           <td className="px-3 py-3 font-semibold text-brand">{match.numero_licitacion || "N/D"}</td>
                           <td className="px-3 py-3">{match.anio || "N/D"}</td>
                           <td className="px-3 py-3">{match.codigo_acp || "N/D"}</td>
@@ -946,7 +938,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} className="px-3 py-6 text-center text-muted">
+                        <td colSpan={8} className="px-3 py-6 text-center text-muted">
                           {loadingHistorico ? "Buscando antecedentes..." : "No se encontraron antecedentes historicos claros."}
                         </td>
                       </tr>
@@ -959,11 +951,19 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           </div>
         ) : null}
 
+        {!selectedRow ? (
+          <div className="grid min-h-[28rem] place-items-center p-6 text-center">
+            <div className="max-w-sm"><Search className="mx-auto h-7 w-7 text-brand" /><div className="mt-3 text-base font-semibold text-ink">Selecciona una licitación</div><p className="mt-2 text-sm leading-6 text-muted">El resumen, la comparación histórica y la acción para ponerla en seguimiento aparecerán aquí.</p></div>
+          </div>
+        ) : null}
+
         {selectedSliRfq ? (
           <div className="border-t border-line p-4">
             <SliLookupPanel initialRfq={selectedSliRfq} />
           </div>
         ) : null}
+          </div>
+        </div>
       </section>
 
       <details className="rounded-xl border border-line bg-panel shadow-sm">
