@@ -240,6 +240,7 @@ summary:focus-visible {
   min-height: 2.5rem;
   border: 1px solid transparent;
   font-weight: 700;
+  user-select: none;
   white-space: nowrap;
 }
 
@@ -384,13 +385,13 @@ summary:focus-visible {
   gap: 0.65rem;
   padding: 0.65rem 0.8rem;
   border-right: 1px solid var(--ui-border);
-  background: var(--ui-panel);
-  color: var(--ui-muted);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
   transition: background 140ms ease, color 140ms ease;
 }
 
 .app-logistics-step:last-child { border-right: 0; }
-.app-logistics-step:hover { background: var(--ui-soft); color: var(--ui-text); }
+.app-logistics-step:hover:not(:disabled) { background: var(--ui-surface-muted); color: var(--ui-text); }
 .app-logistics-step-active { background: var(--ui-primary-soft); color: var(--ui-primary); }
 
 .app-logistics-step-index {
@@ -507,6 +508,10 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
 
 .app-filter-pill-idle { background: var(--ui-surface); color: var(--ui-text); }
 .app-filter-pill-active { border-color: var(--ui-primary); background: var(--ui-primary-soft); color: var(--ui-primary); }
+.app-filter-pill-idle:hover:not(:disabled) { border-color: var(--ui-primary); background: var(--ui-primary-soft); color: var(--ui-primary); }
+
+input[type="checkbox"],
+input[type="radio"] { accent-color: var(--ui-primary); }
 
 .app-table-shell {
   max-width: 100%;
@@ -539,9 +544,22 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
   background: var(--ui-surface-muted);
   padding: 1.25rem;
   text-align: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .app-file-drop:hover { border-color: var(--ui-primary); background: var(--ui-primary-soft); }
+.app-file-drop:active { box-shadow: inset 0 0 0 1px var(--ui-primary); }
+
+details > summary {
+  border-radius: 0.45rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+details > summary:hover {
+  background: var(--ui-surface-muted);
+  color: var(--ui-primary);
+}
 
 .app-decision-panel,
 .app-dashboard-hero,
@@ -566,9 +584,30 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
 .app-scrollbar::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--ui-border-strong); }
 
 .dark .bg-white,
-.dark .bg-panel,
+.dark .bg-panel { background-color: var(--ui-surface) !important; }
+
 .dark .bg-slate-50,
-.dark .bg-slate-100 { background-color: var(--ui-surface) !important; }
+.dark .bg-slate-100 { background-color: var(--ui-surface-muted) !important; }
+
+.dark [class~="bg-white/70"],
+.dark [class~="bg-white/80"],
+.dark [class~="bg-slate-50/40"],
+.dark [class~="bg-slate-50/80"] { background-color: var(--ui-surface-muted) !important; }
+
+.dark [class~="bg-blue-50/40"],
+.dark [class~="bg-blue-50/50"],
+.dark [class~="bg-blue-50/60"],
+.dark [class~="bg-blue-50/70"],
+.dark [class~="bg-blue-100"] { background-color: var(--ui-primary-soft) !important; }
+
+.dark [class~="bg-emerald-50/70"],
+.dark [class~="bg-emerald-100"] { background-color: var(--ui-success-soft) !important; }
+
+.dark [class~="bg-amber-50/55"],
+.dark [class~="bg-amber-50/70"],
+.dark [class~="bg-amber-100"] { background-color: var(--ui-warning-soft) !important; }
+
+.dark [class~="bg-rose-50/35"] { background-color: var(--ui-danger-soft) !important; }
 
 .dark .text-slate-950,
 .dark .text-slate-900,
@@ -576,32 +615,58 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
 .dark .text-slate-700 { color: var(--ui-text) !important; }
 
 .dark .text-slate-600,
-.dark .text-slate-500 { color: var(--ui-text-muted) !important; }
+.dark .text-slate-500,
+.dark .text-slate-400 { color: var(--ui-text-muted) !important; }
 
 .dark .text-brand,
-.dark .text-blue-700 { color: var(--ui-primary) !important; }
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-950 { color: var(--ui-primary) !important; }
 .dark .text-emerald-700,
 .dark .text-emerald-800,
-.dark .text-emerald-900 { color: var(--ui-success) !important; }
+.dark .text-emerald-900,
+.dark .text-emerald-600 { color: var(--ui-success) !important; }
 .dark .text-amber-700,
 .dark .text-amber-800,
-.dark .text-amber-900 { color: var(--ui-warning) !important; }
+.dark .text-amber-900,
+.dark .text-amber-600 { color: var(--ui-warning) !important; }
 .dark .text-rose-700,
 .dark .text-rose-800,
-.dark .text-rose-900 { color: var(--ui-danger) !important; }
+.dark .text-rose-900,
+.dark .text-rose-600 { color: var(--ui-danger) !important; }
 
 .dark .border-line,
 .dark .border-slate-200,
 .dark .border-slate-300 { border-color: var(--ui-border) !important; }
-.dark .border-blue-200 { border-color: color-mix(in srgb, var(--ui-primary) 38%, transparent) !important; }
+.dark .border-blue-100,
+.dark .border-blue-200,
+.dark .border-blue-300,
+.dark .border-blue-400,
+.dark .border-blue-500 { border-color: color-mix(in srgb, var(--ui-primary) 42%, transparent) !important; }
 .dark .border-emerald-200 { border-color: color-mix(in srgb, var(--ui-success) 38%, transparent) !important; }
-.dark .border-amber-200 { border-color: color-mix(in srgb, var(--ui-warning) 38%, transparent) !important; }
+.dark .border-amber-200,
+.dark .border-amber-300 { border-color: color-mix(in srgb, var(--ui-warning) 38%, transparent) !important; }
+.dark .border-rose-100,
 .dark .border-rose-200 { border-color: color-mix(in srgb, var(--ui-danger) 38%, transparent) !important; }
+.dark [class~="border-white/80"] { border-color: var(--ui-border) !important; }
 
 .dark .bg-blue-50 { background: var(--ui-primary-soft) !important; }
 .dark .bg-emerald-50 { background: var(--ui-success-soft) !important; }
 .dark .bg-amber-50 { background: var(--ui-warning-soft) !important; }
 .dark .bg-rose-50 { background: var(--ui-danger-soft) !important; }
+
+.dark [class~="ring-blue-100"],
+.dark [class~="ring-blue-200"] { --tw-ring-color: color-mix(in srgb, var(--ui-primary) 30%, transparent) !important; }
+.dark [class~="ring-emerald-200"] { --tw-ring-color: color-mix(in srgb, var(--ui-success) 30%, transparent) !important; }
+.dark [class~="ring-amber-200"] { --tw-ring-color: color-mix(in srgb, var(--ui-warning) 30%, transparent) !important; }
+.dark [class~="ring-rose-200"] { --tw-ring-color: color-mix(in srgb, var(--ui-danger) 30%, transparent) !important; }
+.dark [class~="ring-slate-200"] { --tw-ring-color: var(--ui-border) !important; }
+
+.dark [class~="hover:bg-slate-50"]:hover,
+.dark [class~="hover:bg-slate-50/80"]:hover { background-color: var(--ui-surface-muted) !important; }
+.dark [class~="hover:bg-blue-50/40"]:hover { background-color: var(--ui-primary-soft) !important; }
+.dark [class~="hover:bg-rose-50"]:hover { background-color: var(--ui-danger-soft) !important; }
 
 @media (max-width: 1023px) {
   .app-action-card:hover,

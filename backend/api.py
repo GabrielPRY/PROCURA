@@ -424,7 +424,7 @@ def _extract_acp_codes_from_text(text):
     return list(dict.fromkeys(re.findall(pattern, str(text or "").upper())))
 
 RADAR_ACP_ITEM_START_RE = re.compile(
-    r"^\s*(?:[\u2022\-*]\s*)?(?:(?:rengl[oó]n|l[ií]nea|item|[ií]tem)\s*(?:n[oº°.]*)?\s*#?\s*\d{1,4}\s*[:.\-)\u2013]?\s*|\d{1,4}\s*[.\-):|]\s*)?"
+    r"^\s*(?:[\u2022\-*]\s*)?(?:(?:rengl[oó]n|l[ií]nea|item|[ií]tem)\s*(?:n[oº°.]*)?\s*#?\s*\d{1,4}\s*[:.\-)\u2013|]?\s*|\d{1,4}(?:\s*[.\-):|]\s*|\s+))?"
     r"([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
     re.IGNORECASE,
 )
@@ -877,6 +877,9 @@ Extrae tambiÃƒÂ©n controles tÃƒÂ©cnicos crÃƒÂ­ticos para decidir par
 Para cada renglÃƒÂ³n extrae:
 - codigo_articulo: cÃƒÂ³digo ACP del renglÃƒÂ³n ÃƒÅ¡NICAMENTE si aparece con formato de 3 letras, guion, 3 letras, guion y 5 nÃƒÂºmeros, por ejemplo ABC-DEF-12345. No incluyas descripciones, nÃƒÂºmeros de parte, marcas ni texto adicional. Si el cÃƒÂ³digo no aparece con ese formato exacto, devuelve "".
 - El cÃƒÂ³digo ACP aparece al INICIO de la descripciÃƒÂ³n del renglÃƒÂ³n. Ejemplo: si el renglÃƒÂ³n comienza "PWR-BAT-00009 ...", devuelve codigo_articulo="PWR-BAT-00009". Si el renglÃƒÂ³n no comienza con ese patrÃƒÂ³n exacto, devuelve "". "S/C" significa sin cÃƒÂ³digo y nunca es un cÃƒÂ³digo ACP.
+- En una tabla, el numero de renglon puede aparecer antes del codigo. Ejemplo: "1 | LIF-LAM-00402 | DRG-BULB..." debe devolver codigo_articulo="LIF-LAM-00402". El numero de renglon no forma parte del codigo.
+- Evalua cada renglon por separado: pueden existir varios renglones, cada uno con un codigo ACP diferente, y otros renglones sin codigo.
+- No tomes como codigo ACP un numero de parte o referencia que aparezca mas adelante dentro de la descripcion tecnica.
 - requiere_propuesta_tecnica: true si la propuesta tÃƒÂ©cnica aplica a ese renglÃƒÂ³n/lÃƒÂ­nea; false si no aplica.
 - requiere_ficha_tecnica: true SOLO si el pliego exige entregar/presentar/adjuntar ficha tÃƒÂ©cnica, catÃƒÂ¡logo, datasheet, plano, certificado, muestra, manual, ficha de seguridad o submittal tÃƒÂ©cnico junto con la oferta/propuesta. false si el texto solo describe especificaciones tÃƒÂ©cnicas, marca, modelo, nÃƒÂºmero de parte o cumplimiento tÃƒÂ©cnico sin pedir un documento entregable.
 - marca_modelo_requerido: marca, fabricante, modelo o nÃƒÂºmero de parte exigido para ese renglÃƒÂ³n. Si no hay, null.
@@ -908,10 +911,7 @@ DOCUMENTAL_KEYWORDS = [
 ]
 
 ACP_CODE_RE = re.compile(r"([A-Z]{3})-([A-Z]{3})-(\d{5})", re.IGNORECASE)
-ACP_CODE_AT_ITEM_START_RE = re.compile(
-    r"^\s*([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
-    re.IGNORECASE,
-)
+ACP_CODE_AT_ITEM_START_RE = RADAR_ACP_ITEM_START_RE
 
 def _normalize_acp_code(value):
     text = str(value or "").strip().upper()
@@ -929,11 +929,10 @@ def _extract_item_start_acp_code(item):
     if explicit_code:
         return explicit_code
 
-    for key in ["termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
-        text = str(item.get(key) or "").strip()
-        match = ACP_CODE_AT_ITEM_START_RE.match(text)
-        if match:
-            return match.group(1).upper()
+    for key in ["codigo_articulo", "codigo_acp", "termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
+        code = _extract_radar_item_start_code(item.get(key))
+        if code:
+            return code
     return ""
 
 def _parse_rows_from_scope_text(value):

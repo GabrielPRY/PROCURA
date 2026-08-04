@@ -115,7 +115,7 @@ export function AppShell({
             <Button type="button" onClick={toggleTheme} variant="ghost" size="icon" title={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"} aria-label={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="lg:hidden" title="Abrir navegación" aria-label="Abrir navegación" aria-expanded={mobileOpen}>
+            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="xl:hidden" title="Abrir navegación" aria-label="Abrir navegación" aria-expanded={mobileOpen}>
               {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
             <Button onClick={onLogout} variant="ghost" size="icon" title="Cerrar sesión" aria-label="Cerrar sesión">
@@ -124,7 +124,7 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="hidden border-t border-line lg:block">
+        <div className="hidden border-t border-line xl:block">
           <nav className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-2 px-4 sm:px-5 xl:px-7" aria-label="Navegación principal">
             {primaryItems.map((item) => navButton(item))}
             {moreItems.length ? (
@@ -156,7 +156,7 @@ export function AppShell({
         </div>
 
         {mobileOpen ? (
-          <nav className="grid gap-2 border-t border-line p-3 lg:hidden" aria-label="Navegación móvil">
+          <nav className="grid gap-2 border-t border-line p-3 xl:hidden" aria-label="Navegación móvil">
             {visibleItems.map((item) => navButton(item, true))}
           </nav>
         ) : null}

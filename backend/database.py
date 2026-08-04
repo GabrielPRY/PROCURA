@@ -453,6 +453,10 @@ def init_db():
 def _clean_codigo_match(value):
     return "".join(ch for ch in str(value or "").upper() if ch.isascii() and ch.isalnum())
 
+def _is_acp_code(value):
+    """Identifica un codigo ACP completo para evitar busquedas textuales ambiguas."""
+    return bool(re.fullmatch(r"[A-Z]{3}-[A-Z]{3}-\d{5}", str(value or "").strip().upper()))
+
 def _clean_text(value):
     if pd.isna(value):
         return ""
@@ -572,6 +576,10 @@ def _historico_filter_sql(search=None, searches=None, anio=None):
     if terms:
         term_filters = []
         for term in terms:
+            if _is_acp_code(term):
+                term_filters.append("codigo_match = %s")
+                params.append(_clean_codigo_match(term))
+                continue
             q = f"%{term}%"
             term_filters.append("(numero_licitacion ILIKE %s OR codigo_acp ILIKE %s OR observaciones ILIKE %s OR analista_procura ILIKE %s OR mes ILIKE %s OR CAST(anio AS TEXT) ILIKE %s)")
             params.extend([q, q, q, q, q, q])
@@ -923,17 +931,18 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
 
         params = []
         filters = []
-        if numero:
-            filters.append("numero_licitacion = %s")
-            params.append(str(numero))
         if codigo_matches:
             filters.append("codigo_match = ANY(%s)")
             params.append(codigo_matches)
-        if keywords:
-            keyword_filter = "(" + " OR ".join(["observaciones ILIKE %s OR codigo_acp ILIKE %s"] * len(keywords)) + ")"
-            filters.append(keyword_filter)
-            for kw in keywords:
-                params.extend([f"%{kw}%", f"%{kw}%"])
+        else:
+            if numero:
+                filters.append("numero_licitacion = %s")
+                params.append(str(numero))
+            if keywords:
+                keyword_filter = "(" + " OR ".join(["observaciones ILIKE %s OR codigo_acp ILIKE %s"] * len(keywords)) + ")"
+                filters.append(keyword_filter)
+                for kw in keywords:
+                    params.extend([f"%{kw}%", f"%{kw}%"])
 
         empty_summary = {
             "total": 0,
