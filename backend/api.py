@@ -432,6 +432,8 @@ RADAR_ROW_MARKER_RE = re.compile(
     r"^\s*(?:[\u2022\-*]\s*)?(?:rengl[oó]n|l[ií]nea|item|[ií]tem)\s*(?:n[oº°.]*)?\s*#?\s*(\d{1,4})\s*[:.\-)\u2013]?\s*(.*)$",
     re.IGNORECASE,
 )
+RADAR_BARE_ROW_NUMBER_RE = re.compile(r"^\s*(\d{1,4})\s*$")
+RADAR_NUMBERED_ROW_RE = re.compile(r"^\s*(\d{1,4})(?:\s*[.\-):|]\s*|\s+)(.+)$")
 
 def _extract_radar_item_start_code(value):
     """Acepta un codigo ACP solo al inicio semantico de un renglón."""
@@ -470,6 +472,99 @@ def _looks_like_sli_label(value):
     }
     return text in labels or text.endswith(":")
 
+SLI_STRUCTURED_ACP_RE = re.compile(
+    r"art[ií]culo\s+ACP\s*:\s*([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
+    re.IGNORECASE,
+)
+RADAR_DOCUMENT_PARSER_VERSION = 2
+
+def _radar_parser_cache_current(cache):
+    if not cache or not isinstance(cache.get("result"), dict):
+        return False
+    try:
+        return int(cache["result"].get("parser_version") or 0) >= RADAR_DOCUMENT_PARSER_VERSION
+    except (TypeError, ValueError):
+        return False
+
+def _extract_sli_structured_items(soup, document_url=""):
+    """Extrae las filas del detalle SLI usando sus columnas HTML reales."""
+    items = []
+    seen = set()
+    for item_row in soup.select("div.row"):
+        columns = item_row.find_all("div", recursive=False)
+        if len(columns) < 5:
+            continue
+        first_classes = columns[0].get("class") or []
+        description_classes = columns[1].get("class") or []
+        if "col-lg-1" not in first_classes or "col-lg-5" not in description_classes:
+            continue
+
+        row_text = _clean_sli_fragment(columns[0].get_text(" ", strip=True))
+        if not re.fullmatch(r"\d{1,4}", row_text):
+            continue
+        row_number = row_text
+        description_column = columns[1]
+        description_text = _clean_sli_fragment(description_column.get_text(" ", strip=True))
+        code_match = SLI_STRUCTURED_ACP_RE.search(description_text)
+        code = code_match.group(1).upper() if code_match else ""
+        key = (row_number, code, description_text[:120])
+        if key in seen:
+            continue
+        seen.add(key)
+
+        if code:
+            repeated_label = re.compile(
+                rf"(?:art[ií]culo\s+ACP\s*:\s*{re.escape(code)}\s*)+",
+                re.IGNORECASE,
+            )
+            description = repeated_label.sub("", description_text)
+        else:
+            description = re.sub(
+                r"(?:art[ií]culo\s+ACP\s*:\s*(?:S/C|N/?A|NO\s+APLICA|SIN\s+C[OÓ]DIGO)?\s*)+",
+                "",
+                description_text,
+                flags=re.IGNORECASE,
+            )
+        description = re.sub(r"\binformaci[oó]n adicional\b", "", description, flags=re.IGNORECASE)
+        description = _clean_sli_fragment(description) or "Descripcion no especificada en el detalle SLI."
+        unit = _clean_sli_fragment(columns[2].get_text(" ", strip=True))
+        quantity = _clean_sli_fragment(columns[3].get_text(" ", strip=True))
+        category = _clean_sli_fragment(columns[4].get_text(" ", strip=True))
+        evidence = _clean_sli_fragment(item_row.get_text(" ", strip=True))[:500]
+        items.append({
+            "renglon": f"Renglon {row_number}",
+            "renglon_numero": row_number,
+            "codigo_articulo": code or None,
+            "codigo_acp": code or None,
+            "estado_codigo": "confirmado" if code else "sin_codigo",
+            "descripcion": description[:450],
+            "cantidad": quantity or None,
+            "unidad": unit or None,
+            "categoria": category or None,
+            "fuente": "sli_estructurado",
+            "documento": "Detalle visible SLI",
+            "documento_url": document_url or None,
+            "pagina": None,
+            "evidencia": evidence,
+        })
+    return items
+
+def _merge_radar_items(primary_items, secondary_items, limit=80):
+    merged = []
+    seen = set()
+    for item in [*(primary_items or []), *(secondary_items or [])]:
+        code = str(item.get("codigo_acp") or item.get("codigo_articulo") or "").upper()
+        row_number = str(item.get("renglon_numero") or "")
+        description = _clean_sli_fragment(item.get("descripcion") or "")
+        key = (row_number, code, description[:100] if not code else "")
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+        if len(merged) >= limit:
+            break
+    return merged
+
 def _extract_radar_items_from_documents(documents, limit=80):
     """Extrae renglones con evidencia de documento/pagina sin inferir codigos."""
     items = []
@@ -482,15 +577,32 @@ def _extract_radar_items_from_documents(documents, limit=80):
         for page_data in document.get("paginas") or []:
             page_number = int(page_data.get("pagina") or 0) or None
             raw_text = str(page_data.get("texto") or "")
+            pending_row_number = ""
             lines = [
                 _clean_sli_fragment(line)
                 for line in re.split(r"\n+|\|+", raw_text)
                 if _clean_sli_fragment(line)
             ]
             for index, line in enumerate(lines):
+                bare_row_match = RADAR_BARE_ROW_NUMBER_RE.match(line)
+                if bare_row_match:
+                    pending_row_number = bare_row_match.group(1)
+                    continue
+
                 row_match = RADAR_ROW_MARKER_RE.match(line)
-                row_number = row_match.group(1) if row_match else ""
-                candidate = (row_match.group(2) or "").strip() if row_match else line
+                numbered_row_match = RADAR_NUMBERED_ROW_RE.match(line) if not row_match else None
+                row_number = row_match.group(1) if row_match else (numbered_row_match.group(1) if numbered_row_match else "")
+                candidate = (
+                    (row_match.group(2) or "").strip()
+                    if row_match
+                    else ((numbered_row_match.group(2) or "").strip() if numbered_row_match else line)
+                )
+                has_row_context = bool(row_match or numbered_row_match)
+
+                if pending_row_number and not has_row_context and not _looks_like_sli_label(candidate):
+                    row_number = pending_row_number
+                    has_row_context = True
+                    pending_row_number = ""
 
                 if row_match and not candidate:
                     for next_line in lines[index + 1:index + 4]:
@@ -498,8 +610,8 @@ def _extract_radar_items_from_documents(documents, limit=80):
                             candidate = next_line
                             break
 
-                code = _extract_radar_item_start_code(candidate if row_match else line)
-                if not row_match and not code:
+                code = _extract_radar_item_start_code(candidate if has_row_context else line)
+                if not has_row_context and not code:
                     continue
                 if not candidate or _looks_like_sli_label(candidate):
                     continue
@@ -525,6 +637,7 @@ def _extract_radar_items_from_documents(documents, limit=80):
                 evidence = line[:500]
                 items.append({
                     "renglon": row_label,
+                    "renglon_numero": row_number or None,
                     "codigo_articulo": code or None,
                     "codigo_acp": code or None,
                     "estado_codigo": "confirmado" if code else "sin_codigo",
@@ -643,6 +756,7 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
             content = page.content()
             soup = BeautifulSoup(content, "html.parser")
             texto_sli = soup.get_text(separator="|", strip=True)
+            structured_sli_items = _extract_sli_structured_items(soup, document_url=page.url)
             fingerprint = hashlib.sha256(content.encode("utf-8", errors="ignore"))
             pdf_urls = []
             documents = [{
@@ -713,7 +827,12 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
             except Exception as link_exc:
                 logger.warning(f"Radar historico: no se pudieron listar PDFs SLI {rfq_id}: {link_exc}")
 
-            renglones = _extract_radar_items_from_documents(documents, limit=80)
+            pdf_documents = [document for document in documents if document.get("tipo") == "rfq_pdf"]
+            pdf_items = _extract_radar_items_from_documents(pdf_documents, limit=80)
+            if structured_sli_items:
+                renglones = _merge_radar_items(structured_sli_items, pdf_items, limit=80)
+            else:
+                renglones = _extract_radar_items_from_documents(documents, limit=80)
             codigos = list(dict.fromkeys(
                 str(item.get("codigo_articulo") or "").upper()
                 for item in renglones
@@ -744,6 +863,7 @@ def _consultar_sli_visible_detail_for_radar(rfq_id: str):
                 "renglones_detectados": renglones,
                 "texto_visible": texto_total[:24000],
                 "document_fingerprint": fingerprint.hexdigest(),
+                "parser_version": RADAR_DOCUMENT_PARSER_VERSION,
                 "requiere_ocr": requiere_ocr,
                 "analizado_en": datetime.now().isoformat(),
                 "error": None,
@@ -778,12 +898,15 @@ def radar_historico_matches(
         db.save_radar_document_analysis(licitacion_id, sli_detail, analyzed_by="legacy_get")
         cache = db.get_radar_document_analysis(licitacion_id)
         result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=sli_detail)
-    elif cache and cache.get("available") and isinstance(cache.get("result"), dict):
+    elif cache and cache.get("available") and _radar_parser_cache_current(cache):
         result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=cache.get("result"))
     else:
         result = initial
 
     cache_meta = {key: value for key, value in (cache or {}).items() if key != "result"}
+    if cache_meta and not _radar_parser_cache_current(cache):
+        cache_meta["available"] = False
+        cache_meta["status"] = "parser_outdated"
     result["cache_meta"] = cache_meta or {
         "available": False,
         "stale": False,
@@ -812,7 +935,7 @@ def radar_analizar_rfq_historico(
         raise HTTPException(status_code=400, detail="La licitacion no tiene un numero SLI valido.")
 
     cache = db.get_radar_document_analysis(licitacion_id)
-    if cache and cache.get("available") and not cache.get("stale") and not force:
+    if cache and cache.get("available") and _radar_parser_cache_current(cache) and not cache.get("stale") and not force:
         result = db.get_radar_historico_matches(licitacion_id, limit=limit, sli_detail=cache.get("result") or {})
     else:
         sli_detail = _consultar_sli_visible_detail_for_radar(str(numero))
@@ -877,9 +1000,6 @@ Extrae tambiÃƒÂ©n controles tÃƒÂ©cnicos crÃƒÂ­ticos para decidir par
 Para cada renglÃƒÂ³n extrae:
 - codigo_articulo: cÃƒÂ³digo ACP del renglÃƒÂ³n ÃƒÅ¡NICAMENTE si aparece con formato de 3 letras, guion, 3 letras, guion y 5 nÃƒÂºmeros, por ejemplo ABC-DEF-12345. No incluyas descripciones, nÃƒÂºmeros de parte, marcas ni texto adicional. Si el cÃƒÂ³digo no aparece con ese formato exacto, devuelve "".
 - El cÃƒÂ³digo ACP aparece al INICIO de la descripciÃƒÂ³n del renglÃƒÂ³n. Ejemplo: si el renglÃƒÂ³n comienza "PWR-BAT-00009 ...", devuelve codigo_articulo="PWR-BAT-00009". Si el renglÃƒÂ³n no comienza con ese patrÃƒÂ³n exacto, devuelve "". "S/C" significa sin cÃƒÂ³digo y nunca es un cÃƒÂ³digo ACP.
-- En una tabla, el numero de renglon puede aparecer antes del codigo. Ejemplo: "1 | LIF-LAM-00402 | DRG-BULB..." debe devolver codigo_articulo="LIF-LAM-00402". El numero de renglon no forma parte del codigo.
-- Evalua cada renglon por separado: pueden existir varios renglones, cada uno con un codigo ACP diferente, y otros renglones sin codigo.
-- No tomes como codigo ACP un numero de parte o referencia que aparezca mas adelante dentro de la descripcion tecnica.
 - requiere_propuesta_tecnica: true si la propuesta tÃƒÂ©cnica aplica a ese renglÃƒÂ³n/lÃƒÂ­nea; false si no aplica.
 - requiere_ficha_tecnica: true SOLO si el pliego exige entregar/presentar/adjuntar ficha tÃƒÂ©cnica, catÃƒÂ¡logo, datasheet, plano, certificado, muestra, manual, ficha de seguridad o submittal tÃƒÂ©cnico junto con la oferta/propuesta. false si el texto solo describe especificaciones tÃƒÂ©cnicas, marca, modelo, nÃƒÂºmero de parte o cumplimiento tÃƒÂ©cnico sin pedir un documento entregable.
 - marca_modelo_requerido: marca, fabricante, modelo o nÃƒÂºmero de parte exigido para ese renglÃƒÂ³n. Si no hay, null.
@@ -911,7 +1031,10 @@ DOCUMENTAL_KEYWORDS = [
 ]
 
 ACP_CODE_RE = re.compile(r"([A-Z]{3})-([A-Z]{3})-(\d{5})", re.IGNORECASE)
-ACP_CODE_AT_ITEM_START_RE = RADAR_ACP_ITEM_START_RE
+ACP_CODE_AT_ITEM_START_RE = re.compile(
+    r"^\s*([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
+    re.IGNORECASE,
+)
 
 def _normalize_acp_code(value):
     text = str(value or "").strip().upper()
@@ -929,10 +1052,11 @@ def _extract_item_start_acp_code(item):
     if explicit_code:
         return explicit_code
 
-    for key in ["codigo_articulo", "codigo_acp", "termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
-        code = _extract_radar_item_start_code(item.get(key))
-        if code:
-            return code
+    for key in ["termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
+        text = str(item.get(key) or "").strip()
+        match = ACP_CODE_AT_ITEM_START_RE.match(text)
+        if match:
+            return match.group(1).upper()
     return ""
 
 def _parse_rows_from_scope_text(value):

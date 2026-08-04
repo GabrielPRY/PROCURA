@@ -920,6 +920,11 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
                 for match in re.findall(r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b|\b[A-Z]{6}\d{5}\b", str(text_blob).upper())
             ]
         codigo_matches = [code for code in list(dict.fromkeys(codigo_matches)) if code][:12]
+        codigo_display_matches = [
+            f"{code[:3]}-{code[3:6]}-{code[6:]}"
+            for code in codigo_matches
+            if re.fullmatch(r"[A-Z]{6}\d{5}", code)
+        ]
         keywords = _history_keywords(text_blob)
         sli_consultado = bool(sli_detail.get("consultado"))
         sli_error = sli_detail.get("error") or ""
@@ -1042,7 +1047,7 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
         return {
             "radar": {"numero_licitacion": numero, "objeto": objeto, "categoria": categoria},
             "keywords": keywords,
-            "codigo_matches": codigo_matches,
+            "codigo_matches": codigo_display_matches,
             "sli_detail": {
                 "consultado": sli_consultado,
                 "error": sli_error,
