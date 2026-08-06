@@ -419,7 +419,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
       await updateRadarEstado(row.id, "en_seguimiento", user.username, nota);
       await loadRadar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo enviar la licitacion a seguimiento.");
+      setError(err instanceof Error ? err.message : "No se pudo enviar la licitación a seguimiento.");
     } finally {
       setBusy(false);
     }
@@ -428,17 +428,17 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const summaryCards: Array<[string, string | number, string, LucideIcon, string]> = [
     ["Total abiertas", total, `${visibleRows.length} visibles con filtros`, ShieldCheck, "text-blue-700"],
     ["Nuevas", newCount, "Sin revisar todavia", CheckCircle2, "text-emerald-700"],
-    ["Alertas enmienda", alertCount, "Requieren revision", AlertTriangle, "text-amber-700"],
+    ["Alertas enmienda", alertCount, "Requieren revisión", AlertTriangle, "text-amber-700"],
     ["Cierre 72h", closingSoonCount, "Prioridad operativa", CalendarClock, "text-rose-700"]
   ];
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
+      <div className="space-y-4">
         <PageHeader
           eyebrow="Radar Supervisor"
           title="Licitaciones abiertas del SLI"
-          copy="Vista operativa para filtrar, ordenar, detectar enmiendas y decidir que procesos pasan a seguimiento."
+          copy="Vista operativa para filtrar, ordenar, detectar enmiendas y decidir qué procesos pasan a seguimiento."
           actions={
             <Button onClick={handleScan} disabled={busy} variant="primary" size="lg">
               <RefreshCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
@@ -446,12 +446,12 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+        <ModuleSection className="flex flex-wrap gap-2 p-3 text-xs font-semibold">
           <StatusBadge tone="neutral">Actualización: {scheduler?.enabled === false ? "manual" : `cada ${scheduler?.interval_minutes || 25} min`}</StatusBadge>
-          <StatusBadge tone={scheduler?.last_error ? "danger" : "ok"}>{scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Ultimo escaneo con error" : "Scheduler listo"}</StatusBadge>
-          <StatusBadge tone="neutral">Ultimo escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}</StatusBadge>
-        </div>
-      </ModuleSection>
+          <StatusBadge tone={scheduler?.last_error ? "danger" : "ok"}>{scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Último escaneo con error" : "Scheduler listo"}</StatusBadge>
+          <StatusBadge tone="neutral">Último escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}</StatusBadge>
+        </ModuleSection>
+      </div>
 
       <section className="grid gap-3 md:grid-cols-4">
         {summaryCards.map(([label, value, hint, Icon, tone]) => (
@@ -474,7 +474,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
               <div>
                 <div className="font-semibold">Enmiendas pendientes sobre procesos ya decididos</div>
                 <p className="mt-1 leading-6">
-                  Hay {amendmentPriorityRows.length} licitacion(es) descartadas, revisadas o en seguimiento que recibieron enmienda nueva.
+                  Hay {amendmentPriorityRows.length} licitación(es) descartadas, revisadas o en seguimiento que recibieron una enmienda nueva.
                 </p>
               </div>
             </div>
@@ -680,7 +680,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-brand">Detalle seleccionado</div>
                     <div className="mt-1 text-lg font-semibold text-slate-900">{selectedRow.numero_licitacion} | {selectedRow.objeto || "Sin objeto"}</div>
-                    <p className="mt-2 text-sm text-muted">{selectedRow.categoria || "Categoria no clasificada"}</p>
+                    <p className="mt-2 text-sm text-muted">{selectedRow.categoria || "Categoría no clasificada"}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusTone(selectedRow.estado_radar)}`}>
                     {estadoLabel[String(selectedRow.estado_radar || "nueva")] || selectedRow.estado_radar || "Nueva"}
@@ -708,7 +708,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 }`}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-brand">Cruce historico ACP</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-brand">Cruce histórico ACP</div>
                       <div className="mt-1 text-base font-semibold text-slate-900">
                         {loadingHistorico
                           ? "Leyendo RFQ y comparando..."
@@ -772,11 +772,11 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="font-semibold">Revisar por enmienda nueva</div>
                     <p className="mt-1 leading-6">
-                      Esta licitacion estaba {selectedRow.estado_radar === "descartada" ? "descartada" : "en seguimiento/revisada"} y recibio una enmienda.
+                      Esta licitación estaba {selectedRow.estado_radar === "descartada" ? "descartada" : "en seguimiento/revisada"} y recibió una enmienda.
                       Anterior: {selectedRow.enmienda_anterior || "N/D"} | Actual: {selectedRow.numero_enmienda || "N/D"}.
                     </p>
                     {selectedRow.estado_radar === "descartada" ? (
-                      <p className="mt-1 font-semibold">Conviene reabrir la revision antes de mantenerla descartada.</p>
+                      <p className="mt-1 font-semibold">Conviene reabrir la revisión antes de mantenerla descartada.</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -812,7 +812,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     value={supervisorNote}
                     onChange={(event) => setSupervisorNote(event.target.value)}
                     rows={4}
-                    placeholder="Ej: Revisar RFQ por posible enmienda, comparar contra historico y confirmar proveedor local."
+                    placeholder="Ej.: revisar RFQ por posible enmienda, comparar contra histórico y confirmar proveedor local."
                     className="mt-2 w-full resize-none rounded-lg border border-line bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-brand focus:ring-2 focus:ring-blue-100"
                   />
                 </label>
@@ -871,11 +871,11 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     active: loadingHistorico
                   },
                   {
-                    label: "3. Codigos / renglones",
+                    label: "3. Códigos / renglones",
                     value: historicoMatch?.codigo_matches?.length
-                      ? `${historicoMatch.codigo_matches.length} codigo(s)`
+                      ? `${historicoMatch.codigo_matches.length} código(s)`
                       : historicoMatch?.summary?.renglones_detectados_count
-                        ? `${historicoMatch.summary.renglones_detectados_count} renglon(es)`
+                        ? `${historicoMatch.summary.renglones_detectados_count} renglón(es)`
                         : "Requiere pliego",
                     done: Boolean(historicoMatch?.codigo_matches?.length),
                     active: Boolean(historicoMatch?.summary?.requiere_revision_rfq)

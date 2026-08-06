@@ -127,7 +127,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
       <section className="grid gap-3 rounded-xl border border-line bg-panel p-5 shadow-sm lg:grid-cols-3">
         <label className="grid gap-2 text-sm font-semibold text-slate-800">
           Periodo
-          <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
+          <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="app-input h-11">
             {[7, 30, 60, 90, 180].map((value) => (
               <option key={value} value={value}>
                 Ultimos {value} dias
@@ -137,7 +137,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-800">
           Usuario
-          <select value={username} onChange={(event) => setUsername(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
+          <select value={username} onChange={(event) => setUsername(event.target.value)} className="app-input h-11">
             {(options.users || ["Todos"]).map((value) => (
               <option key={value} value={value}>
                 {value}
@@ -147,7 +147,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-800">
           Modulo
-          <select value={module} onChange={(event) => setModule(event.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-sm outline-none">
+          <select value={module} onChange={(event) => setModule(event.target.value)} className="app-input h-11">
             {(options.modules || ["Todos"]).map((value) => (
               <option key={value} value={value}>
                 {value}
@@ -191,7 +191,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
               (summary?.recent_errors || []).slice(0, 6).map((row, index) => (
                 <div key={index} className="rounded-lg border border-rose-100 bg-rose-50 p-3">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-sm font-semibold text-rose-900">{String(row.module || "modulo")} | {String(row.action || "accion")}</div>
+                    <div className="text-sm font-semibold text-rose-900">{String(row.module || "módulo")} | {String(row.action || "acción")}</div>
                     <div className="text-xs font-semibold text-rose-700">{shortDate(row.created_at)}</div>
                   </div>
                   <div className="mt-1 text-xs text-rose-800">{String(row.username || "sin usuario")} | {String(row.provider || "sin proveedor")} | {String(row.model || "sin modelo")}</div>

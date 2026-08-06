@@ -444,15 +444,16 @@ export function AdminConsole({ user }: { user: AuthUser }) {
                 className="app-input"
               />
             </label>
-            <button
+            <Button
               type="button"
               onClick={saveGlobalApiKey}
               disabled={savingApiKey || !globalGeminiKey.trim()}
-              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 text-sm font-semibold text-white disabled:opacity-60"
+              variant="primary"
+              className="mt-3 w-full"
             >
               {savingApiKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Guardar llave global
-            </button>
+            </Button>
           </div>
           </div>
         </div>
@@ -493,7 +494,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
           <input
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
-            placeholder="Contrasena temporal"
+            placeholder="Contraseña temporal"
             type="password"
             className="app-input"
           />
@@ -508,15 +509,16 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="button"
             onClick={createUser}
             disabled={saving || !newUsername.trim() || !newPassword.trim()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+            variant="primary"
+            size="lg"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCog className="h-4 w-4" />}
             Crear
-          </button>
+          </Button>
         </div>
       </details>
 
@@ -524,7 +526,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="text-sm font-semibold text-slate-900">Usuarios existentes</div>
-            <p className="mt-1 text-sm text-muted">Cambia roles, resetea contrasenas y revisa si cada usuario tiene llaves configuradas.</p>
+            <p className="mt-1 text-sm text-muted">Cambia roles, restablece contraseñas y revisa la configuración de cada usuario.</p>
           </div>
           <label className="relative block lg:w-80">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -532,7 +534,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar usuario, rol o correo..."
-              className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm outline-none"
+              className="app-input h-10 w-full pl-9 pr-3"
             />
           </label>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-brand" />}
@@ -571,27 +573,29 @@ export function AdminConsole({ user }: { user: AuthUser }) {
                         <input
                           value={resetPasswords[item.Usuario] || ""}
                           onChange={(event) => setResetPasswords((current) => ({ ...current, [item.Usuario]: event.target.value }))}
-                          placeholder="Nueva contrasena"
+                          placeholder="Nueva contraseña"
                           type="password"
-                          className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+                          className="app-input h-10 min-w-0 flex-1"
                         />
-                        <button
+                        <Button
                           type="button"
                           onClick={() => resetPassword(item.Usuario)}
-                          className="rounded-lg border border-line bg-slate-50 px-3 text-xs font-semibold text-slate-700"
+                          variant="secondary"
+                          size="sm"
                         >
-                          Reset
-                        </button>
+                          Restablecer
+                        </Button>
                       </div>
-                      <button
+                      <Button
                         type="button"
                         onClick={() => removeUser(item.Usuario)}
                         disabled={item.Usuario.toLowerCase() === "admin" || item.Usuario === user.username}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        variant="danger"
+                        size="sm"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Borrar
-                      </button>
+                      </Button>
                     </div>
                     <div className="mt-4 rounded-xl border border-line bg-slate-50 p-3">
                       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -609,17 +613,17 @@ export function AdminConsole({ user }: { user: AuthUser }) {
                           }
                           placeholder="Gemini API Key"
                           type="password"
-                          className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none"
+                          className="app-input h-10"
                         />
-                        <button
+                        <Button
                           type="button"
                           onClick={() => saveUserApiKeys(item.Usuario)}
                           disabled={savingUserApiKey === item.Usuario || !apiDraft.gemini_key.trim()}
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand px-3 text-sm font-semibold text-white disabled:opacity-60"
+                          variant="primary"
                         >
                           {savingUserApiKey === item.Usuario ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                           Guardar llaves
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

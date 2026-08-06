@@ -341,7 +341,7 @@ export function RfqEmailConsole({ user }: { user: AuthUser }) {
           copy="Selecciona los renglones, define las condiciones y genera un correo listo para Outlook."
           actions={
             <StatusBadge tone={selectedItems.length ? "info" : "neutral"}>
-              {selectedItems.length} de {items.length} renglones
+              {items.length ? `${selectedItems.length} de ${items.length} renglones` : "Sin RFQ cargado"}
             </StatusBadge>
           }
         />

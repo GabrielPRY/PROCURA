@@ -8,7 +8,6 @@ import {
   ExternalLink,
   Loader2,
   MessageSquareText,
-  Plus,
   RefreshCcw,
   Search,
   Trash2
@@ -16,7 +15,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type AuthUser } from "@/lib/auth";
 import {
-  createSeguimiento,
   deleteSeguimiento,
   getSeguimientoHistorial,
   getSeguimientos,
@@ -110,6 +108,18 @@ function normalizeStatus(value?: string | null) {
     .toLowerCase();
 }
 
+function displayStatus(value?: string | null) {
+  const status = String(value || "").trim();
+  const labels: Record<string, string> = {
+    "Cumple Tecnicamente": "Cumple técnicamente",
+    "No Cumple Tecnicamente": "No cumple técnicamente",
+    "En Evaluacion Economica": "En evaluación económica",
+    "No Adjudicada": "No adjudicada",
+    "Oferta Enviada al SLI": "Oferta enviada al SLI"
+  };
+  return labels[status] || status;
+}
+
 function suggestedEstadoFromSli(result?: SliLookupResult | null, current = "En Preparacion") {
   const acta = result?.resumen_acta;
   if (acta?.posible_adjudicacion_propia) return "Adjudicada";
@@ -159,8 +169,6 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
   const [history, setHistory] = useState<SeguimientoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ numero_licitacion: "", objeto: "", responsable: user.username, notas: "" });
   const [comment, setComment] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -226,31 +234,6 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     if (!sliResults[item.id] && !sliLoading[item.id]) void checkSli(item, true);
     if (typeof window !== "undefined" && window.innerWidth < 1280) {
       window.setTimeout(() => document.getElementById("seguimiento-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-    }
-  }
-
-  async function createItem() {
-    const number = cleanRfq(form.numero_licitacion);
-    if (!number) {
-      setError("Ingresa un número de licitación válido.");
-      return;
-    }
-    setError(null);
-    try {
-      const response = await createSeguimiento({
-        ...form,
-        numero_licitacion: number,
-        owner_username: user.username,
-        responsable: form.responsable || user.username,
-        moneda: "USD",
-        monto_ofertado: 0
-      });
-      setForm({ numero_licitacion: "", objeto: "", responsable: user.username, notas: "" });
-      setShowCreate(false);
-      await refresh();
-      if (response.seguimiento) await openItem(response.seguimiento);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear seguimiento.");
     }
   }
 
@@ -438,31 +421,18 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
             </label>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="app-input h-11 sm:w-56">
               <option value="Todos">Todos los estados</option>
-              {states.map((state) => <option key={state} value={state}>{state}</option>)}
+              {states.map((state) => <option key={state} value={state}>{displayStatus(state)}</option>)}
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={() => setAlertsOnly((current) => !current)} variant={alertsOnly ? "primary" : "secondary"}>
               <BellRing className="h-4 w-4" /> Solo alertas
             </Button>
-            <Button type="button" onClick={() => setShowCreate((current) => !current)} variant="secondary">
-              <Plus className="h-4 w-4" /> Agregar
-            </Button>
             <Button type="button" onClick={() => void refresh()} variant="ghost" size="icon" title="Actualizar registros">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             </Button>
           </div>
         </div>
-
-        {showCreate ? (
-          <div className="mt-4 grid gap-3 border-t border-line pt-4 lg:grid-cols-[180px_minmax(0,1fr)_180px_minmax(0,1fr)_auto]">
-            <input value={form.numero_licitacion} onChange={(event) => setForm((current) => ({ ...current, numero_licitacion: event.target.value }))} placeholder="Número RFQ" className="app-input" />
-            <input value={form.objeto} onChange={(event) => setForm((current) => ({ ...current, objeto: event.target.value }))} placeholder="Objeto de la licitación" className="app-input" />
-            <input value={form.responsable} onChange={(event) => setForm((current) => ({ ...current, responsable: event.target.value }))} placeholder="Responsable" className="app-input" />
-            <input value={form.notas} onChange={(event) => setForm((current) => ({ ...current, notas: event.target.value }))} placeholder="Comentario inicial" className="app-input" />
-            <Button type="button" onClick={createItem} variant="primary"><Plus className="h-4 w-4" /> Crear</Button>
-          </div>
-        ) : null}
       </ModuleSection>
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -489,8 +459,8 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                       <button type="button" onClick={() => void openItem(item)} aria-current={isSelected ? "true" : undefined} className="min-w-0 flex-1 text-left">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-base font-semibold text-brand">{item.numero_licitacion}</span>
-                          <StatusBadge tone={statusTone(item.estado)}>{item.estado || "Pendiente SLI"}</StatusBadge>
-                          {result?.estatus ? <StatusBadge tone={statusTone(result.estatus)}>SLI: {result.estatus}</StatusBadge> : null}
+                          <StatusBadge tone={statusTone(item.estado)}>{displayStatus(item.estado) || "Pendiente SLI"}</StatusBadge>
+                          {result?.estatus ? <StatusBadge tone={statusTone(result.estatus)}>SLI: {displayStatus(result.estatus)}</StatusBadge> : null}
                         </div>
                         <div className="mt-2 line-clamp-2 break-words text-sm font-semibold leading-6 text-ink">{item.objeto || "Sin objeto registrado"}</div>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
@@ -523,7 +493,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
               })}
             </div>
           ) : (
-            <div className="p-5"><EmptyState icon={Search} title="No hay procesos con esos filtros" copy="Cambia la búsqueda, desactiva Solo alertas o agrega una licitación manualmente." /></div>
+            <div className="p-5"><EmptyState icon={Search} title="No hay procesos con esos filtros" copy="Cambia la búsqueda o desactiva Solo alertas. Las licitaciones se agregan desde Radar." /></div>
           )}
         </ModuleSection>
 
@@ -536,7 +506,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                   <h2 className="mt-1 break-words text-lg font-semibold text-ink">{selected.numero_licitacion}</h2>
                   <p className="mt-1 break-words text-sm leading-5 text-muted">{selected.objeto || "Sin objeto registrado"}</p>
                 </div>
-                <StatusBadge tone={statusTone(selected.estado)}>{selected.estado || "Pendiente"}</StatusBadge>
+                <StatusBadge tone={statusTone(selected.estado)}>{displayStatus(selected.estado) || "Pendiente"}</StatusBadge>
               </div>
 
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
@@ -613,7 +583,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                     {history.map((row, index) => (
                       <li key={index} className="relative">
                         <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-blue-500 bg-panel" />
-                        <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold text-ink">{row.estado_nuevo}</span><span className="text-xs text-muted">{formatDate(row.fecha)}</span></div>
+                        <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold text-ink">{displayStatus(row.estado_nuevo)}</span><span className="text-xs text-muted">{formatDate(row.fecha)}</span></div>
                         <div className="mt-1 text-xs text-muted">{row.registrado_por || "Sistema"}</div>
                         {row.nota ? <p className="mt-2 text-sm leading-6 text-ink">{row.nota}</p> : null}
                       </li>

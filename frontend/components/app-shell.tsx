@@ -16,6 +16,13 @@ const primaryByRole: Record<string, ModuleId[]> = {
   Admin: ["admin", "metricas"]
 };
 
+const compactNavLabels: Partial<Record<ModuleId, string>> = {
+  costos: "Costos",
+  radar: "Radar",
+  workspaces: "Espacios",
+  auditor_empresas: "Auditor IA"
+};
+
 function productName(role: string) {
   if (role === "Admin") return "Administración";
   if (role === "Logistica") return "Logística";
@@ -108,6 +115,7 @@ export function AppShell({
   function navButton(item: (typeof visibleItems)[number], mobile = false) {
     const active = item.id === activeModule;
     const Icon = item.icon;
+    const visibleLabel = mobile ? item.label : compactNavLabels[item.id] || item.label;
     return (
       <button
         key={item.id}
@@ -123,7 +131,7 @@ export function AppShell({
       >
         <span className="app-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-md"><Icon className="h-4 w-4" /></span>
         <span className="min-w-0">
-          <span className="block truncate">{item.label}</span>
+          <span className="block truncate">{visibleLabel}</span>
           {mobile ? <span className="mt-0.5 block truncate text-xs font-normal text-muted">{item.description}</span> : null}
         </span>
       </button>
@@ -133,39 +141,24 @@ export function AppShell({
   return (
     <div className={cn("app-shell-root min-h-screen", theme === "dark" && "dark")}>
       <header className="app-header sticky top-0 z-40 border-b border-line">
-        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center justify-between gap-4 px-4 sm:px-5 xl:px-7">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-4 px-4 sm:px-5 xl:px-7">
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand text-xs font-black text-white">PA</div>
             <div className="min-w-0">
               <div className="truncate text-[11px] font-bold uppercase text-brand">Procura AI</div>
-              <div className="truncate text-base font-semibold text-ink">{productName(role)}</div>
+              <div className="hidden truncate text-base font-semibold text-ink sm:block">{productName(role)}</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="hidden max-w-48 truncate px-2 text-sm font-semibold text-ink sm:block">{user.username}</span>
-            <Button type="button" onClick={toggleTheme} variant="ghost" size="icon" title={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"} aria-label={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"}>
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="lg:hidden" title={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-label={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-expanded={mobileOpen}>
-              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
-            <Button onClick={onLogout} variant="ghost" size="icon" title="Cerrar sesión" aria-label="Cerrar sesión">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="hidden border-t border-line lg:block">
-          <nav className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-1.5 px-4 sm:px-5 xl:gap-2 xl:px-7" aria-label="Navegación principal">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex" aria-label="Navegación principal">
+            <div className="flex min-w-0 items-center justify-center gap-1">
               {primaryItems.map((item) => navButton(item))}
             </div>
-            {visibleItems.length ? (
-              <div ref={moreMenuRef} className="relative ml-2 shrink-0 border-l border-line pl-3">
+            {moreItems.length ? (
+              <div ref={moreMenuRef} className="relative ml-1 shrink-0 border-l border-line pl-2">
                 <button
                   type="button"
-                  className={cn("app-top-nav-button app-nav-more-current inline-flex h-10 max-w-52 items-center gap-2 border px-3 text-sm font-semibold", activeInMore && "app-top-nav-button-active")}
+                  className={cn("app-top-nav-button app-nav-more-current inline-flex h-10 max-w-48 items-center gap-2 border px-3 text-sm font-semibold", activeInMore && "app-top-nav-button-active")}
                   onClick={() => setMoreOpen((current) => !current)}
                   aria-expanded={moreOpen}
                   aria-haspopup="menu"
@@ -173,19 +166,19 @@ export function AppShell({
                 >
                   <LayoutGrid className="h-4 w-4" />
                   <span className="truncate">Módulos</span>
-                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-muted">{visibleItems.length}</span>
+                  <span className="app-nav-count rounded-full px-1.5 py-0.5 text-[10px] font-bold">{moreItems.length}</span>
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
                 </button>
                 {moreOpen ? (
                   <div className="app-nav-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(42rem,calc(100vw-2rem))] border border-line p-3 shadow-lg" role="menu">
                     <div className="flex items-center justify-between gap-3 px-2 pb-3 pt-1">
-                      <div><div className="text-sm font-semibold text-ink">Todos los módulos</div><div className="mt-0.5 text-xs text-muted">Accesos disponibles para {role}</div></div>
-                      <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-muted">{visibleItems.length} disponibles</span>
+                      <div><div className="text-sm font-semibold text-ink">Herramientas adicionales</div><div className="mt-0.5 text-xs text-muted">Funciones que no aparecen en la barra principal</div></div>
+                      <span className="app-menu-count rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-muted">{moreItems.length} disponibles</span>
                     </div>
                     <div className="grid gap-1 sm:grid-cols-2">
-                      {visibleItems.map((item) => (
-                        <button key={item.id} type="button" role="menuitem" aria-current={item.id === activeModule ? "page" : undefined} onClick={() => onModuleChange(item.id)} className={cn("app-menu-item flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left", item.id === activeModule && "app-menu-item-active")}>
-                          <span className="app-nav-icon grid h-8 w-8 shrink-0 place-items-center rounded-md"><item.icon className="h-4 w-4 text-brand" /></span>
+                      {moreItems.map((item) => (
+                        <button key={item.id} type="button" role="menuitem" aria-current={item.id === activeModule ? "page" : undefined} onClick={() => { setMoreOpen(false); onModuleChange(item.id); }} className={cn("app-menu-item flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left", item.id === activeModule && "app-menu-item-active")}>
+                          <span className="app-nav-icon grid h-8 w-8 shrink-0 place-items-center rounded-md"><item.icon className="h-4 w-4" /></span>
                           <span className="min-w-0"><span className="block text-sm font-semibold text-ink">{item.label}</span><span className="mt-0.5 block line-clamp-1 text-xs leading-5 text-muted">{item.description}</span></span>
                         </button>
                       ))}
@@ -195,10 +188,23 @@ export function AppShell({
               </div>
             ) : null}
           </nav>
+
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <span className="app-user-name hidden max-w-40 truncate text-sm font-semibold text-ink sm:block">{user.username}</span>
+            <Button type="button" onClick={toggleTheme} variant="ghost" size="icon" title={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"} aria-label={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"}>
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="xl:hidden" title={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-label={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-expanded={mobileOpen}>
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+            <Button onClick={onLogout} variant="ghost" size="icon" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {mobileOpen ? (
-          <nav className="app-mobile-nav border-t border-line p-3 lg:hidden" aria-label="Navegación móvil">
+          <nav className="app-mobile-nav border-t border-line p-3 xl:hidden" aria-label="Navegación móvil">
             <div className="flex items-center justify-between gap-3 px-1 pb-3">
               <div><div className="text-sm font-semibold text-ink">Navegación</div><div className="mt-0.5 text-xs text-muted">{role}</div></div>
               <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-muted">{visibleItems.length} módulos</span>
@@ -214,7 +220,7 @@ export function AppShell({
         ) : null}
       </header>
 
-      <main className="app-content mx-auto w-full max-w-[1680px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">
+      <main className="app-content mx-auto w-full max-w-[1680px] min-w-0 px-4 py-4 sm:px-5 xl:px-7 xl:py-5">
         <div key={activeModule} className="app-module-enter">
           {children}
         </div>

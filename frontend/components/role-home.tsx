@@ -1,15 +1,19 @@
 "use client";
 
-import { AlertTriangle, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { getAllowedModules, type ModuleId } from "@/lib/navigation";
 import { getRadarStats } from "@/lib/radar";
 import { getLogisticsCalculations, getLogisticsCarriersStatus, getLogisticsSettings } from "@/lib/logistics";
+import { loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
+import { getSeguimientos } from "@/lib/seguimiento";
+import { listWorkspaces } from "@/lib/workspaces";
 
 type DashboardAction = {
   module: ModuleId;
@@ -44,6 +48,15 @@ function dashboardDefinition(role: string) {
   return { title: "Tu jornada de procura", copy: "Analiza el RFQ y continúa con costos, proveedores y seguimiento.", primary: "rfq" as ModuleId };
 }
 
+function generalValue(result: RfqAnalysisResponse | null, keys: string[], fallback: string) {
+  const source = result?.condiciones_generales || {};
+  for (const key of keys) {
+    const value = String(source[key] ?? "").trim();
+    if (value && !["nan", "none", "null"].includes(value.toLowerCase())) return value;
+  }
+  return fallback;
+}
+
 export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
   const role = normalizeRole(user.role);
   const definition = dashboardDefinition(role);
@@ -52,6 +65,9 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
   const [loading, setLoading] = useState(allowed.has("radar"));
   const [logisticsStats, setLogisticsStats] = useState({ calculations: 0, forwarders: 0, carrierReady: false });
   const [loadingLogistics, setLoadingLogistics] = useState(role === "Logistica");
+  const [activeRfq, setActiveRfq] = useState<RfqAnalysisResponse | null>(null);
+  const [analystStats, setAnalystStats] = useState({ tracking: 0, workspaces: 0 });
+  const [loadingAnalyst, setLoadingAnalyst] = useState(role === "Analista");
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +116,31 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
     return () => { mounted = false; };
   }, [role]);
 
+  useEffect(() => {
+    let mounted = true;
+    if (role !== "Analista") {
+      setLoadingAnalyst(false);
+      return () => { mounted = false; };
+    }
+
+    setActiveRfq(loadLastRfq(user.username));
+    setLoadingAnalyst(true);
+    Promise.allSettled([
+      getSeguimientos({ username: user.username, role: user.role }),
+      listWorkspaces(user.username, false)
+    ]).then(([tracking, workspaces]) => {
+      if (!mounted) return;
+      setAnalystStats({
+        tracking: tracking.status === "fulfilled" ? tracking.value.seguimientos?.length || 0 : 0,
+        workspaces: workspaces.status === "fulfilled" ? workspaces.value.workspaces?.length || 0 : 0
+      });
+    }).finally(() => {
+      if (mounted) setLoadingAnalyst(false);
+    });
+
+    return () => { mounted = false; };
+  }, [role, user.role, user.username]);
+
   const primary = allowed.has(definition.primary) ? actions[definition.primary] : actions[[...allowed][0] as ModuleId];
   const PrimaryIcon = primary?.icon;
 
@@ -110,7 +151,7 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
           eyebrow={role}
           title={definition.title}
           copy={definition.copy}
-          actions={primary && PrimaryIcon ? (
+          actions={role !== "Analista" && primary && PrimaryIcon ? (
             <Button variant="primary" size="lg" onClick={() => onModuleChange?.(primary.module)}>
               <PrimaryIcon className="h-4 w-4" />
               {primary.title}
@@ -133,6 +174,55 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
           <StatCard loading={loadingLogistics} label="Forwarders activos" value={logisticsStats.forwarders} hint="Destinos compartidos" icon={FolderOpen} />
           <StatCard loading={loadingLogistics} label="Transportista" value={logisticsStats.carrierReady ? "Conectado" : "Pendiente"} hint="Estado de tarifas en vivo" icon={ShieldCheck} />
         </section>
+      ) : null}
+
+      {role === "Analista" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-3">
+            <StatCard
+              label="RFQ actual"
+              value={activeRfq?.items?.length || 0}
+              hint={activeRfq ? `${generalValue(activeRfq, ["numero_licitacion", "numero_licitación", "licitacion", "n_licitacion"], "Sin número")} · renglones detectados` : "No hay un análisis activo"}
+              icon={FileText}
+            />
+            <StatCard loading={loadingAnalyst} label="Mis seguimientos" value={analystStats.tracking} hint="Procesos conectados al SLI" icon={ClipboardList} />
+            <StatCard loading={loadingAnalyst} label="Expedientes guardados" value={analystStats.workspaces} hint="Análisis disponibles para recuperar" icon={FolderOpen} />
+          </section>
+
+          <ModuleSection className="overflow-hidden p-0">
+            <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div>
+                <h2 className="text-base font-semibold text-ink">{activeRfq ? "Continúa con el RFQ actual" : "Comienza un análisis RFQ"}</h2>
+                <p className="mt-1 text-sm text-muted">{activeRfq ? "El análisis permanece disponible durante tu sesión." : "Carga el pliego para habilitar costos, proveedores y correo."}</p>
+              </div>
+              <StatusBadge tone={activeRfq ? "ok" : "neutral"}>{activeRfq ? "Análisis disponible" : "Sin RFQ activo"}</StatusBadge>
+            </div>
+
+            {activeRfq ? (
+              <div className="grid min-w-0 gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Licitación</div>
+                  <div className="mt-1 break-words text-lg font-semibold text-ink">{generalValue(activeRfq, ["numero_licitacion", "numero_licitación", "licitacion", "n_licitacion"], "Sin número identificado")}</div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">{generalValue(activeRfq, ["objeto", "objeto_licitacion", "descripcion_general"], `${activeRfq.items?.length || 0} renglones listos para continuar.`)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button type="button" variant="primary" onClick={() => onModuleChange?.("rfq")}><FileText className="h-4 w-4" />Abrir RFQ</Button>
+                  <Button type="button" variant="secondary" onClick={() => onModuleChange?.("costos")}><BarChart3 className="h-4 w-4" />Costos</Button>
+                  <Button type="button" variant="secondary" onClick={() => onModuleChange?.("proveedores")}><PackageSearch className="h-4 w-4" />Proveedores</Button>
+                  <Button type="button" variant="ghost" onClick={() => onModuleChange?.("rfq_email")}><Mail className="h-4 w-4" />Correo</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand"><FileText className="h-5 w-5" /></div>
+                  <div><div className="text-sm font-semibold text-ink">Primer paso: analiza el pliego</div><p className="mt-1 text-sm leading-6 text-muted">Después podrás comparar precios, buscar proveedores y preparar la solicitud de cotización.</p></div>
+                </div>
+                <Button type="button" variant="primary" onClick={() => onModuleChange?.("rfq")} className="shrink-0">Analizar RFQ<ArrowRight className="h-4 w-4" /></Button>
+              </div>
+            )}
+          </ModuleSection>
+        </>
       ) : null}
 
       {allowed.has("radar") && !loading && (radarStats.alertas > 0 || radarStats.cierre72h > 0) ? (

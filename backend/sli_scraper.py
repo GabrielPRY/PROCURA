@@ -6,6 +6,7 @@ y guarda las licitaciones abiertas en la tabla radar_licitaciones.
 """
 
 import re
+import unicodedata
 from datetime import datetime
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -53,9 +54,22 @@ MESES_SLI = {
 def parse_sli_datetime(value):
     if not value:
         return None
-    text = re.sub(r"\s+", " ", str(value).replace("\xa0", " ")).strip().lower()
+    raw = re.sub(r"\s+", " ", str(value).replace("\xa0", " ")).strip()
+    if not raw:
+        return None
+
+    for candidate in (raw, raw.replace("Z", "+00:00")):
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+        except ValueError:
+            pass
+
+    text = unicodedata.normalize("NFD", raw.lower())
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+    text = re.sub(r"\s+", " ", text.replace(".", " ")).strip()
     match = re.search(
-        r"(\d{1,2})-([a-záéíóúñ]{3,})-(\d{4})\s+(\d{1,2}):(\d{2})\s*([ap])\.m\.",
+        r"(\d{1,2})[-/\s]([a-z]{3,})[-/\s](\d{4})\s+(\d{1,2}):(\d{2})(?:\s*([ap])\s*m?)?",
         text,
         re.IGNORECASE,
     )
@@ -68,9 +82,9 @@ def parse_sli_datetime(value):
         return None
 
     hora = int(hora)
-    if ampm.lower() == "p" and hora != 12:
+    if (ampm or "").lower() == "p" and hora != 12:
         hora += 12
-    if ampm.lower() == "a" and hora == 12:
+    if (ampm or "").lower() == "a" and hora == 12:
         hora = 0
 
     try:

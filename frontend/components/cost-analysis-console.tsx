@@ -296,7 +296,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const isLoadingSelection = selectedIndexes.some((index) => loadingIndexes.includes(index));
   const rfqNumber = cleanValue(
     rfq?.condiciones_generales?.numero_licitacion || rfq?.condiciones_generales?.licitacion,
-    "RFQ activo"
+    ""
   );
 
   function toggleSelectedIndex(index: number) {
@@ -314,8 +314,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
           title="Referencias históricas del RFQ"
           copy="Selecciona los renglones que vas a participar y compara sus precios anteriores sin mezclar partidas no elegidas."
           actions={
-            <StatusBadge tone="info">
-              <BarChart3 className="h-3.5 w-3.5" /> {rfqNumber}
+            <StatusBadge tone={items.length ? "info" : "neutral"}>
+              <BarChart3 className="h-3.5 w-3.5" /> {items.length ? `RFQ ${rfqNumber || "sin número"}` : "Sin RFQ cargado"}
             </StatusBadge>
           }
         />

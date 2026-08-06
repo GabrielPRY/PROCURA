@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --ui-bg: #f4f7fb;
+  --ui-bg: #f6f8fb;
   --ui-surface: #ffffff;
   --ui-surface-muted: #f8fafc;
   --ui-surface-strong: #eef3f9;
@@ -14,6 +14,9 @@
   --ui-primary: #155eef;
   --ui-primary-hover: #0b4fd8;
   --ui-primary-soft: #edf4ff;
+  --ui-primary-solid: #155eef;
+  --ui-primary-solid-hover: #0b4fd8;
+  --ui-on-primary: #ffffff;
   --ui-success: #067647;
   --ui-success-soft: #ecfdf3;
   --ui-warning: #b54708;
@@ -48,6 +51,9 @@
   --ui-primary: #6ea8fe;
   --ui-primary-hover: #8bb9ff;
   --ui-primary-soft: rgba(59, 130, 246, 0.15);
+  --ui-primary-solid: #2563eb;
+  --ui-primary-solid-hover: #3b82f6;
+  --ui-on-primary: #ffffff;
   --ui-success: #6ce9a6;
   --ui-success-soft: rgba(18, 183, 106, 0.13);
   --ui-warning: #fec84b;
@@ -75,6 +81,9 @@ button,
 input,
 select,
 textarea { font: inherit; min-width: 0; }
+
+button svg,
+a svg { pointer-events: none; }
 
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
@@ -117,9 +126,20 @@ summary:focus-visible {
 .app-shell-root * { letter-spacing: 0 !important; }
 
 .app-header {
-  background: color-mix(in srgb, var(--ui-surface) 96%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ui-border) 78%, transparent), 0 8px 24px rgba(16, 24, 40, 0.04);
+  background: color-mix(in srgb, var(--ui-surface) 97%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ui-border) 86%, transparent), 0 5px 18px rgba(16, 24, 40, 0.04);
+}
+
+.app-user-name {
+  border-left: 1px solid var(--ui-border);
+  padding-left: 0.875rem;
+}
+
+.app-nav-count,
+.app-menu-count {
+  background: var(--ui-surface-strong);
+  color: var(--ui-text-muted);
 }
 
 .app-nav-menu {
@@ -207,19 +227,18 @@ summary:focus-visible {
   color: var(--ui-text);
 }
 
+.app-surface:has(> .app-page-header:only-child) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.25rem 0 0.5rem;
+}
+
 .app-card { padding: 1rem; }
 
 .app-stat-card {
   overflow: hidden;
   position: relative;
-}
-
-.app-stat-card::after {
-  position: absolute;
-  inset: auto 0 0;
-  height: 0.18rem;
-  background: var(--ui-primary);
-  content: "";
 }
 
 .app-data-card,
@@ -268,6 +287,11 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ui-primary-solid);
+}
+
 .app-btn,
 .app-btn-mini,
 .app-top-nav-button,
@@ -300,15 +324,15 @@ summary:focus-visible {
 }
 
 .app-btn-primary {
-  border-color: #155eef !important;
-  background: #155eef !important;
-  color: #ffffff !important;
+  border-color: var(--ui-primary-solid) !important;
+  background: var(--ui-primary-solid) !important;
+  color: var(--ui-on-primary) !important;
   box-shadow: 0 5px 12px rgba(21, 94, 239, 0.18) !important;
 }
 
 .app-btn-primary:hover:not(:disabled) {
-  border-color: #0b4fd8 !important;
-  background: #0b4fd8 !important;
+  border-color: var(--ui-primary-solid-hover) !important;
+  background: var(--ui-primary-solid-hover) !important;
   box-shadow: 0 7px 15px rgba(21, 94, 239, 0.24) !important;
   transform: translateY(-1px);
 }
@@ -408,7 +432,7 @@ summary:focus-visible {
   border-color: color-mix(in srgb, var(--ui-primary) 34%, transparent);
   background: var(--ui-primary-soft);
   color: var(--ui-primary);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 8%, transparent);
 }
 
 .app-top-nav-button-active::after {
@@ -442,7 +466,7 @@ summary:focus-visible {
   box-shadow: inset 3px 0 0 var(--ui-primary);
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .app-mobile-nav .app-top-nav-button {
     border-color: var(--ui-border);
     background: var(--ui-surface);

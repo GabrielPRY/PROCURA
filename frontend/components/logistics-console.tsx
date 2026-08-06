@@ -591,26 +591,26 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
 
   return (
     <div className="space-y-5">
-      <ModuleSection>
+      <div className="space-y-4">
         <PageHeader eyebrow="Logística doméstica USA" title="Cotizador de transporte" copy="Desde el proveedor hasta el forwarder en Estados Unidos." actions={<StatusBadge tone={items.length ? "info" : "neutral"}>{items.length ? "RFQ conectado" : "Cotización manual"}</StatusBadge>} />
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4" role="tablist" aria-label="Cotizadores logísticos">
+        <ModuleSection className="flex flex-wrap gap-2 p-2" role="tablist" aria-label="Cotizadores logísticos">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = view === tab.id;
             return <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setView(tab.id); setQuotes([]); setError(null); }} className={`app-tab-button inline-flex h-10 items-center gap-2 px-3 text-sm font-semibold ${active ? "app-tab-button-active" : ""}`}><Icon className="h-4 w-4" />{tab.label}{tab.id === "history" && visibleCalculations.length ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{visibleCalculations.length}</span> : null}</button>;
           })}
-        </div>
-      </ModuleSection>
+        </ModuleSection>
+      </div>
 
       {error ? <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</section> : null}
-      {loading ? <section className="flex items-center gap-2 rounded-xl border border-line bg-panel p-4 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Cargando configuración logística...</section> : null}
-
       {view === "rates" ? (
         <>
           <ModuleSection>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h3 className="text-base font-semibold text-ink">Nueva cotización</h3><p className="mt-1 text-sm text-muted">Completa la ruta, describe la carga y confirma antes de consultar.</p></div>
-              <CarrierState name="ShipStation API" configured={carrierStatus?.shipstation.configured} environment={carrierStatus?.shipstation.environment} />
+              {loading
+                ? <div className="flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-muted"><Loader2 className="h-4 w-4 animate-spin text-brand" />Verificando servicio...</div>
+                : <CarrierState name="ShipStation API" configured={carrierStatus?.shipstation.configured} environment={carrierStatus?.shipstation.environment} />}
             </div>
             {items.length ? <div className="mt-5"><Field label="Renglón relacionado"><select value={selectedIndex} onChange={(event) => setSelectedIndex(Number(event.target.value))} className="app-input">{items.map((item, index) => <option key={`${item.renglon}-${index}`} value={index}>{itemLabel(item, index)}</option>)}</select></Field></div> : null}
 

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { AlertTriangle, ArrowRight, CheckCircle2, FileText, Loader2, ShieldAlert, UploadCloud } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, FileText, Loader2, Mail, PackageSearch, ShieldAlert, Truck, UploadCloud } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { analyzeRfq, asBool, asOptionalBool, cleanValue, getUserConfig, loadLastRfq, saveActiveRfqContext, saveLastRfq, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
@@ -218,6 +218,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const contactPhone = getCg(cg, ["telefono_encargado_licitacion", "telefono_encargado", "telefono_contacto"], "");
   const contactCount = [contactName, contactEmail, contactPhone].filter(Boolean).length;
   const risk = getCg(cg, ["riesgo_tecnico_global"], "Bajo");
+  const technicalAttention = risk.toLowerCase() === "alto" ? "Alta" : risk.toLowerCase() === "medio" ? "Media" : "Baja";
   const proposalGlobal = getCg(cg, ["propuesta_tecnica_requerida"], "No especificado en los documentos adjuntos");
   const rfqNumber = getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"], "");
   const proposalLines = Array.isArray(cg.propuesta_tecnica_aplica_renglones)
@@ -230,12 +231,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     ["Ficha/catalogo", String(fichaCount)],
     ["Marca/modelo", String(marcaCount)],
     ["Codigos ACP", `${validCodeCount}/${items.length}`],
-    ["Riesgo tecnico", risk]
+    ["Atencion tecnica", technicalAttention]
   ];
 
   const decisionStats = [
     ["Presencia local", presenceDecision.label],
-    ["Riesgo técnico", risk],
+    ["Atención técnica", technicalAttention],
     ["Propuesta técnica", proposalCount ? `Preparar en ${proposalCount} renglón(es)` : "No detectada"],
     ["Ficha o catálogo", fichaCount ? `Preparar en ${fichaCount} renglón(es)` : "No solicitado aparte"]
   ];
@@ -316,8 +317,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: presenceDecision.tone
         },
         {
-          label: "Complejidad tecnica",
-          value: risk,
+          label: "Atencion tecnica",
+          value: technicalAttention,
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         }
       ]
@@ -325,12 +326,6 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   const criticalAlerts = result
     ? [
-        {
-          label: "Complejidad tecnica",
-          value: risk,
-          detail: "Lectura operativa segun restricciones, entregables y posibles cambios tecnicos.",
-          tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
-        },
         {
           label: "Marca / proveedor",
           value: getCg(cg, ["restriccion_marca_proveedor"], "Sin restriccion detectada"),
@@ -350,7 +345,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "warn" : "neutral"
         },
         {
-          label: "Documentos por renglon",
+          label: "Ficha / catalogo",
           value: fichaCount ? `${fichaCount} renglon(es)` : "No pedida aparte",
           detail: "Solo cuenta entregables documentales, no simples especificaciones.",
           tone: fichaCount ? "warn" : "neutral"
@@ -388,8 +383,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     ? [
         {
           label: "Codigo ACP",
-          value: isValidAcpCode(selectedItem.codigo_articulo) ? cleanValue(selectedItem.codigo_articulo) : "No detectado",
-          tone: isValidAcpCode(selectedItem.codigo_articulo) ? "ok" : "warn"
+          value: isValidAcpCode(selectedItem.codigo_articulo) ? cleanValue(selectedItem.codigo_articulo) : "S/C",
+          tone: isValidAcpCode(selectedItem.codigo_articulo) ? "ok" : "neutral"
         },
         {
           label: "Cantidad",
@@ -402,7 +397,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "warn" : "neutral"
         },
         {
-          label: "Documentos por renglon",
+          label: "Ficha / catalogo",
           value: asBool(selectedItem.requiere_ficha_tecnica) ? "Requerida" : "No pedida aparte",
           tone: asBool(selectedItem.requiere_ficha_tecnica) ? "warn" : "neutral"
         },
@@ -501,7 +496,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         <ModuleSection className="border-l-4 border-l-blue-500">
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr] xl:items-center">
             <div>
-              <div className="text-sm font-semibold text-brand">Recomendación operativa</div>
+              <div className="text-sm font-semibold text-brand">Participación recomendada</div>
               <div className="mt-2 text-2xl font-semibold text-ink">{presenceDecision.company}</div>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{presenceDecision.note}</p>
             </div>
@@ -514,12 +509,11 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               ))}
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <div className="text-xs text-muted">Vista simple para operar rapido. Usa avanzado solo cuando necesites evidencia completa.</div>
-            <div className="inline-flex rounded-lg border border-line bg-slate-50 p-1">
+          <div className="mt-4 flex justify-end border-t border-line pt-4">
+            <div className="inline-flex rounded-lg border border-line bg-slate-50 p-1" aria-label="Nivel de detalle">
               {[
-                ["simple", "Vista simple"],
-                ["advanced", "Vista avanzada"]
+                ["simple", "Simple"],
+                ["advanced", "Con evidencia"]
               ].map(([mode, label]) => (
                 <button
                   key={mode}
@@ -720,9 +714,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       {result && activeTab === "resumen" ? (
         <section className="app-surface">
           <div className="border-b border-line p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-brand">Revisiones necesarias</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand">Pendientes</div>
             <div className="mt-1 text-base font-semibold">Antes de solicitar cotización</div>
-            <p className="mt-1 text-sm text-muted">Aquí solo aparecen requisitos que todavía exigen una acción o confirmación.</p>
+            <p className="mt-1 text-sm text-muted">Requisitos que necesitan preparación o confirmación.</p>
           </div>
           <div className="divide-y divide-line">
             {visibleAlerts.length ? (
@@ -783,10 +777,10 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   >
                     <td className="px-4 py-3 font-semibold">{cleanValue(item.renglon, String(index + 1))}</td>
                     <td className="px-4 py-3">
-                      <div className={isValidAcpCode(item.codigo_articulo) ? "font-semibold text-brand" : "font-semibold text-amber-700"}>
-                        {cleanValue(item.codigo_articulo, "No detectado")}
+                      <div className={isValidAcpCode(item.codigo_articulo) ? "font-semibold text-brand" : "font-semibold text-muted"}>
+                        {isValidAcpCode(item.codigo_articulo) ? cleanValue(item.codigo_articulo) : "S/C"}
                       </div>
-                      {!isValidAcpCode(item.codigo_articulo) ? <div className="mt-1 text-xs text-muted">Formato por validar</div> : null}
+                      {!isValidAcpCode(item.codigo_articulo) ? <div className="mt-1 text-xs text-muted">No indicado</div> : null}
                     </td>
                     <td className="max-w-[360px] px-4 py-3">
                       <div className="truncate font-medium">{cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa)}</div>
@@ -848,10 +842,10 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               <div className="mt-4 border-t border-line pt-4">
                 <div className="mb-3 text-xs font-semibold uppercase text-muted">Siguiente paso</div>
                 <div className="flex flex-wrap gap-2">
-                <Button onClick={() => openModuleFromItem("proveedores")} variant="primary">Buscar proveedores</Button>
-                <Button onClick={() => openModuleFromItem("costos")} variant="secondary">Comparar costos</Button>
-                <Button onClick={() => openModuleFromItem("logistica")} variant="secondary">Calcular logistica</Button>
-                <Button onClick={() => openModuleFromItem("rfq_email")} variant="secondary">Generar correo RFQ</Button>
+                <Button onClick={() => openModuleFromItem("proveedores")} variant="primary"><PackageSearch className="h-4 w-4" />Buscar proveedores</Button>
+                <Button onClick={() => openModuleFromItem("costos")} variant="secondary"><BarChart3 className="h-4 w-4" />Comparar costos</Button>
+                <Button onClick={() => openModuleFromItem("logistica")} variant="secondary"><Truck className="h-4 w-4" />Calcular logística</Button>
+                <Button onClick={() => openModuleFromItem("rfq_email")} variant="secondary"><Mail className="h-4 w-4" />Generar correo RFQ</Button>
                 </div>
               </div>
             </div>
