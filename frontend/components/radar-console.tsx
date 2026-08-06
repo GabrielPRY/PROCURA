@@ -156,7 +156,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const [dateTo, setDateTo] = useState("");
   const [hideDiscarded, setHideDiscarded] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastFrontendRefresh, setLastFrontendRefresh] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,7 +204,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
         if (!current) return null;
         return response.items.find((item) => item.id === current.id) || null;
       });
-      setLastFrontendRefresh(new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar el Radar.");
     } finally {
@@ -449,22 +447,20 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           }
         />
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-          <StatusBadge tone="neutral">Autoescaneo: {scheduler?.enabled === false ? "apagado" : `cada ${scheduler?.interval_minutes || 25} min`}</StatusBadge>
-          <StatusBadge tone="neutral">Proximo: {scheduler?.next_run_at || "N/D"}</StatusBadge>
+          <StatusBadge tone="neutral">Actualización: {scheduler?.enabled === false ? "manual" : `cada ${scheduler?.interval_minutes || 25} min`}</StatusBadge>
           <StatusBadge tone={scheduler?.last_error ? "danger" : "ok"}>{scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Ultimo escaneo con error" : "Scheduler listo"}</StatusBadge>
           <StatusBadge tone="neutral">Ultimo escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}</StatusBadge>
-          <StatusBadge tone="info">Vista actualizada: {formatDate(lastFrontendRefresh)}</StatusBadge>
         </div>
       </ModuleSection>
 
       <section className="grid gap-3 md:grid-cols-4">
         {summaryCards.map(([label, value, hint, Icon, tone]) => (
-          <div key={label} className="rounded-xl border border-line bg-panel p-4 shadow-sm">
+          <div key={label} className="app-stat-card p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted">{label}</div>
               <Icon className={`h-4 w-4 ${tone}`} />
             </div>
-            <div className="mt-3 text-3xl font-semibold tracking-tight">{value}</div>
+            <div className="mt-3 text-2xl font-semibold">{value}</div>
             <div className="mt-1 text-xs text-muted">{hint}</div>
           </div>
         ))}
@@ -496,7 +492,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
         </section>
       ) : null}
 
-      <section className="rounded-xl border border-line bg-panel shadow-sm">
+      <section className="app-surface">
         <div className="border-b border-line p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
             <label className="relative block flex-1">
@@ -554,7 +550,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 key={value}
                 type="button"
                 onClick={() => setFilterMode(value as FilterMode)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                className={`app-filter-pill px-3 py-1.5 text-xs font-semibold ${
                   filterMode === value ? "app-filter-pill-active" : "app-filter-pill-idle"
                 }`}
               >

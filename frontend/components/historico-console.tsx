@@ -139,6 +139,7 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [rfqTerms, setRfqTerms] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   async function loadHistory(terms: string[], selectedYear = anio) {
     setLoading(true);
@@ -210,6 +211,13 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
     });
   }, [rows, outcome, sortMode]);
 
+  useEffect(() => {
+    setVisibleCount(30);
+    setExpanded(null);
+  }, [rows, outcome, sortMode]);
+
+  const visibleRows = displayedRows.slice(0, visibleCount);
+
   const summary = useMemo(() => {
     const ownPrices = displayedRows.map(proyelecPrice).filter((value) => value > 0);
     const competitionPrices = displayedRows.map(competitionPrice).filter((value) => value > 0);
@@ -263,10 +271,10 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
         </div>
 
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><h2 className="text-sm font-semibold text-ink">Resultados</h2><p className="mt-1 text-xs text-muted">{displayedRows.length} registros visibles de {matchedCount} coincidencias.</p></div>
+          <div><h2 className="text-sm font-semibold text-ink">Resultados</h2><p className="mt-1 text-xs text-muted">{visibleRows.length} mostrados de {displayedRows.length} resultados cargados · {matchedCount} coincidencias.</p></div>
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-            <select value={outcome} onChange={(event) => setOutcome(event.target.value as OutcomeFilter)} className="app-input h-10 min-w-0 sm:w-40"><option value="all">Todos los resultados</option><option value="won">Solo ganadas</option><option value="reference">Solo referencias</option></select>
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="app-input h-10 min-w-0 sm:w-44"><option value="recent">Más recientes</option><option value="lowest">Menor precio Proyelec</option><option value="won">Ganadas primero</option></select>
+            <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-muted">Resultado</span><select value={outcome} onChange={(event) => setOutcome(event.target.value as OutcomeFilter)} className="app-input h-10 min-w-0 sm:w-40"><option value="all">Todos</option><option value="won">Solo ganadas</option><option value="reference">Solo referencias</option></select></label>
+            <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-muted">Ordenar por</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="app-input h-10 min-w-0 sm:w-44"><option value="recent">Más recientes</option><option value="lowest">Menor precio Proyelec</option><option value="won">Ganadas primero</option></select></label>
           </div>
         </div>
 
@@ -276,7 +284,7 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
               <span>Licitación</span><span>Fecha</span><span>Código ACP</span><span>Cantidad</span><span>Proyelec</span><span>Competencia</span><span>Resultado</span><span />
             </div>
             <div className="divide-y divide-line">
-              {displayedRows.map((row, index) => {
+              {visibleRows.map((row, index) => {
                 const signature = `${rowSignature(row)}-${index}`;
                 const won = wonRow(row);
                 const analyst = cell(row, ["Analista", "analista_procura"]);
@@ -307,6 +315,14 @@ export function HistoricoConsole({ user }: { user: AuthUser }) {
                 );
               })}
             </div>
+            {visibleRows.length < displayedRows.length ? (
+              <div className="flex flex-col items-center gap-2 border-t border-line p-4">
+                <Button type="button" variant="secondary" onClick={() => setVisibleCount((current) => Math.min(current + 30, displayedRows.length))}>
+                  Mostrar 30 más
+                </Button>
+                <span className="text-xs text-muted">Quedan {displayedRows.length - visibleRows.length} resultados cargados.</span>
+              </div>
+            ) : null}
           </div>
         ) : <div className="border-t border-line p-5"><EmptyState icon={BarChart3} title="No encontramos antecedentes" copy="Prueba con el código ACP exacto, número de licitación o una descripción más corta." /></div>}
       </ModuleSection>

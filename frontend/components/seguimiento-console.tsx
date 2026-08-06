@@ -224,6 +224,9 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     setComment("");
     void loadHistory(item.id);
     if (!sliResults[item.id] && !sliLoading[item.id]) void checkSli(item, true);
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      window.setTimeout(() => document.getElementById("seguimiento-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    }
   }
 
   async function createItem() {
@@ -462,7 +465,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
         ) : null}
       </ModuleSection>
 
-      <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_440px]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <ModuleSection className="min-w-0 p-0">
           <div className="flex items-center justify-between gap-3 border-b border-line p-4 sm:p-5">
             <div>
@@ -483,7 +486,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
                 return (
                   <article key={item.id} className={`min-w-0 p-4 transition sm:p-5 ${isSelected ? "bg-blue-50" : "bg-panel hover:bg-slate-50"}`}>
                     <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <button type="button" onClick={() => void openItem(item)} className="min-w-0 flex-1 text-left">
+                      <button type="button" onClick={() => void openItem(item)} aria-current={isSelected ? "true" : undefined} className="min-w-0 flex-1 text-left">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-base font-semibold text-brand">{item.numero_licitacion}</span>
                           <StatusBadge tone={statusTone(item.estado)}>{item.estado || "Pendiente SLI"}</StatusBadge>
@@ -524,7 +527,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
           )}
         </ModuleSection>
 
-        <ModuleSection className="min-w-0 self-start">
+        <ModuleSection id="seguimiento-detail" className="app-scrollbar min-w-0 scroll-mt-32 self-start xl:sticky xl:top-32 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto">
           {selected ? (
             <div className="space-y-5">
               <div className="flex items-start justify-between gap-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModuleSection } from "@/components/ui/module-section";
@@ -38,10 +38,10 @@ const actions: Record<ModuleId, DashboardAction> = {
 };
 
 function dashboardDefinition(role: string) {
-  if (role === "Supervisor") return { title: "Prioridades del equipo", copy: "Revisa oportunidades, cambios del SLI y procesos que requieren atención.", primary: "radar" as ModuleId, shortcuts: ["rfq", "seguimiento", "costos", "proveedores"] as ModuleId[] };
-  if (role === "Gerencia") return { title: "Resumen gerencial", copy: "Consulta oportunidades, actividad y referencias para decidir con rapidez.", primary: "radar" as ModuleId, shortcuts: ["seguimiento", "costos", "historico", "metricas"] as ModuleId[] };
-  if (role === "Logistica") return { title: "Mesa logística", copy: "Cotiza transportes y consulta referencias guardadas por el equipo.", primary: "logistica" as ModuleId, shortcuts: ["historico", "workspaces"] as ModuleId[] };
-  return { title: "Tu jornada de procura", copy: "Analiza el RFQ y continúa con costos, proveedores y seguimiento.", primary: "rfq" as ModuleId, shortcuts: ["costos", "proveedores", "seguimiento", "rfq_email"] as ModuleId[] };
+  if (role === "Supervisor") return { title: "Prioridades del equipo", copy: "Revisa oportunidades, cambios del SLI y procesos que requieren atención.", primary: "radar" as ModuleId };
+  if (role === "Gerencia") return { title: "Resumen gerencial", copy: "Consulta oportunidades, actividad y referencias para decidir con rapidez.", primary: "radar" as ModuleId };
+  if (role === "Logistica") return { title: "Mesa logística", copy: "Cotiza transportes y consulta referencias guardadas por el equipo.", primary: "logistica" as ModuleId };
+  return { title: "Tu jornada de procura", copy: "Analiza el RFQ y continúa con costos, proveedores y seguimiento.", primary: "rfq" as ModuleId };
 }
 
 export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleChange?: (moduleId: ModuleId) => void }) {
@@ -101,14 +101,13 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
   }, [role]);
 
   const primary = allowed.has(definition.primary) ? actions[definition.primary] : actions[[...allowed][0] as ModuleId];
-  const shortcuts = definition.shortcuts.filter((id) => allowed.has(id)).map((id) => actions[id]);
   const PrimaryIcon = primary?.icon;
 
   return (
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow={`${role} · ${user.username}`}
+          eyebrow={role}
           title={definition.title}
           copy={definition.copy}
           actions={primary && PrimaryIcon ? (
@@ -143,23 +142,6 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
         </div>
       ) : null}
 
-      {shortcuts.length ? (
-        <ModuleSection>
-          <div>
-            <h2 className="text-base font-semibold text-ink">Accesos de trabajo</h2>
-            <p className="mt-1 text-sm text-muted">Continúa directamente con las tareas más utilizadas.</p>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {shortcuts.map((action) => (
-              <button key={action.module} type="button" onClick={() => onModuleChange?.(action.module)} className="app-action-card flex min-h-28 w-full items-start gap-3 p-4 text-left">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand dark:bg-blue-500/10"><action.icon className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{action.title}</span><span className="mt-1 block text-xs leading-5 text-muted">{action.copy}</span></span>
-                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-brand" />
-              </button>
-            ))}
-          </div>
-        </ModuleSection>
-      ) : null}
     </div>
   );
 }

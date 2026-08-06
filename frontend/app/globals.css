@@ -23,6 +23,10 @@
   --ui-focus: rgba(21, 94, 239, 0.22);
   --ui-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   --ui-shadow-menu: 0 16px 32px rgba(16, 24, 40, 0.14);
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 260ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --color-ink: var(--ui-text);
   --color-panel: var(--ui-surface);
   --color-line: var(--ui-border);
@@ -63,6 +67,8 @@ body {
   background: var(--ui-bg);
   color: var(--ui-text);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -113,13 +119,48 @@ summary:focus-visible {
 .app-header {
   background: color-mix(in srgb, var(--ui-surface) 96%, transparent);
   backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ui-border) 78%, transparent), 0 8px 24px rgba(16, 24, 40, 0.04);
 }
 
 .app-nav-menu {
   background: var(--ui-surface);
   border-radius: 0.5rem;
   box-shadow: var(--ui-shadow-menu);
+  transform-origin: top right;
+  animation: app-menu-enter var(--motion-base) var(--motion-ease) both;
 }
+
+.app-mobile-nav {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  max-height: calc(100dvh - 4rem);
+  overflow-y: auto;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-menu);
+  transform-origin: top;
+  animation: app-menu-enter var(--motion-base) var(--motion-ease) both;
+}
+
+.app-nav-icon {
+  background: var(--ui-surface-strong);
+  color: var(--ui-text-muted);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.app-module-enter {
+  min-width: 0;
+  animation: app-module-enter var(--motion-slow) var(--motion-ease) both;
+}
+
+.app-module-enter > * {
+  animation: app-content-enter var(--motion-slow) var(--motion-ease) both;
+}
+
+.app-module-enter > :nth-child(2) { animation-delay: 35ms; }
+.app-module-enter > :nth-child(3) { animation-delay: 65ms; }
+.app-module-enter > :nth-child(n + 4) { animation-delay: 90ms; }
 
 .app-content,
 .app-content > *,
@@ -200,7 +241,8 @@ summary:focus-visible {
   box-shadow: var(--ui-shadow);
   color: var(--ui-text);
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  touch-action: manipulation;
+  transition: background-color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 
 .app-action-card:hover,
@@ -233,7 +275,8 @@ summary:focus-visible {
 .app-tab-button,
 .app-filter-pill {
   border-radius: 0.5rem;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  touch-action: manipulation;
+  transition: background-color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
 }
 
 .app-btn {
@@ -327,9 +370,25 @@ summary:focus-visible {
 }
 
 .app-top-nav-button {
+  position: relative;
   border-color: transparent;
   background: transparent;
   color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+.app-top-nav-button::after {
+  position: absolute;
+  right: 0.65rem;
+  bottom: -1px;
+  left: 0.65rem;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: var(--ui-primary);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition: opacity var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 
 .app-top-nav-button:hover:not(:disabled) {
@@ -338,12 +397,70 @@ summary:focus-visible {
   color: var(--ui-text);
 }
 
+.app-top-nav-button:hover:not(:disabled) .app-nav-icon {
+  background: color-mix(in srgb, var(--ui-primary) 11%, var(--ui-surface));
+  color: var(--ui-primary);
+  transform: translateY(-1px);
+}
+
 .app-top-nav-button-active,
 .app-top-nav-button-active:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--ui-primary) 34%, transparent);
   background: var(--ui-primary-soft);
   color: var(--ui-primary);
-  box-shadow: inset 0 -2px 0 var(--ui-primary);
+  box-shadow: none;
+}
+
+.app-top-nav-button-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.app-top-nav-button-active .app-nav-icon {
+  background: color-mix(in srgb, var(--ui-primary) 16%, var(--ui-surface));
+  color: var(--ui-primary);
+}
+
+.app-nav-more-current {
+  min-width: 8.75rem;
+}
+
+.app-menu-item {
+  color: var(--ui-text);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.app-menu-item:hover,
+.app-menu-item:focus-visible {
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  transform: translateX(2px);
+}
+
+.app-menu-item-active {
+  background: var(--ui-primary-soft);
+  box-shadow: inset 3px 0 0 var(--ui-primary);
+}
+
+@media (max-width: 1023px) {
+  .app-mobile-nav .app-top-nav-button {
+    border-color: var(--ui-border);
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow);
+  }
+
+  .app-mobile-nav .app-top-nav-button:hover:not(:disabled) {
+    border-color: var(--ui-primary);
+    background: var(--ui-primary-soft);
+  }
+
+  .app-mobile-nav .app-top-nav-button-active {
+    border-color: var(--ui-primary);
+    background: var(--ui-primary-soft);
+    box-shadow: inset 3px 0 0 var(--ui-primary);
+  }
+
+  .app-mobile-nav .app-top-nav-button::after { display: none; }
 }
 
 .app-tab-button {
@@ -361,6 +478,12 @@ summary:focus-visible {
   color: var(--ui-text-muted);
   font-size: 0.72rem;
   font-weight: 500;
+}
+
+.app-tab-button .app-tab-detail { display: none; }
+
+@media (min-width: 640px) {
+  .app-tab-button .app-tab-detail { display: block; }
 }
 
 .app-tab-button:hover:not(:disabled) {
@@ -449,6 +572,13 @@ select {
 
 textarea { padding: 0.75rem; line-height: 1.55; }
 
+.app-input,
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, background-color var(--motion-base) ease;
+}
+
 .app-input:hover,
 input:not([type="checkbox"]):not([type="radio"]):hover,
 select:hover,
@@ -531,6 +661,7 @@ input[type="radio"] { accent-color: var(--ui-primary); }
 .app-table th, .app-table td { border-bottom: 1px solid var(--ui-border); padding: 0.75rem 0.875rem; text-align: left; vertical-align: top; }
 .app-table th { font-weight: 700; white-space: normal; }
 .app-table tr:last-child td { border-bottom: 0; }
+.app-table tbody tr { transition: background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease; }
 .app-table tbody tr[class*="cursor-pointer"]:hover { background: var(--ui-primary-soft); box-shadow: inset 3px 0 0 var(--ui-primary); }
 
 .app-file-drop {
@@ -553,7 +684,7 @@ input[type="radio"] { accent-color: var(--ui-primary); }
 
 details > summary {
   border-radius: 0.45rem;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-base) ease, color var(--motion-base) ease;
 }
 
 details > summary:hover {
@@ -578,6 +709,21 @@ details > summary:hover {
 
 @keyframes skeleton-pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.42; } }
 .app-skeleton { display: block; border-radius: 0.35rem; background: var(--ui-surface-strong); animation: skeleton-pulse 1.35s ease-in-out infinite; }
+
+@keyframes app-module-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-content-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-menu-enter {
+  from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .app-scrollbar { scrollbar-width: thin; scrollbar-color: var(--ui-border-strong) transparent; }
 .app-scrollbar::-webkit-scrollbar { width: 0.5rem; height: 0.5rem; }

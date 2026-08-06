@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronDown, LogOut, Menu, Moon, MoreHorizontal, Sun, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/ui/cn";
@@ -38,12 +38,15 @@ export function AppShell({
   const role = normalizeRole(user.role);
   const visibleItems = useMemo(() => getAllowedModules(user), [user]);
   const preferred = primaryByRole[role] || [];
-  const primaryItems = visibleItems.filter((item) => preferred.includes(item.id));
+  const primaryItems = visibleItems
+    .filter((item) => preferred.includes(item.id))
+    .sort((left, right) => preferred.indexOf(left.id) - preferred.indexOf(right.id));
   const moreItems = visibleItems.filter((item) => !preferred.includes(item.id));
   const activeInMore = moreItems.some((item) => item.id === activeModule);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -64,6 +67,31 @@ export function AppShell({
     setMobileOpen(false);
     setMoreOpen(false);
   }, [activeModule]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function closeMenu(event: MouseEvent) {
+      if (!moreMenuRef.current?.contains(event.target as Node)) setMoreOpen(false);
+    }
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMoreOpen(false);
+    }
+    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeMenu);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
 
   function toggleTheme() {
     setTheme((current) => {
@@ -86,14 +114,18 @@ export function AppShell({
         type="button"
         onClick={() => onModuleChange(item.id)}
         title={item.description}
+        aria-current={active ? "page" : undefined}
         className={cn(
-          "app-top-nav-button inline-flex min-w-0 items-center gap-2 border text-sm font-semibold",
-          mobile ? "h-11 w-full justify-start px-3" : "h-10 justify-center px-3",
+          "app-top-nav-button min-w-0 items-center gap-2 border text-sm font-semibold",
+          mobile ? "flex min-h-14 w-full justify-start px-3 py-2.5 text-left" : "inline-flex h-10 justify-center px-3",
           active && "app-top-nav-button-active"
         )}
       >
-        <Icon className="h-4 w-4 shrink-0" />
-        <span className="truncate">{item.label}</span>
+        <span className="app-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-md"><Icon className="h-4 w-4" /></span>
+        <span className="min-w-0">
+          <span className="block truncate">{item.label}</span>
+          {mobile ? <span className="mt-0.5 block truncate text-xs font-normal text-muted">{item.description}</span> : null}
+        </span>
       </button>
     );
   }
@@ -115,7 +147,7 @@ export function AppShell({
             <Button type="button" onClick={toggleTheme} variant="ghost" size="icon" title={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"} aria-label={theme === "dark" ? "Usar modo claro" : "Usar modo oscuro"}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="xl:hidden" title="Abrir navegación" aria-label="Abrir navegación" aria-expanded={mobileOpen}>
+            <Button type="button" onClick={() => setMobileOpen((current) => !current)} variant="secondary" size="icon" className="lg:hidden" title={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-label={mobileOpen ? "Cerrar navegación" : "Abrir navegación"} aria-expanded={mobileOpen}>
               {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
             <Button onClick={onLogout} variant="ghost" size="icon" title="Cerrar sesión" aria-label="Cerrar sesión">
@@ -124,30 +156,40 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="hidden border-t border-line xl:block">
-          <nav className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-2 px-4 sm:px-5 xl:px-7" aria-label="Navegación principal">
-            {primaryItems.map((item) => navButton(item))}
-            {moreItems.length ? (
-              <div className="relative ml-auto">
+        <div className="hidden border-t border-line lg:block">
+          <nav className="mx-auto flex h-14 w-full max-w-[1680px] items-center gap-1.5 px-4 sm:px-5 xl:gap-2 xl:px-7" aria-label="Navegación principal">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
+              {primaryItems.map((item) => navButton(item))}
+            </div>
+            {visibleItems.length ? (
+              <div ref={moreMenuRef} className="relative ml-2 shrink-0 border-l border-line pl-3">
                 <button
                   type="button"
-                  className={cn("app-top-nav-button inline-flex h-10 items-center gap-2 border px-3 text-sm font-semibold", activeInMore && "app-top-nav-button-active")}
+                  className={cn("app-top-nav-button app-nav-more-current inline-flex h-10 max-w-52 items-center gap-2 border px-3 text-sm font-semibold", activeInMore && "app-top-nav-button-active")}
                   onClick={() => setMoreOpen((current) => !current)}
                   aria-expanded={moreOpen}
                   aria-haspopup="menu"
+                  aria-current={activeInMore ? "page" : undefined}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
-                  Más
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="truncate">Módulos</span>
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-muted">{visibleItems.length}</span>
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
                 </button>
                 {moreOpen ? (
-                  <div className="app-nav-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 border border-line p-2 shadow-lg" role="menu">
-                    {moreItems.map((item) => (
-                      <button key={item.id} type="button" role="menuitem" onClick={() => onModuleChange(item.id)} className={cn("flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800", item.id === activeModule && "bg-blue-50 dark:bg-slate-800")}>
-                        <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-                        <span className="min-w-0"><span className="block text-sm font-semibold text-ink">{item.label}</span><span className="mt-0.5 block text-xs leading-5 text-muted">{item.description}</span></span>
-                      </button>
-                    ))}
+                  <div className="app-nav-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(42rem,calc(100vw-2rem))] border border-line p-3 shadow-lg" role="menu">
+                    <div className="flex items-center justify-between gap-3 px-2 pb-3 pt-1">
+                      <div><div className="text-sm font-semibold text-ink">Todos los módulos</div><div className="mt-0.5 text-xs text-muted">Accesos disponibles para {role}</div></div>
+                      <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-muted">{visibleItems.length} disponibles</span>
+                    </div>
+                    <div className="grid gap-1 sm:grid-cols-2">
+                      {visibleItems.map((item) => (
+                        <button key={item.id} type="button" role="menuitem" aria-current={item.id === activeModule ? "page" : undefined} onClick={() => onModuleChange(item.id)} className={cn("app-menu-item flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left", item.id === activeModule && "app-menu-item-active")}>
+                          <span className="app-nav-icon grid h-8 w-8 shrink-0 place-items-center rounded-md"><item.icon className="h-4 w-4 text-brand" /></span>
+                          <span className="min-w-0"><span className="block text-sm font-semibold text-ink">{item.label}</span><span className="mt-0.5 block line-clamp-1 text-xs leading-5 text-muted">{item.description}</span></span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -156,13 +198,27 @@ export function AppShell({
         </div>
 
         {mobileOpen ? (
-          <nav className="grid gap-2 border-t border-line p-3 xl:hidden" aria-label="Navegación móvil">
-            {visibleItems.map((item) => navButton(item, true))}
+          <nav className="app-mobile-nav border-t border-line p-3 lg:hidden" aria-label="Navegación móvil">
+            <div className="flex items-center justify-between gap-3 px-1 pb-3">
+              <div><div className="text-sm font-semibold text-ink">Navegación</div><div className="mt-0.5 text-xs text-muted">{role}</div></div>
+              <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-muted">{visibleItems.length} módulos</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {primaryItems.map((item) => navButton(item, true))}
+            </div>
+            {moreItems.length ? <>
+              <div className="mb-2 mt-4 border-t border-line pt-3 text-[11px] font-bold uppercase text-muted">Más herramientas</div>
+              <div className="grid gap-2 sm:grid-cols-2">{moreItems.map((item) => navButton(item, true))}</div>
+            </> : null}
           </nav>
         ) : null}
       </header>
 
-      <main className="app-content mx-auto w-full max-w-[1680px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">{children}</main>
+      <main className="app-content mx-auto w-full max-w-[1680px] min-w-0 px-4 py-5 sm:px-5 xl:px-7 xl:py-6">
+        <div key={activeModule} className="app-module-enter">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

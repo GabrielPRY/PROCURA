@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldAlert, UploadCloud } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, FileText, Loader2, ShieldAlert, UploadCloud } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { analyzeRfq, asBool, asOptionalBool, cleanValue, getUserConfig, loadLastRfq, saveActiveRfqContext, saveLastRfq, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
@@ -234,7 +234,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   ];
 
   const decisionStats = [
-    ["Empresa sugerida", presenceDecision.company],
+    ["Presencia local", presenceDecision.label],
     ["Riesgo técnico", risk],
     ["Propuesta técnica", proposalCount ? `Preparar en ${proposalCount} renglón(es)` : "No detectada"],
     ["Ficha o catálogo", fichaCount ? `Preparar en ${fichaCount} renglón(es)` : "No solicitado aparte"]
@@ -441,7 +441,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Análisis de RFQ"
+          eyebrow="Licitaciones"
+          title="Análisis de RFQ"
           copy={result ? `RFQ ${rfqNumber || "sin número"} · ${items.length} renglón(es) detectados` : "Sube el pliego, anexos y enmiendas disponibles para iniciar el análisis."}
           actions={
             <>
@@ -454,45 +455,10 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       : "Gemini lista"
                     : "Gemini pendiente"}
               </StatusBadge>
-              {activeTab === "entrada" ? (
-                <div className="flex flex-col items-end gap-2">
-                  <Button onClick={handleAnalyze} disabled={processing || loadingConfig} variant="primary" size="lg">
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {processing
-                      ? progressStep === 1 ? "Enviando documentos..."
-                        : progressStep === 2 ? "Analizando con IA..."
-                        : progressStep === 3 ? "Extrayendo renglones..."
-                        : progressStep === 4 ? "Guardando análisis..."
-                        : "Procesando..."
-                      : "Procesar RFQ"}
-                  </Button>
-                  {processing && (
-                    <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                      {[
-                        { step: 1, label: "Documentos" },
-                        { step: 2, label: "IA Gemini" },
-                        { step: 3, label: "Renglones" },
-                        { step: 4, label: "Guardando" },
-                      ].map(({ step, label }) => (
-                        <span key={step} className="app-progress-step">
-                          <span
-                            className={`app-progress-step-dot ${
-                              step < progressStep
-                                ? "app-progress-step-dot-done"
-                                : step === progressStep
-                                ? "app-progress-step-dot-active"
-                                : "app-progress-step-dot-pending"
-                            }`}
-                          />
-                          <span className={step <= progressStep ? "font-semibold" : "opacity-50"}>{label}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : activeTab === "resumen" && result ? (
+              {activeTab === "resumen" && result ? (
                 <Button onClick={() => setActiveTab("renglones")} variant="primary" size="lg">
                   Revisar renglones
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : null}
             </>
@@ -501,8 +467,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       </ModuleSection>
 
       <section className="app-surface p-2">
-        <div className="grid gap-2 md:grid-cols-3">
-          {tabs.map((tab) => {
+        <div className="grid grid-cols-3 gap-2">
+          {tabs.map((tab, index) => {
             const active = activeTab === tab.id;
             const disabled = tab.id !== "entrada" && !result;
             return (
@@ -511,7 +477,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 type="button"
                 onClick={() => !disabled && setActiveTab(tab.id)}
                 disabled={disabled}
-                className={`app-tab-button px-4 py-3 ${
+                aria-current={active ? "step" : undefined}
+                className={`app-tab-button px-2 py-3 sm:px-4 ${
                   active
                     ? "app-tab-button-active"
                     : disabled
@@ -519,8 +486,11 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                       : ""
                 }`}
               >
-                <span className="block text-sm font-semibold">{tab.label}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted">{tab.detail}</span>
+                <div className="flex items-center gap-1.5 text-xs font-semibold sm:gap-2 sm:text-sm">
+                  <div className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${active ? "border-brand bg-brand text-white" : "border-line bg-white text-muted"}`}>{index + 1}</div>
+                  {tab.label}
+                </div>
+                <span className="app-tab-detail ml-8 mt-1 text-xs leading-5 text-muted">{tab.detail}</span>
               </button>
             );
           })}
@@ -569,9 +539,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
       {activeTab === "entrada" || activeTab === "resumen" ? (
       <section className="grid gap-4">
         {activeTab === "entrada" ? (
-        <div className="app-card mx-auto w-full max-w-4xl p-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-brand">Documentos</div>
-          <div className="mt-1 text-base font-semibold">Documentos del RFQ</div>
+        <div className="app-card mx-auto w-full max-w-4xl p-5" aria-busy={processing}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand">Paso 1</div>
+          <div className="mt-1 text-base font-semibold">Carga los documentos del RFQ</div>
           <p className="mt-2 text-sm leading-6 text-muted">Adjunta el pliego, anexos técnicos y enmiendas disponibles en formato PDF.</p>
 
           <label className="app-file-drop mt-5 min-h-40">
@@ -593,12 +563,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
             </div>
           ) : null}
 
-          {hasStoredKey ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted">
-              <StatusBadge tone="ok">IA configurada</StatusBadge>
-              <span>{geminiSource === "admin_global" ? "Configuración administrada por Admin." : "Configuración del usuario disponible."}</span>
-            </div>
-          ) : (
+          {!hasStoredKey ? (
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">Gemini API Key temporal</span>
               <input
@@ -613,7 +578,39 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 type="password"
               />
             </label>
-          )}
+          ) : null}
+
+          <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted">
+              {files.length ? `${files.length} documento(s) listo(s) para analizar.` : "Selecciona al menos un documento PDF para continuar."}
+            </div>
+            <Button onClick={handleAnalyze} disabled={processing || loadingConfig || !files.length} variant="primary" size="lg" className="w-full sm:w-auto">
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {processing
+                ? progressStep === 1 ? "Enviando documentos..."
+                  : progressStep === 2 ? "Analizando con IA..."
+                  : progressStep === 3 ? "Extrayendo renglones..."
+                  : progressStep === 4 ? "Guardando análisis..."
+                  : "Procesando..."
+                : "Procesar RFQ"}
+            </Button>
+          </div>
+
+          {processing ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+              {[
+                { step: 1, label: "Documentos" },
+                { step: 2, label: "IA Gemini" },
+                { step: 3, label: "Renglones" },
+                { step: 4, label: "Guardando" }
+              ].map(({ step, label }) => (
+                <span key={step} className="app-progress-step">
+                  <span className={`app-progress-step-dot ${step < progressStep ? "app-progress-step-dot-done" : step === progressStep ? "app-progress-step-dot-active" : "app-progress-step-dot-pending"}`} />
+                  <span className={step <= progressStep ? "font-semibold" : "opacity-50"}>{label}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {error ? (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
@@ -759,7 +756,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
             <p className="mt-1 text-sm text-muted">Selecciona un renglón para revisar sus requisitos y continuar con proveedores, costos, logística o correo.</p>
           </div>
 
-          <div className="overflow-hidden">
+          <div className="app-scrollbar overflow-x-auto">
               <table className="app-table">
                 <thead>
                 <tr>

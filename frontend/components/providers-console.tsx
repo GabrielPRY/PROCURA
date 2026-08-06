@@ -1,14 +1,15 @@
 "use client";
 
 import {
+  ArrowRight,
   AlertTriangle,
-  Bot,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
   Globe2,
   Loader2,
+  ListFilter,
   PackageSearch,
   Search,
   ShieldCheck,
@@ -38,8 +39,9 @@ import { StatusBadge } from "@/components/ui/status-badge";
 
 type Strategy = "proveedor_integral" | "por_renglon";
 type View = "prepare" | "results";
-type ChatMessage = { role: "user" | "assistant"; content: string };
 type BadgeTone = "neutral" | "info" | "ok" | "warn" | "danger";
+type ResultFilter = "todos" | "cobertura" | "bajo_riesgo" | "auditados";
+type ResultSort = "recomendados" | "cobertura" | "tecnico" | "precio";
 
 const starterPrompts = [
   "Prioriza fabricante directo y stock disponible.",
@@ -118,6 +120,22 @@ function savingTone(value?: string): BadgeTone {
   return "info";
 }
 
+function providerCoverage(provider: SourcingProvider) {
+  const declared = Number(provider.cobertura_renglones || 0);
+  const listed = provider.renglones_cubiertos?.length || 0;
+  return Math.max(Number.isFinite(declared) ? declared : 0, listed);
+}
+
+function providerRankScore(provider: SourcingProvider, selectedCount: number) {
+  const technical = Math.max(0, Math.min(100, Number(provider.match_tecnico || 0)));
+  const coverage = selectedCount ? Math.min(1, providerCoverage(provider) / selectedCount) * 100 : 0;
+  const price = String(provider.probabilidad_buen_precio || "").toLowerCase().includes("alta") ? 100
+    : String(provider.probabilidad_buen_precio || "").toLowerCase().includes("media") ? 65 : 35;
+  const risk = String(provider.riesgo || "").toLowerCase().includes("bajo") ? 100
+    : String(provider.riesgo || "").toLowerCase().includes("alto") ? 15 : 55;
+  return Math.round((technical * 0.42) + (coverage * 0.28) + (price * 0.18) + (risk * 0.12));
+}
+
 function itemPayload(item: RfqItem) {
   return {
     renglon: cleanValue(item.renglon, ""),
@@ -163,9 +181,6 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const [input, setInput] = useState("");
   const [view, setView] = useState<View>("prepare");
   const [searching, setSearching] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Selecciona los renglones y dime si tienes una condición especial. Yo construiré la estrategia de búsqueda." }
-  ]);
   const [summary, setSummary] = useState("");
   const [providers, setProviders] = useState<SourcingProvider[]>([]);
   const [engine, setEngine] = useState("");
@@ -177,6 +192,9 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const [auditHistory, setAuditHistory] = useState<CompanyAuditListItem[]>([]);
   const [loadingAudits, setLoadingAudits] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [resultSearch, setResultSearch] = useState("");
+  const [resultFilter, setResultFilter] = useState<ResultFilter>("todos");
+  const [resultSort, setResultSort] = useState<ResultSort>("recomendados");
 
   useEffect(() => {
     const saved = loadLastRfq(user.username);
@@ -210,6 +228,30 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   const rfqNumber = cleanValue(rfq?.condiciones_generales?.numero_licitacion, "Sin RFQ");
   const activeQuery = selectedItems.map(queryFromItem).filter(Boolean).slice(0, 12).join(" | ");
   const grounded = engine === "gemini_google_search";
+
+  const visibleProviders = useMemo(() => {
+    const query = resultSearch.trim().toLowerCase();
+    const filtered = providers.filter((provider) => {
+      const prior = auditForProvider(provider);
+      const haystack = [provider.proveedor, provider.pais_region, provider.tipo, provider.renglon, provider.cobertura_detalle]
+        .join(" ")
+        .toLowerCase();
+      if (query && !haystack.includes(query)) return false;
+      if (resultFilter === "cobertura" && providerCoverage(provider) < selectedItems.length) return false;
+      if (resultFilter === "bajo_riesgo" && !String(provider.riesgo || "").toLowerCase().includes("bajo")) return false;
+      if (resultFilter === "auditados" && !prior) return false;
+      return true;
+    });
+    return filtered.sort((a, b) => {
+      if (resultSort === "cobertura") return providerCoverage(b) - providerCoverage(a);
+      if (resultSort === "tecnico") return Number(b.match_tecnico || 0) - Number(a.match_tecnico || 0);
+      if (resultSort === "precio") {
+        const value = (provider: SourcingProvider) => String(provider.probabilidad_buen_precio || "").toLowerCase().includes("alta") ? 3 : String(provider.probabilidad_buen_precio || "").toLowerCase().includes("media") ? 2 : 1;
+        return value(b) - value(a);
+      }
+      return providerRankScore(b, selectedItems.length) - providerRankScore(a, selectedItems.length);
+    });
+  }, [providers, resultFilter, resultSearch, resultSort, selectedItems.length, auditHistory]);
 
   useEffect(() => {
     if (!providers.length) {
@@ -266,9 +308,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
 
   async function runSourcing() {
     if (!selectedItems.length || searching || !hasGeminiKey) return;
-    const visiblePrompt = input.trim() || "Busca los mejores proveedores para los renglones seleccionados.";
     const requestPrompt = [smartPrompt(selectedItems, strategy), input.trim() ? `Condición adicional: ${input.trim()}` : ""].filter(Boolean).join("\n\n");
-    setMessages((current) => [...current, { role: "user", content: visiblePrompt }]);
     setInput("");
     setSearching(true);
     setError(null);
@@ -291,17 +331,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
       setEngine(response.engine || "");
       setSearchPlan(response.search_plan || []);
       setExpandedIndex(nextProviders.length ? 0 : null);
-      setMessages((current) => [...current, {
-        role: "assistant",
-        content: nextProviders.length
-          ? `${response.resumen || `Encontré ${nextProviders.length} candidatos.`} Revisa evidencia y auditoría antes de solicitar cotización.`
-          : "No encontré candidatos con evidencia suficiente. Ajusta los renglones o la instrucción."
-      }]);
       setView("results");
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo completar la búsqueda.";
       setError(message);
-      setMessages((current) => [...current, { role: "assistant", content: message }]);
     } finally {
       setSearching(false);
     }
@@ -310,10 +343,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
   return (
     <div className="space-y-5">
       <ModuleSection>
-        <PageHeader
-          eyebrow="Sourcing global"
-          title="Búsqueda inteligente de proveedores"
-          copy="Selecciona las partidas y deja que la IA prepare una búsqueda global orientada a cumplimiento, ahorro y proveedor real."
+          <PageHeader
+            eyebrow="Sourcing global"
+          title="Encuentra proveedores que sí pueden cotizar"
+          copy="Selecciona renglones, define el objetivo y compara candidatos globales por cobertura, ajuste técnico, precio y riesgo comercial."
           actions={
             <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "danger"}>
               {loadingConfig ? "Verificando IA" : hasGeminiKey ? `IA lista${geminiSource === "admin_global" ? " · Admin" : ""}` : "IA no configurada"}
@@ -333,10 +366,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
           <ModuleSection className="p-2">
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setView("prepare")} className={`app-tab-button ${view === "prepare" ? "app-tab-button-active" : ""}`}>
-                Preparar búsqueda <span>{selectedItems.length} renglones</span>
+                1. Preparar <span>{selectedItems.length} seleccionado(s)</span>
               </button>
               <button type="button" onClick={() => providers.length && setView("results")} disabled={!providers.length} className={`app-tab-button ${view === "results" ? "app-tab-button-active" : ""}`}>
-                Resultados <span>{providers.length ? `${providers.length} candidatos` : "Pendiente"}</span>
+                2. Comparar <span>{providers.length ? `${providers.length} candidatos` : "Pendiente"}</span>
               </button>
             </div>
           </ModuleSection>
@@ -391,17 +424,8 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
               <div className="min-w-0 space-y-5">
                 <ModuleSection className="min-w-0 overflow-hidden p-0">
                   <div className="flex items-start gap-3 border-b border-line p-5">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand"><Bot className="h-4 w-4" /></div>
-                    <div><h2 className="text-base font-semibold text-ink">Asistente de sourcing</h2><p className="mt-1 text-sm text-muted">El contexto técnico se agrega automáticamente.</p></div>
-                  </div>
-
-                  <div className="max-h-64 space-y-3 overflow-y-auto bg-slate-50 p-4 sm:p-5">
-                    {messages.slice(-5).map((message, index) => (
-                      <div key={index} className={`max-w-[88%] rounded-lg border p-3 text-sm leading-6 ${message.role === "user" ? "ml-auto border-blue-200 bg-blue-50 text-blue-950" : "border-line bg-panel text-ink"}`}>
-                        {message.content}
-                      </div>
-                    ))}
-                    {searching ? <div className="flex items-center gap-2 text-sm font-semibold text-brand"><Loader2 className="h-4 w-4 animate-spin" /> Analizando requisitos y buscando candidatos...</div> : null}
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand"><Target className="h-4 w-4" /></div>
+                    <div><h2 className="text-base font-semibold text-ink">Objetivo de la búsqueda</h2><p className="mt-1 text-sm text-muted">La descripción, código ACP, marca y requisitos técnicos ya están incluidos.</p></div>
                   </div>
 
                   <div className="p-4 sm:p-5">
@@ -422,8 +446,15 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                       </label>
                       <Button type="button" onClick={() => void runSourcing()} disabled={searching || !selectedItems.length || !hasGeminiKey} variant="primary" size="lg">
                         {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        Buscar 10 proveedores
+                        {searching ? "Buscando y verificando..." : "Buscar 10 proveedores"}
                       </Button>
+                    </div>
+                    <div className="mt-4 grid gap-2 border-t border-line pt-4 sm:grid-cols-3">
+                      {[
+                        ["1", "Comprende", `${selectedItems.length} renglón(es)`],
+                        ["2", "Busca", depth === "Profunda" ? "Global profunda" : "Global rápida"],
+                        ["3", "Ordena", "Técnico + precio + riesgo"]
+                      ].map(([step, label, value]) => <div key={step} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-brand">{step}</span><div><div className="text-xs font-semibold text-muted">{label}</div><div className="text-sm font-semibold text-ink">{value}</div></div></div>)}
                     </div>
                   </div>
                 </ModuleSection>
@@ -459,34 +490,61 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                 </div>
               </ModuleSection>
 
-              {providers.length ? providers.map((provider, index) => {
+              <ModuleSection className="p-4">
+                <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto] lg:items-center">
+                  <label className="relative block min-w-0">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                    <input value={resultSearch} onChange={(event) => setResultSearch(event.target.value)} className="app-input pl-9" placeholder="Filtrar empresa, país o tipo" />
+                  </label>
+                  <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 lg:pb-0">
+                    {([
+                      ["todos", "Todos"], ["cobertura", "Cobertura total"], ["bajo_riesgo", "Riesgo bajo"], ["auditados", "Auditados"]
+                    ] as [ResultFilter, string][]).map(([value, label]) => <button key={value} type="button" onClick={() => setResultFilter(value)} className={`app-filter-pill whitespace-nowrap ${resultFilter === value ? "app-filter-pill-active" : "app-filter-pill-idle"}`}>{label}</button>)}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+                    <ListFilter className="h-4 w-4 text-brand" />
+                    <select value={resultSort} onChange={(event) => setResultSort(event.target.value as ResultSort)} className="app-input h-10">
+                      <option value="recomendados">Mejor balance</option>
+                      <option value="cobertura">Mayor cobertura</option>
+                      <option value="tecnico">Mayor ajuste técnico</option>
+                      <option value="precio">Mejor oportunidad de precio</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="mt-3 text-xs text-muted">Mostrando {visibleProviders.length} de {providers.length} candidatos. El ranking es preliminar y no sustituye la cotización ni la auditoría.</div>
+              </ModuleSection>
+
+              {visibleProviders.length ? visibleProviders.map((provider, index) => {
                 const prior = auditForProvider(provider);
                 const expanded = expandedIndex === index;
+                const coverage = providerCoverage(provider);
+                const rankScore = providerRankScore(provider, selectedItems.length);
                 return (
                   <ModuleSection key={`${provider.proveedor}-${provider.url}-${index}`} className="min-w-0 p-0">
                     <div className="p-4 sm:p-5">
                       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <button type="button" onClick={() => setExpandedIndex(expanded ? null : index)} className="min-w-0 flex-1 text-left">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-sm font-semibold text-brand">{index + 1}</span>
+                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-sm font-bold text-brand">{index + 1}</span>
                             <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{provider.proveedor || "Proveedor sin nombre"}</h3>
                             {expanded ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <StatusBadge tone="neutral">{provider.pais_region || "Región no confirmada"}</StatusBadge>
                             <StatusBadge tone="neutral">{provider.tipo || "Tipo no confirmado"}</StatusBadge>
-                            <StatusBadge tone="info">Match preliminar {provider.match_tecnico ?? 0}%</StatusBadge>
+                            <StatusBadge tone="info">Ajuste técnico {provider.match_tecnico ?? 0}%</StatusBadge>
                             <StatusBadge tone={savingTone(provider.probabilidad_buen_precio)}>Ahorro: {provider.probabilidad_buen_precio || "Validar"}</StatusBadge>
                             <StatusBadge tone={riskTone(provider.riesgo)}>Riesgo: {provider.riesgo || "Validar"}</StatusBadge>
                             <StatusBadge tone={decisionTone(provider.decision)}>{provider.decision || "Validar"}</StatusBadge>
                           </div>
-                          <div className="mt-3 text-sm leading-6 text-muted">
-                            Cobertura: {provider.renglones_cubiertos?.length ? provider.renglones_cubiertos.join(", ") : provider.cobertura_detalle || provider.renglon || "Por validar"}
+                          <div className="mt-3 grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-center">
+                            <div className="rounded-lg border border-line bg-slate-50 px-3 py-2"><div className="text-xs font-semibold text-muted">Balance preliminar</div><div className="mt-1 text-lg font-bold text-ink">{rankScore}/100</div></div>
+                            <div className="text-sm leading-6 text-muted"><span className="font-semibold text-ink">Cobertura {coverage}/{selectedItems.length}:</span> {provider.renglones_cubiertos?.length ? provider.renglones_cubiertos.join(", ") : provider.cobertura_detalle || provider.renglon || "Por validar"}</div>
                           </div>
                         </button>
                         <div className="flex shrink-0 flex-wrap gap-2">
                           {provider.url ? <a href={provider.url} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 items-center justify-center gap-2 border px-3 text-sm font-semibold">Fuente <ExternalLink className="h-4 w-4" /></a> : null}
-                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary"><ShieldCheck className="h-4 w-4" />Auditar</Button>
+                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary"><ShieldCheck className="h-4 w-4" />Validar empresa <ArrowRight className="h-4 w-4" /></Button>
                         </div>
                       </div>
                     </div>
@@ -506,7 +564,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                   </ModuleSection>
                 );
               }) : (
-                <ModuleSection><EmptyState icon={Target} title="No hay candidatos" copy="Vuelve a Preparar búsqueda y ajusta los renglones o la instrucción." /></ModuleSection>
+                <ModuleSection><EmptyState icon={Target} title={providers.length ? "Ningún candidato coincide con el filtro" : "No hay candidatos"} copy={providers.length ? "Limpia el filtro o cambia el orden para volver a mostrar resultados." : "Vuelve a Preparar búsqueda y ajusta los renglones o la instrucción."} /></ModuleSection>
               )}
 
               {searchPlan.length ? (

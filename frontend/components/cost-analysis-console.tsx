@@ -122,8 +122,12 @@ function historicalDateLabel(record: Record<string, unknown>) {
 function itemLabel(item: CostRow, index: number) {
   const line = cleanValue(item.renglon, String(index + 1));
   const code = cleanValue(item.codigo_articulo, "S/C");
+  return `Renglón ${line} · ${code}`;
+}
+
+function itemDescription(item: CostRow) {
   const description = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "Sin descripción");
-  return `Renglón ${line} | ${code} | ${description.slice(0, 76)}`;
+  return description.slice(0, 110);
 }
 
 function itemSearchTerm(item?: CostRow | null) {
@@ -353,7 +357,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
             </div>
           </ModuleSection>
 
-          <div className="grid min-w-0 gap-5 2xl:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="grid min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
             <ModuleSection className="min-w-0 self-start">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -361,7 +365,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                   <p className="mt-1 text-sm leading-5 text-muted">Marca solamente las partidas que vas a evaluar.</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIndexes(items.map((_, index) => index))}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedIndexes(items.map((_, index) => index))}>
                     Todos
                   </Button>
                   <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIndexes([])}>
@@ -370,7 +374,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                 </div>
               </div>
 
-              <div className="mt-4 max-h-[640px] space-y-2 overflow-y-auto pr-1">
+              <div className="app-scrollbar mt-4 max-h-[560px] space-y-2 overflow-y-auto pr-1">
                 {itemRows.map((row) => {
                   const checked = selectedIndexes.includes(row.index);
                   const loading = loadingIndexes.includes(row.index);
@@ -392,6 +396,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold leading-5">{itemLabel(row.item, row.index)}</span>
+                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">{itemDescription(row.item)}</span>
                         <span className="mt-1 block text-xs leading-5 text-muted">
                           Cant. {cleanValue(row.item.cantidad, "N/D")} · Mejor ref. {money(row.best)}
                         </span>
@@ -402,7 +407,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                         ) : failed ? (
                           <StatusBadge tone="danger">Error</StatusBadge>
                         ) : row.hasMatch ? (
-                          <StatusBadge tone="ok">Match</StatusBadge>
+                          <StatusBadge tone="ok">Con datos</StatusBadge>
                         ) : itemHistoryMap[row.index] ? (
                           <StatusBadge tone="neutral">Sin datos</StatusBadge>
                         ) : null}

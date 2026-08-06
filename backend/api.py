@@ -148,6 +148,25 @@ async def save_upload_to_runtime_file(upload_file, suffix=".pdf", validate_pdf=F
         tmp.write(content)
         return tmp.name
 
+def extract_pdf_pages_from_path(path, max_pages=80, max_chars_per_page=24000):
+    """Extrae texto local para validar hechos que Gemini no debe inferir."""
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(path)
+        pages = []
+        for page_number, pdf_page in enumerate(reader.pages[:max_pages], start=1):
+            extracted = (pdf_page.extract_text() or "").strip()
+            if extracted:
+                pages.append({
+                    "pagina": page_number,
+                    "texto": extracted[:max_chars_per_page],
+                })
+        return pages
+    except Exception as exc:
+        logger.warning(f"No se pudo extraer texto local del PDF {path}: {exc}")
+        return []
+
 def safe_remove_file(path):
     try:
         if path and os.path.exists(path):
@@ -1043,20 +1062,30 @@ def _normalize_acp_code(value):
         return ""
     return f"{match.group(1).upper()}-{match.group(2).upper()}-{match.group(3)}"
 
-def _extract_item_start_acp_code(item):
+def _extract_item_start_acp_code(item, allowed_codes=None):
     """Recupera el codigo solo desde campos que representan el inicio del renglÃ³n."""
     if not isinstance(item, dict):
         return ""
 
+    allowed = None if allowed_codes is None else {
+        normalized
+        for value in allowed_codes
+        if (normalized := _normalize_acp_code(value))
+    }
+
+    def is_allowed(code):
+        return bool(code and (allowed is None or code in allowed))
+
     explicit_code = _normalize_acp_code(item.get("codigo_articulo"))
-    if explicit_code:
+    if is_allowed(explicit_code):
         return explicit_code
 
     for key in ["termino_de_busqueda_corto", "descripcion", "detalle", "nombre_articulo"]:
         text = str(item.get(key) or "").strip()
         match = ACP_CODE_AT_ITEM_START_RE.match(text)
-        if match:
-            return match.group(1).upper()
+        code = match.group(1).upper() if match else ""
+        if is_allowed(code):
+            return code
     return ""
 
 def _parse_rows_from_scope_text(value):
@@ -1111,14 +1140,31 @@ def _to_optional_bool(value):
         return False
     return None
 
-def postprocess_technical_analysis(data: dict) -> dict:
+def postprocess_technical_analysis(data: dict, source_documents=None) -> dict:
     """Reduce falsos positivos entre especificaciones tÃƒÂ©cnicas y entregables documentales."""
     items = data.get("items", []) if isinstance(data, dict) else []
+    source_documents = source_documents or []
+    source_text_available = any(
+        str(page.get("texto") or "").strip()
+        for document in source_documents
+        for page in (document.get("paginas") or [])
+    )
+    source_items = _extract_radar_items_from_documents(source_documents, limit=500) if source_text_available else []
+    source_acp_codes = {
+        str(item.get("codigo_articulo") or "").upper()
+        for item in source_items
+        if item.get("codigo_articulo")
+    }
     proposal_rows = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        item["codigo_articulo"] = _extract_item_start_acp_code(item)
+        # Si el PDF tiene texto legible, el codigo debe existir en una fila real
+        # del documento. Esto impide que la IA reutilice o invente codigos ACP.
+        item["codigo_articulo"] = _extract_item_start_acp_code(
+            item,
+            allowed_codes=source_acp_codes if source_text_available else None,
+        )
         requiere_propuesta = _to_bool(item.get("requiere_propuesta_tecnica"), default=False)
         item["requiere_propuesta_tecnica"] = requiere_propuesta
         if requiere_propuesta:
@@ -1347,12 +1393,19 @@ async def analizar_pliego(
     client = None
     local_temp_files = []
     archivos_subidos = []
+    source_documents = []
     try:
         client = get_gemini_client(api_key_clean)
 
         for archivo in archivos_pdf:
             tmp_path = await save_upload_to_runtime_file(archivo, suffix=".pdf", validate_pdf=True)
             local_temp_files.append(tmp_path)
+            source_documents.append({
+                "nombre": archivo.filename or os.path.basename(tmp_path),
+                "url": "",
+                "tipo": "rfq_pdf_subido",
+                "paginas": extract_pdf_pages_from_path(tmp_path),
+            })
             uploaded_file = gemini_upload_file(client, tmp_path)
             archivos_subidos.append(uploaded_file)
 
@@ -1377,7 +1430,7 @@ async def analizar_pliego(
 
         logger.info(f"{len(archivos_subidos)} pliego(s) analizados exitosamente.")
         data = json.loads(response.text)
-        return postprocess_technical_analysis(data)
+        return postprocess_technical_analysis(data, source_documents=source_documents)
 
     except Exception as e:
         logger.exception("Error analizando pliego")

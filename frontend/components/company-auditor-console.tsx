@@ -247,14 +247,18 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
   const sanctions = result?.sanciones;
   const adverse = result?.reputacion_adversa;
   const consistency = result?.coherencia_datos;
+  const verificationChecks = [identity, sanctions, adverse, consistency];
+  const confirmedChecks = verificationChecks.filter((check) => verificationTone(String(check?.estado || "")) === "ok").length;
+  const attentionChecks = verificationChecks.filter((check) => ["warn", "danger"].includes(verificationTone(String(check?.estado || "")))).length;
+  const officialEvidence = (result?.evidencia || []).filter((item) => item.verificado || String(item.nivel_fuente || "").toLowerCase().includes("oficial")).length;
 
   return (
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
           eyebrow="Riesgo comercial"
-          title="Auditor IA de proveedores"
-          copy="Verifica identidad digital, antigüedad del dominio, contacto y señales comerciales antes de solicitar una cotización o realizar un pago."
+          title="Debida diligencia de proveedores"
+          copy="Comprueba identidad, dominio, sanciones, reputación y coherencia comercial antes de solicitar una cotización o autorizar un pago."
           actions={
             <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "danger"}>
               {loadingConfig ? "Verificando IA" : hasGeminiKey ? `IA lista${geminiSource === "admin_global" ? " · Admin" : ""}` : "IA no configurada"}
@@ -266,13 +270,13 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
       <ModuleSection className="p-2">
         <div className="grid grid-cols-3 gap-2">
           <button type="button" onClick={() => setView("prepare")} className={`app-tab-button ${view === "prepare" ? "app-tab-button-active" : ""}`}>
-            Preparar <span>Empresa</span>
+            1. Empresa <span>Datos de entrada</span>
           </button>
           <button type="button" onClick={() => result && setView("result")} disabled={!result} className={`app-tab-button ${view === "result" ? "app-tab-button-active" : ""}`}>
-            Resultado <span>{result ? "Disponible" : "Pendiente"}</span>
+            2. Decisión <span>{result ? "Disponible" : "Pendiente"}</span>
           </button>
           <button type="button" onClick={() => setView("history")} className={`app-tab-button ${view === "history" ? "app-tab-button-active" : ""}`}>
-            Historial <span>{auditHistory.length} registros</span>
+            3. Historial <span>{auditHistory.length} registros</span>
           </button>
         </div>
       </ModuleSection>
@@ -361,18 +365,22 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             </form>
           </ModuleSection>
 
-          <ModuleSection className="self-start">
-            <h2 className="text-base font-semibold text-ink">Qué revisa el sistema</h2>
+          <ModuleSection className="self-start xl:sticky xl:top-32">
+            <h2 className="text-base font-semibold text-ink">Controles de la auditoría</h2>
+            <p className="mt-1 text-sm leading-6 text-muted">Cada control distingue evidencia confirmada de datos pendientes.</p>
             <div className="mt-4 space-y-3">
               {[
-                [Globe2, "Identidad digital", "Dominio, web, país y coherencia corporativa."],
-                [ShieldCheck, "Controles técnicos", "RDAP/WHOIS, edad del dominio, SSL y contacto."],
-                [Search, "Evidencia pública", "Señales comerciales y fuentes encontradas en la web."],
-                [ShieldAlert, "Riesgo operativo", "Alertas, validaciones y preguntas antes de pagar."]
+                [Globe2, "Identidad y presencia", "Dominio, web, país y coherencia corporativa."],
+                [ShieldCheck, "Dominio y seguridad", "RDAP/WHOIS, antigüedad, SSL y contacto."],
+                [Scale, "Sanciones y reputación", "Listas oficiales, alertas y antecedentes públicos."],
+                [ShieldAlert, "Decisión operativa", "Riesgos, pendientes y preguntas antes de pagar."]
               ].map(([Icon, title, copy]) => {
                 const ItemIcon = Icon as typeof Globe2;
                 return <div key={String(title)} className="flex gap-3 border-t border-line pt-3 first:border-0 first:pt-0"><ItemIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" /><div><div className="text-sm font-semibold text-ink">{String(title)}</div><p className="mt-1 text-xs leading-5 text-muted">{String(copy)}</p></div></div>;
               })}
+            </div>
+            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              El sistema no declara que una empresa sea 100% segura. Indica qué pudo confirmar, qué no y qué debe validar una persona.
             </div>
           </ModuleSection>
         </div>
@@ -381,31 +389,40 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
       {view === "result" ? (
         result ? (
           <div className="space-y-5">
-            <ModuleSection>
+            <ModuleSection className="overflow-hidden p-0">
+              <div className={`border-l-4 p-5 sm:p-6 ${riskTone(result.riesgo) === "danger" ? "border-rose-500" : riskTone(result.riesgo) === "ok" ? "border-emerald-500" : "border-amber-500"}`}>
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 max-w-3xl">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Decisión operativa</div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge tone={decisionTone(result.decision)}>{cleanValue(result.decision, "Pedir validación")}</StatusBadge>
                     <StatusBadge tone={riskTone(result.riesgo)}>Riesgo {cleanValue(result.riesgo, "Medio")}</StatusBadge>
                     <StatusBadge tone={confidenceTone(result.confianza)}>Confianza {cleanValue(result.confianza, "Media")}</StatusBadge>
                   </div>
-                  <h2 className="mt-4 break-words text-xl font-semibold text-ink">{cleanValue(result.empresa, companyName)}</h2>
+                  <h2 className="mt-3 break-words text-2xl font-semibold text-ink">{cleanValue(result.empresa, companyName)}</h2>
                   <p className="mt-2 text-sm leading-6 text-muted">{cleanValue(result.resumen, "Auditoría completada.")}</p>
                   <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                    <div className="text-xs font-semibold uppercase text-brand">Acción recomendada</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-brand">Qué hacer ahora</div>
                     <p className="mt-1 text-sm font-semibold leading-6 text-blue-950">{cleanValue(result.recomendacion_operativa, "Validar documentos corporativos y condiciones de pago antes de comprar.")}</p>
                   </div>
                 </div>
                 <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:w-[390px]">
                   <div className="rounded-lg border border-line bg-slate-50 p-3"><div className="text-xs font-semibold text-muted">Puntaje final</div><div className="mt-1 text-xl font-semibold text-ink">{typeof score === "number" ? `${score}/100` : "N/D"}</div><div className="mt-1 text-xs text-muted">{scoreLabel(score)}</div></div>
                   <div className="rounded-lg border border-line bg-slate-50 p-3"><div className="text-xs font-semibold text-muted">Técnico</div><div className="mt-1 text-xl font-semibold text-ink">{typeof result.score_tecnico === "number" ? result.score_tecnico : "N/D"}</div><div className="mt-1 text-xs text-muted">WHOIS + web</div></div>
-                  <div className="col-span-2 rounded-lg border border-line bg-slate-50 p-3 sm:col-span-1"><div className="text-xs font-semibold text-muted">Fuentes</div><div className="mt-1 text-xl font-semibold text-ink">{result.evidence_count ?? 0}</div><div className="mt-1 text-xs text-muted">{grounded ? "Búsqueda web" : "Sin grounding"}</div></div>
+                  <div className="col-span-2 rounded-lg border border-line bg-slate-50 p-3 sm:col-span-1"><div className="text-xs font-semibold text-muted">Fuentes sólidas</div><div className="mt-1 text-xl font-semibold text-ink">{officialEvidence}</div><div className="mt-1 text-xs text-muted">de {result.evidence_count ?? 0} evidencias</div></div>
                 </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+                <div className="app-data-card"><div className="text-xs font-semibold text-muted">Controles favorables</div><div className="mt-1 text-lg font-bold text-emerald-700">{confirmedChecks}/4</div></div>
+                <div className="app-data-card"><div className="text-xs font-semibold text-muted">Requieren atención</div><div className="mt-1 text-lg font-bold text-amber-700">{attentionChecks}</div></div>
+                <div className="app-data-card"><div className="text-xs font-semibold text-muted">Validaciones pendientes</div><div className="mt-1 text-lg font-bold text-ink">{pending.length}</div></div>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
                 <div className="text-xs leading-5 text-muted">{cleanValue(result.criterio_puntaje, "Resultado combinado con evidencia disponible.")}</div>
                 <Button type="button" variant="secondary" size="sm" onClick={() => setView("prepare")}><RotateCcw className="h-4 w-4" />Nueva auditoría</Button>
+              </div>
               </div>
             </ModuleSection>
 
@@ -417,6 +434,10 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             ) : null}
 
             <ModuleSection>
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div><h3 className="text-base font-semibold text-ink">Matriz de verificación</h3><p className="mt-1 text-sm text-muted">Lee primero el estado; abre las fuentes solo cuando necesites sustento.</p></div>
+                <StatusBadge tone={attentionChecks ? "warn" : "ok"}>{attentionChecks ? `${attentionChecks} control(es) por revisar` : "Controles favorables"}</StatusBadge>
+              </div>
               <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -438,12 +459,13 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                     [GitCompareArrows, "Coherencia de datos", consistency?.estado, consistency?.detalle]
                   ].map(([Icon, label, state, detail]) => {
                     const RowIcon = Icon as typeof Building2;
-                    return <div key={String(label)} className="flex min-w-0 gap-3 p-4">
-                      <RowIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                    const tone = verificationTone(String(state || ""));
+                    return <div key={String(label)} className={`flex min-w-0 gap-3 p-4 ${tone === "danger" ? "bg-rose-50/70" : tone === "warn" ? "bg-amber-50/60" : ""}`}>
+                      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone === "ok" ? "bg-emerald-100 text-emerald-700" : tone === "danger" ? "bg-rose-100 text-rose-700" : tone === "warn" ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-brand"}`}><RowIcon className="h-4 w-4" /></div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="text-sm font-semibold text-ink">{String(label)}</div>
-                          <StatusBadge tone={verificationTone(String(state || ""))}>{cleanValue(state, "No verificado")}</StatusBadge>
+                          <StatusBadge tone={tone}>{cleanValue(state, "No verificado")}</StatusBadge>
                         </div>
                         <p className="mt-2 text-xs leading-5 text-muted">{cleanValue(detail, "Sin evidencia concluyente.")}</p>
                       </div>
@@ -461,7 +483,7 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
                 </div>
               </ModuleSection>
               <ModuleSection>
-                <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-rose-600" /><h3 className="text-sm font-semibold text-ink">Por qué requiere atención</h3></div>
+                <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-rose-600" /><h3 className="text-sm font-semibold text-ink">Riesgos y datos no confirmados</h3></div>
                 <div className="mt-4 space-y-3">
                   {(alerts.length ? alerts : ["No se detectaron alertas concretas; conserva la validación comercial estándar."]).map((item) => <div key={item} className="flex gap-3 border-t border-line pt-3 text-sm leading-6 text-ink first:border-0 first:pt-0"><AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-rose-600" /><span>{item}</span></div>)}
                 </div>
@@ -532,14 +554,12 @@ export function CompanyAuditorConsole({ user }: { user: AuthUser }) {
             </form>
           </div>
 
-          <div className="mt-5 divide-y divide-line overflow-hidden rounded-lg border border-line">
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
             {auditHistory.map((audit) => (
-              <div key={audit.id} className="grid min-w-0 gap-3 bg-panel p-4 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1fr)_110px_130px_170px_auto] lg:items-center">
-                <div className="min-w-0"><div className="break-words text-sm font-semibold text-ink">{cleanValue(audit.company_name, "Sin nombre")}</div><div className="mt-1 break-words text-xs text-muted">{cleanValue(audit.domain || audit.website, "Sin dominio confirmado")}</div></div>
-                <div><div className="text-xs text-muted">Puntaje</div><div className="mt-1 text-sm font-semibold text-ink">{typeof audit.score_final === "number" ? `${audit.score_final}/100` : "N/D"}</div></div>
-                <div className="flex flex-wrap gap-2 lg:block"><StatusBadge tone={riskTone(audit.riesgo)}>Riesgo {cleanValue(audit.riesgo, "N/D")}</StatusBadge></div>
-                <div><div className="text-xs text-muted">{formatAuditDate(audit.created_at)}</div><div className="mt-1 text-xs text-muted">Por {cleanValue(audit.username, "N/D")}</div></div>
-                <Button type="button" variant="secondary" size="sm" onClick={() => reuseAudit(audit)}><RotateCcw className="h-4 w-4" />Revisar de nuevo</Button>
+              <div key={audit.id} className="app-action-card min-w-0 p-4">
+                <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><div className="break-words text-base font-semibold text-ink">{cleanValue(audit.company_name, "Sin nombre")}</div><div className="mt-1 break-words text-xs text-muted">{cleanValue(audit.domain || audit.website, "Sin dominio confirmado")}</div></div><div className="text-right"><div className="text-xl font-bold text-ink">{typeof audit.score_final === "number" ? audit.score_final : "N/D"}</div><div className="text-[11px] text-muted">sobre 100</div></div></div>
+                <div className="mt-4 flex flex-wrap gap-2"><StatusBadge tone={riskTone(audit.riesgo)}>Riesgo {cleanValue(audit.riesgo, "N/D")}</StatusBadge><StatusBadge tone={decisionTone(audit.decision)}>{cleanValue(audit.decision, "Revisar")}</StatusBadge></div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3"><div className="text-xs text-muted">{formatAuditDate(audit.created_at)} · {cleanValue(audit.username, "N/D")}</div><Button type="button" variant="secondary" size="sm" onClick={() => reuseAudit(audit)}><RotateCcw className="h-4 w-4" />Volver a auditar</Button></div>
               </div>
             ))}
             {!auditHistory.length ? <EmptyState icon={History} title="No hay auditorías con ese filtro" copy="Cambia la búsqueda o crea la primera auditoría corporativa." /> : null}
