@@ -195,7 +195,7 @@ INTERNAL_API_TOKEN = os.getenv("INTERNAL_API_TOKEN", "default-dev-token")
 SESSION_TTL_SECONDS = max(3600, int(os.getenv("SESSION_TTL_SECONDS", "86400") or 86400))
 RADAR_AUTO_SCAN_ENABLED = os.getenv("RADAR_AUTO_SCAN_ENABLED", "true").strip().lower() in ["1", "true", "yes", "si", "sÃƒÂ­", "on"]
 RADAR_AUTO_SCAN_INTERVAL_MINUTES = max(5, int(os.getenv("RADAR_AUTO_SCAN_INTERVAL_MINUTES", "25") or 25))
-RADAR_AUTO_SCAN_ON_STARTUP = os.getenv("RADAR_AUTO_SCAN_ON_STARTUP", "false").strip().lower() in ["1", "true", "yes", "si", "sÃƒÂ­", "on"]
+RADAR_AUTO_SCAN_ON_STARTUP = os.getenv("RADAR_AUTO_SCAN_ON_STARTUP", "true").strip().lower() in ["1", "true", "yes", "si", "sÃƒÂ­", "on"]
 RADAR_SCHEDULER_STATE = {
     "enabled": RADAR_AUTO_SCAN_ENABLED,
     "interval_minutes": RADAR_AUTO_SCAN_INTERVAL_MINUTES,
@@ -311,10 +311,11 @@ def run_radar_auto_scan(source="scheduler"):
         import sli_scraper
         logger.info(f"[RADAR AUTO] Iniciando escaneo SLI ({source}).")
         result = sli_scraper.ejecutar_radar_detallado(db_module=db)
-        RADAR_SCHEDULER_STATE["last_result"] = result
+        result_summary = {key: value for key, value in result.items() if key != "licitaciones"}
+        RADAR_SCHEDULER_STATE["last_result"] = result_summary
         RADAR_SCHEDULER_STATE["last_finished"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"[RADAR AUTO] Escaneo completado: {result}")
-        return {"status": "success", "result": result}
+        logger.info(f"[RADAR AUTO] Escaneo completado: {result_summary}")
+        return {"status": "success", "result": result_summary}
     except Exception as exc:
         error_text = str(exc)
         RADAR_SCHEDULER_STATE["last_error"] = error_text
@@ -339,6 +340,46 @@ def radar_scheduler_loop():
         if _radar_scheduler_stop.wait(interval_seconds):
             break
         run_radar_auto_scan()
+
+def _radar_latest_persisted_scan():
+    try:
+        scans = db.get_ultimos_escaneos(1)
+        if scans is None or scans.empty:
+            return None
+        return {key: _radar_json_safe(value) for key, value in scans.iloc[0].to_dict().items()}
+    except Exception as exc:
+        logger.warning(f"[RADAR AUTO] No se pudo leer el ultimo escaneo persistido: {exc}")
+        return None
+
+def _radar_scan_is_stale(scan=None):
+    scan = scan or _radar_latest_persisted_scan()
+    if not scan or not scan.get("fecha"):
+        return True
+    try:
+        scanned_at = datetime.fromisoformat(str(scan.get("fecha")).replace("Z", "+00:00"))
+        if scanned_at.tzinfo:
+            scanned_at = scanned_at.replace(tzinfo=None)
+        age_seconds = max(0, (datetime.now() - scanned_at).total_seconds())
+        completed = str(scan.get("escaneo_completo") or "").strip().lower() in {"true", "1", "yes", "si"}
+        retry_minutes = RADAR_AUTO_SCAN_INTERVAL_MINUTES if completed else min(5, RADAR_AUTO_SCAN_INTERVAL_MINUTES)
+        return age_seconds >= retry_minutes * 60
+    except (TypeError, ValueError):
+        return True
+
+def _trigger_radar_scan_if_stale(source="lazy_refresh"):
+    latest = _radar_latest_persisted_scan()
+    if not RADAR_AUTO_SCAN_ENABLED or not _radar_scan_is_stale(latest):
+        return False
+    if RADAR_SCHEDULER_STATE.get("running") or _radar_scan_lock.locked():
+        return False
+    thread = threading.Thread(
+        target=run_radar_auto_scan,
+        kwargs={"source": source},
+        name="radar-sli-lazy-refresh",
+        daemon=True,
+    )
+    thread.start()
+    return True
 
 @app.on_event("startup")
 def start_radar_scheduler():
@@ -365,7 +406,20 @@ def stop_radar_scheduler():
 
 @app.get("/api/v1/radar/scheduler")
 def radar_scheduler_status(_token: str = Depends(verify_internal_token)):
-    return RADAR_SCHEDULER_STATE
+    latest = _radar_latest_persisted_scan()
+    if latest and not RADAR_SCHEDULER_STATE.get("last_finished"):
+        RADAR_SCHEDULER_STATE["last_finished"] = latest.get("fecha")
+        RADAR_SCHEDULER_STATE["last_result"] = {
+            "total": latest.get("total_encontradas", 0),
+            "nuevas": latest.get("nuevas", 0),
+            "paginas_recorridas": latest.get("paginas_recorridas", 0),
+            "escaneo_completo": bool(latest.get("escaneo_completo")),
+            "errores": latest.get("errores") or "",
+        }
+        if latest.get("errores") or not _radar_bool(latest.get("escaneo_completo")):
+            RADAR_SCHEDULER_STATE["last_error"] = latest.get("errores") or "El ultimo escaneo no confirmo cobertura completa."
+    _trigger_radar_scan_if_stale(source="radar_opened")
+    return {**RADAR_SCHEDULER_STATE, "stale": _radar_scan_is_stale(latest)}
 
 @app.get("/api/v1/radar/stats")
 def radar_stats(_token: str = Depends(verify_internal_token)):
@@ -495,7 +549,7 @@ SLI_STRUCTURED_ACP_RE = re.compile(
     r"art[ií]culo\s+ACP\s*:\s*([A-Z]{3}-[A-Z]{3}-\d{5})(?=$|[\s|:;,])",
     re.IGNORECASE,
 )
-RADAR_DOCUMENT_PARSER_VERSION = 2
+RADAR_DOCUMENT_PARSER_VERSION = 3
 
 def _radar_parser_cache_current(cache):
     if not cache or not isinstance(cache.get("result"), dict):
@@ -629,9 +683,9 @@ def _extract_radar_items_from_documents(documents, limit=80):
                             candidate = next_line
                             break
 
-                code = _extract_radar_item_start_code(candidate if has_row_context else line)
-                if not has_row_context and not code:
+                if not has_row_context:
                     continue
+                code = _extract_radar_item_start_code(candidate)
                 if not candidate or _looks_like_sli_label(candidate):
                     continue
 
@@ -686,6 +740,7 @@ def radar_licitaciones(
     limit: int = Query(500, ge=1, le=2000),
     _token: str = Depends(verify_internal_token)
 ):
+    _trigger_radar_scan_if_stale(source="radar_list_opened")
     df = db.get_licitaciones_radar(solo_nuevas=solo_nuevas, solo_hoy=solo_hoy)
     if df.empty:
         return {"status": "success", "total": 0, "items": []}

@@ -345,6 +345,8 @@ def init_db():
         radar_id INTEGER PRIMARY KEY,
         numero_licitacion TEXT NOT NULL,
         numero_enmienda TEXT DEFAULT '',
+        ultima_revision TEXT DEFAULT '',
+        ultima_revision TEXT DEFAULT '',
         document_fingerprint TEXT DEFAULT '',
         status TEXT DEFAULT 'completed',
         result_json JSONB DEFAULT '{}'::jsonb,
@@ -354,10 +356,13 @@ def init_db():
     )''')
     c.execute("CREATE INDEX IF NOT EXISTS idx_radar_document_analyses_numero ON radar_document_analyses(numero_licitacion)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_radar_document_analyses_date ON radar_document_analyses(analyzed_at DESC)")
+    c.execute("ALTER TABLE radar_document_analyses ADD COLUMN IF NOT EXISTS ultima_revision TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS numero_enmienda TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS enmienda_anterior TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS enmienda_alerta BOOLEAN DEFAULT FALSE")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS fecha_enmienda_alerta TEXT DEFAULT ''")
+    c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS ultima_revision TEXT DEFAULT ''")
+    c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS revision_anterior TEXT DEFAULT ''")
     for ddl in [
         "ALTER TABLE radar_escaneos ADD COLUMN IF NOT EXISTS paginas_recorridas INTEGER DEFAULT 0",
         "ALTER TABLE radar_escaneos ADD COLUMN IF NOT EXISTS total_detectadas_portal INTEGER DEFAULT 0",
@@ -744,7 +749,7 @@ def _radar_supervisor_recommendation(total=0, ganadas=0, mejor_match=0, has_code
             "accion": "Abrir detalle SLI/RFQ y validar renglones/codigos ACP antes de decidir.",
             "prioridad": "Alta",
             "tone": "warn",
-            "motivo": "El listado del Radar no trae codigo ACP confiable. La comparacion historica es preliminar."
+            "motivo": "El historico no se compara hasta confirmar un codigo ACP dentro de un renglon del RFQ."
         }
     if mejor_match >= 75 and ganadas > 0:
         return {
@@ -777,8 +782,8 @@ def get_radar_document_analysis(radar_id):
         c = conn.cursor()
         c.execute(
             """
-            SELECT r.numero_licitacion, COALESCE(r.numero_enmienda, ''),
-                   a.numero_enmienda, a.document_fingerprint, a.status,
+            SELECT r.numero_licitacion, COALESCE(r.numero_enmienda, ''), COALESCE(r.ultima_revision, ''),
+                   a.numero_enmienda, COALESCE(a.ultima_revision, ''), a.document_fingerprint, a.status,
                    a.result_json, a.error, a.analyzed_at, a.analyzed_by
             FROM radar_licitaciones r
             LEFT JOIN radar_document_analyses a ON a.radar_id = r.id
@@ -790,13 +795,14 @@ def get_radar_document_analysis(radar_id):
         if not row:
             return None
 
-        numero, current_amendment, cached_amendment, fingerprint, status, result, error, analyzed_at, analyzed_by = row
+        numero, current_amendment, current_revision, cached_amendment, cached_revision, fingerprint, status, result, error, analyzed_at, analyzed_by = row
         if cached_amendment is None:
             return {
                 "available": False,
                 "stale": False,
                 "numero_licitacion": numero,
                 "numero_enmienda_actual": current_amendment or "",
+                "ultima_revision_actual": current_revision or "",
                 "result": None,
             }
 
@@ -808,10 +814,15 @@ def get_radar_document_analysis(radar_id):
         result = result if isinstance(result, dict) else {}
         return {
             "available": True,
-            "stale": str(cached_amendment or "") != str(current_amendment or ""),
+            "stale": (
+                str(cached_amendment or "") != str(current_amendment or "")
+                or str(cached_revision or "") != str(current_revision or "")
+            ),
             "numero_licitacion": numero,
             "numero_enmienda_actual": current_amendment or "",
             "numero_enmienda_analizada": cached_amendment or "",
+            "ultima_revision_actual": current_revision or "",
+            "ultima_revision_analizada": cached_revision or "",
             "document_fingerprint": fingerprint or "",
             "status": status or "completed",
             "error": error or "",
@@ -828,23 +839,24 @@ def save_radar_document_analysis(radar_id, result, analyzed_by=""):
     try:
         c = conn.cursor()
         c.execute(
-            "SELECT numero_licitacion, COALESCE(numero_enmienda, '') FROM radar_licitaciones WHERE id=%s",
+            "SELECT numero_licitacion, COALESCE(numero_enmienda, ''), COALESCE(ultima_revision, '') FROM radar_licitaciones WHERE id=%s",
             (int(radar_id),),
         )
         radar = c.fetchone()
         if not radar:
             return False
-        numero, amendment = radar
+        numero, amendment, revision = radar
         payload = result if isinstance(result, dict) else {}
         c.execute(
             """
             INSERT INTO radar_document_analyses
-                (radar_id, numero_licitacion, numero_enmienda, document_fingerprint,
-                 status, result_json, error, analyzed_at, analyzed_by)
-            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), %s)
+                (radar_id, numero_licitacion, numero_enmienda, ultima_revision, document_fingerprint,
+                  status, result_json, error, analyzed_at, analyzed_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), %s)
             ON CONFLICT (radar_id) DO UPDATE SET
                 numero_licitacion = EXCLUDED.numero_licitacion,
                 numero_enmienda = EXCLUDED.numero_enmienda,
+                ultima_revision = EXCLUDED.ultima_revision,
                 document_fingerprint = EXCLUDED.document_fingerprint,
                 status = EXCLUDED.status,
                 result_json = EXCLUDED.result_json,
@@ -856,6 +868,7 @@ def save_radar_document_analysis(radar_id, result, analyzed_by=""):
                 int(radar_id),
                 str(numero or ""),
                 str(amendment or ""),
+                str(revision or ""),
                 str(payload.get("document_fingerprint") or ""),
                 str(payload.get("status") or ("completed" if payload.get("consultado") else "error")),
                 json.dumps(payload, ensure_ascii=False, default=str),
@@ -915,10 +928,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
                 if re.fullmatch(r"[A-Z]{3}-[A-Z]{3}-\d{5}", code)
             ]
         else:
-            codigo_matches = [
-                _clean_codigo_match(match)
-                for match in re.findall(r"\b[A-Z]{3}-[A-Z]{3}-\d{5}\b|\b[A-Z]{6}\d{5}\b", str(text_blob).upper())
-            ]
+            # El titulo del Radar no es evidencia de un codigo ACP. Solo se
+            # comparan codigos confirmados dentro de renglones del SLI/RFQ.
+            codigo_matches = []
         codigo_matches = [code for code in list(dict.fromkeys(codigo_matches)) if code][:12]
         codigo_display_matches = [
             f"{code[:3]}-{code[3:6]}-{code[6:]}"
@@ -939,15 +951,6 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
         if codigo_matches:
             filters.append("codigo_match = ANY(%s)")
             params.append(codigo_matches)
-        else:
-            if numero:
-                filters.append("numero_licitacion = %s")
-                params.append(str(numero))
-            if keywords:
-                keyword_filter = "(" + " OR ".join(["observaciones ILIKE %s OR codigo_acp ILIKE %s"] * len(keywords)) + ")"
-                filters.append(keyword_filter)
-                for kw in keywords:
-                    params.extend([f"%{kw}%", f"%{kw}%"])
 
         empty_summary = {
             "total": 0,
@@ -961,9 +964,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
             "renglones_detectados_count": renglones_count,
             "pdfs_consultados_count": len(pdfs_consultados) if isinstance(pdfs_consultados, list) else 0,
             "nota": (
-                "No se detectaron codigos ACP en el listado ni en el detalle SLI. Hay que abrir/leer el RFQ o pliego adjunto para comparar por producto."
+                "El RFQ fue revisado y no contiene codigos ACP confirmados al inicio de sus renglones. No se ejecuto una comparacion historica por texto para evitar falsos positivos."
                 if sli_consultado and not codigo_matches
-                else "No se detectaron codigos ACP en el listado del Radar. La comparacion requiere consultar el detalle/RFQ."
+                else "Analiza el RFQ para extraer codigos ACP confirmados antes de consultar el historico."
             ),
             "recomendacion_supervisor": _radar_supervisor_recommendation(has_codes=False)
         }
@@ -1026,7 +1029,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
         prices = [
             float(row.get("precio_proyelec"))
             for row in rows
-            if row.get("precio_proyelec") is not None and str(row.get("precio_proyelec")) != "nan"
+            if row.get("precio_proyelec") is not None
+            and str(row.get("precio_proyelec")) != "nan"
+            and float(row.get("precio_proyelec")) > 0
         ]
         ganadas = [
             row for row in rows
@@ -1041,9 +1046,9 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
         elif has_codes:
             nota = "Comparacion incluye codigo ACP detectado en el listado del Radar."
         elif sli_consultado and renglones_count:
-            nota = "El detalle SLI trajo renglones, pero sin codigo ACP claro. La comparacion queda por palabras y requiere revisar el RFQ/pliego."
+            nota = "El detalle SLI trajo renglones, pero ninguno tiene un codigo ACP confirmado. No se comparo por palabras para evitar falsos positivos."
         else:
-            nota = "Comparacion por palabras del objeto. Para mayor precision, consulta el RFQ y extrae codigos ACP/renglones."
+            nota = "El historico solo se compara por codigo ACP confirmado. Analiza el RFQ para iniciar el cruce exacto."
         return {
             "radar": {"numero_licitacion": numero, "objeto": objeto, "categoria": categoria},
             "keywords": keywords,
@@ -2266,10 +2271,11 @@ def _normalizar_enmienda_radar(value):
         return ""
     return text
 
-def _registrar_alerta_enmienda_si_aplica(cursor, numero_licitacion, enmienda_nueva, fecha):
+def _registrar_alerta_enmienda_si_aplica(cursor, numero_licitacion, enmienda_nueva, revision_nueva, fecha):
     enmienda_nueva = _normalizar_enmienda_radar(enmienda_nueva)
+    revision_nueva = str(revision_nueva or "").strip()
     cursor.execute("""
-        SELECT numero_enmienda, estado_radar
+        SELECT numero_enmienda, estado_radar, COALESCE(ultima_revision, '')
         FROM radar_licitaciones
         WHERE numero_licitacion=%s
     """, (numero_licitacion,))
@@ -2278,22 +2284,26 @@ def _registrar_alerta_enmienda_si_aplica(cursor, numero_licitacion, enmienda_nue
         return False
     enmienda_actual = _normalizar_enmienda_radar(row[0])
     estado = str(row[1] or "")
-    if estado not in ("descartada", "en_seguimiento"):
+    revision_actual = str(row[2] or "").strip()
+    if estado not in ("revisada", "descartada", "en_seguimiento"):
         return False
-    if not enmienda_nueva or enmienda_nueva == enmienda_actual:
+    cambio_enmienda = bool(enmienda_nueva and enmienda_nueva != enmienda_actual)
+    cambio_revision = bool(revision_nueva and revision_actual and revision_nueva != revision_actual)
+    if not cambio_enmienda and not cambio_revision:
         return False
     cursor.execute("""
         UPDATE radar_licitaciones
         SET enmienda_anterior=%s,
             enmienda_alerta=TRUE,
+            revision_anterior=%s,
             fecha_enmienda_alerta=%s
         WHERE numero_licitacion=%s
-    """, (enmienda_actual, fecha, numero_licitacion))
+    """, (enmienda_actual, revision_actual, fecha, numero_licitacion))
     return True
 
 def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimado,
                               moneda, fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
-                              numero_enmienda=""):
+                              numero_enmienda="", ultima_revision=""):
     """Guarda una licitaciÃ³n descubierta por el radar. Retorna True si es nueva, False si ya existÃ­a."""
     conn = get_connection()
     c = conn.cursor()
@@ -2303,12 +2313,12 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
     numero_enmienda = _normalizar_enmienda_radar(numero_enmienda)
 
     try:
-        _registrar_alerta_enmienda_si_aplica(c, numero_licitacion, numero_enmienda, fecha)
+        _registrar_alerta_enmienda_si_aplica(c, numero_licitacion, numero_enmienda, ultima_revision, fecha)
         c.execute("""INSERT INTO radar_licitaciones
             (numero_licitacion, objeto, categoria, monto_estimado, moneda,
              fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
-             numero_enmienda, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'nueva')
+             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'nueva')
             ON CONFLICT (numero_licitacion) DO UPDATE SET
                 objeto = EXCLUDED.objeto,
                 categoria = EXCLUDED.categoria,
@@ -2318,11 +2328,13 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
                 link_sli = EXCLUDED.link_sli,
                 es_prioritaria = EXCLUDED.es_prioritaria,
                 numero_enmienda = EXCLUDED.numero_enmienda,
+                ultima_revision = EXCLUDED.ultima_revision,
                 fecha_ultimo_escaneo = EXCLUDED.fecha_ultimo_escaneo,
                 score_interes = EXCLUDED.score_interes,
                 monto_estimado = CASE WHEN EXCLUDED.monto_estimado > 0 THEN EXCLUDED.monto_estimado ELSE radar_licitaciones.monto_estimado END
         """, (numero_licitacion, objeto, categoria, monto_estimado, moneda,
-              fecha_apertura, fecha_cierre, link_sli, es_prioritaria, numero_enmienda, fecha, fecha, score))
+              fecha_apertura, fecha_cierre, link_sli, es_prioritaria, numero_enmienda,
+              str(ultima_revision or "").strip(), fecha, fecha, score))
 
         # Verificar si fue INSERT o UPDATE
         fue_nueva = c.rowcount > 0
@@ -2358,7 +2370,7 @@ def guardar_licitaciones_radar_bulk(licitaciones):
     c = conn.cursor()
     placeholders = ",".join(["%s"] * len(numeros))
     c.execute(f"""
-        SELECT numero_licitacion, numero_enmienda, estado_radar
+        SELECT numero_licitacion, numero_enmienda, estado_radar, COALESCE(ultima_revision, '')
         FROM radar_licitaciones
         WHERE numero_licitacion IN ({placeholders})
     """, tuple(numeros))
@@ -2366,6 +2378,7 @@ def guardar_licitaciones_radar_bulk(licitaciones):
         str(row[0]): {
             "numero_enmienda": _normalizar_enmienda_radar(row[1]),
             "estado_radar": str(row[2] or ""),
+            "ultima_revision": str(row[3] or "").strip(),
         }
         for row in c.fetchall()
     }
@@ -2380,17 +2393,22 @@ def guardar_licitaciones_radar_bulk(licitaciones):
         es_prioritaria = bool(lic.get("es_prioritaria", False))
         score = _calcular_score_radar(monto, es_prioritaria)
         enmienda_nueva = _normalizar_enmienda_radar(lic.get("numero_enmienda", ""))
+        revision_nueva = str(lic.get("ultima_revision", "") or "").strip()
         existente = existentes_data.get(numero)
-        if existente and existente["estado_radar"] in ("descartada", "en_seguimiento"):
+        if existente and existente["estado_radar"] in ("revisada", "descartada", "en_seguimiento"):
             enmienda_actual = existente["numero_enmienda"]
-            if enmienda_nueva and enmienda_nueva != enmienda_actual:
+            revision_actual = existente["ultima_revision"]
+            cambio_enmienda = bool(enmienda_nueva and enmienda_nueva != enmienda_actual)
+            cambio_revision = bool(revision_nueva and revision_actual and revision_nueva != revision_actual)
+            if cambio_enmienda or cambio_revision:
                 c.execute("""
                     UPDATE radar_licitaciones
                     SET enmienda_anterior=%s,
+                        revision_anterior=%s,
                         enmienda_alerta=TRUE,
                         fecha_enmienda_alerta=%s
                     WHERE numero_licitacion=%s
-                """, (enmienda_actual, fecha, numero))
+                """, (enmienda_actual, revision_actual, fecha, numero))
         values.append((
             numero,
             lic.get("objeto", ""),
@@ -2402,6 +2420,7 @@ def guardar_licitaciones_radar_bulk(licitaciones):
             lic.get("link_sli", ""),
             es_prioritaria,
             enmienda_nueva,
+            revision_nueva,
             fecha,
             fecha,
             score,
@@ -2416,7 +2435,7 @@ def guardar_licitaciones_radar_bulk(licitaciones):
         INSERT INTO radar_licitaciones
             (numero_licitacion, objeto, categoria, monto_estimado, moneda,
              fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
-             numero_enmienda, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
+             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
         VALUES %s
         ON CONFLICT (numero_licitacion) DO UPDATE SET
             objeto = EXCLUDED.objeto,
@@ -2427,6 +2446,7 @@ def guardar_licitaciones_radar_bulk(licitaciones):
             link_sli = EXCLUDED.link_sli,
             es_prioritaria = EXCLUDED.es_prioritaria,
             numero_enmienda = EXCLUDED.numero_enmienda,
+            ultima_revision = EXCLUDED.ultima_revision,
             fecha_ultimo_escaneo = EXCLUDED.fecha_ultimo_escaneo,
             score_interes = EXCLUDED.score_interes,
             monto_estimado = CASE WHEN EXCLUDED.monto_estimado > 0 THEN EXCLUDED.monto_estimado ELSE radar_licitaciones.monto_estimado END

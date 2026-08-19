@@ -16,7 +16,9 @@ export type RadarLicitacion = {
   link_sli?: string | null;
   es_prioritaria?: boolean | number | string | null;
   numero_enmienda?: string | null;
+  ultima_revision?: string | null;
   enmienda_anterior?: string | null;
+  revision_anterior?: string | null;
   enmienda_alerta?: boolean | number | string | null;
   fecha_enmienda_alerta?: string | null;
   fecha_descubierta?: string | null;
@@ -42,6 +44,7 @@ export type RadarSchedulerStatus = {
   last_result?: Record<string, unknown> | null;
   last_error?: string | null;
   next_run_at?: string | null;
+  stale?: boolean;
 };
 
 export type RadarScanLog = {
@@ -115,6 +118,8 @@ export type RadarHistoricoResponse = {
     numero_licitacion?: string | null;
     numero_enmienda_actual?: string | null;
     numero_enmienda_analizada?: string | null;
+    ultima_revision_actual?: string | null;
+    ultima_revision_analizada?: string | null;
     document_fingerprint?: string | null;
     status?: string | null;
     error?: string | null;
@@ -168,7 +173,7 @@ export function getRadarLicitaciones(params: RadarQuery = {}) {
 }
 
 export function runRadarScan() {
-  return apiRequest<Record<string, unknown>>("/radar/scan-now", { method: "POST" });
+  return apiRequest<Record<string, unknown>>("/radar/scan-now", { method: "POST", timeoutMs: 180000 });
 }
 
 export function getRadarScheduler() {

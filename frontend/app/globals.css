@@ -622,6 +622,7 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
 .app-status-badge,
 .app-chip-info {
   display: inline-flex;
+  min-width: 0;
   max-width: 100%;
   align-items: center;
   gap: 0.3rem;
@@ -632,6 +633,19 @@ textarea::placeholder { color: var(--ui-text-muted) !important; opacity: 0.78; }
   font-weight: 700;
   line-height: 1rem;
   cursor: default;
+}
+
+.radar-console .app-status-badge,
+.radar-console .app-data-card,
+.radar-console .app-row-button,
+.radar-console .app-btn {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.radar-console .app-status-badge,
+.radar-console .app-btn {
+  white-space: normal;
 }
 
 .app-status-neutral { border-color: var(--ui-border) !important; background: var(--ui-surface-muted) !important; color: var(--ui-text-muted) !important; }

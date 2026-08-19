@@ -18,7 +18,6 @@ import {
   type RadarScanLog,
   type RadarSchedulerStatus
 } from "@/lib/radar";
-import { SliLookupPanel } from "@/components/sli-lookup-panel";
 import { createSeguimiento } from "@/lib/seguimiento";
 import { type AuthUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -76,8 +75,8 @@ function closeLabel(row: RadarLicitacion) {
   const diffDays = Math.ceil((time - Date.now()) / (24 * 60 * 60 * 1000));
   if (diffDays < 0) return "Vencida";
   if (diffDays === 0) return "Cierra hoy";
-  if (diffDays === 1) return "Manana";
-  return `${diffDays} dias`;
+  if (diffDays === 1) return "Mañana";
+  return `${diffDays} días`;
 }
 
 function getRowTime(row: RadarLicitacion, field: DateField) {
@@ -90,8 +89,11 @@ function getRowTime(row: RadarLicitacion, field: DateField) {
 function sortRows(rows: RadarLicitacion[], mode: SortMode) {
   return [...rows].sort((a, b) => {
     const field = mode === "cierre" ? "fecha_cierre_iso" : "fecha_apertura_iso";
-    const aTime = a[field] ? new Date(String(a[field])).getTime() : 0;
-    const bTime = b[field] ? new Date(String(b[field])).getTime() : 0;
+    const missingTime = mode === "cierre" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+    const parsedA = a[field] ? new Date(String(a[field])).getTime() : missingTime;
+    const parsedB = b[field] ? new Date(String(b[field])).getTime() : missingTime;
+    const aTime = Number.isNaN(parsedA) ? missingTime : parsedA;
+    const bTime = Number.isNaN(parsedB) ? missingTime : parsedB;
     return mode === "cierre" ? aTime - bTime : bTime - aTime;
   });
 }
@@ -138,13 +140,6 @@ function isClosingSoon(row: RadarLicitacion) {
   return time >= now && time <= now + 72 * 60 * 60 * 1000;
 }
 
-function rowVisualTone(row: RadarLicitacion, selected: boolean) {
-  if (selected) return "bg-blue-50/70";
-  if (radarFlag(row.enmienda_alerta)) return "bg-amber-50/55";
-  if (isClosingSoon(row)) return "bg-rose-50/35";
-  return "";
-}
-
 export function RadarConsole({ user }: { user: AuthUser }) {
   const [rows, setRows] = useState<RadarLicitacion[]>([]);
   const [total, setTotal] = useState(0);
@@ -159,7 +154,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSliRfq, setSelectedSliRfq] = useState<string | null>(null);
   const [selectedRow, setSelectedRow] = useState<RadarLicitacion | null>(null);
   const [historicoMatch, setHistoricoMatch] = useState<RadarHistoricoResponse | null>(null);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
@@ -172,7 +166,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
 
   function selectRadarRow(row: RadarLicitacion) {
     setSelectedRow(row);
-    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+    if (typeof window !== "undefined" && window.innerWidth < 1536) {
       window.setTimeout(() => detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     }
   }
@@ -196,7 +190,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
         soloNuevas: filterMode === "nuevas",
         soloHoy: filterMode === "hoy",
         soloAlertas: filterMode === "alertas",
-        limit: 800
+        limit: 2000
       });
       setRows(response.items);
       setTotal(response.total);
@@ -292,6 +286,15 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     }, intervalMs);
     return () => window.clearInterval(timer);
   }, [autoRefresh, scheduler?.interval_minutes, search, filterMode]);
+
+  useEffect(() => {
+    if (!scheduler?.running && !scheduler?.stale) return;
+    const timer = window.setInterval(async () => {
+      await loadRadarHealth();
+      await loadRadar();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [scheduler?.running, scheduler?.stale, search, filterMode]);
 
   useEffect(() => {
     let mounted = true;
@@ -392,7 +395,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     setBusy(true);
     setError(null);
     try {
-      await updateRadarEstado(id, estado, "supervisor", (notasOverride ?? supervisorNote).trim());
+      await updateRadarEstado(id, estado, user.username, (notasOverride ?? supervisorNote).trim());
       await loadRadar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar el estado.");
@@ -427,13 +430,13 @@ export function RadarConsole({ user }: { user: AuthUser }) {
 
   const summaryCards: Array<[string, string | number, string, LucideIcon, string]> = [
     ["Total abiertas", total, `${visibleRows.length} visibles con filtros`, ShieldCheck, "text-blue-700"],
-    ["Nuevas", newCount, "Sin revisar todavia", CheckCircle2, "text-emerald-700"],
+    ["Nuevas", newCount, "Sin revisar todavía", CheckCircle2, "text-emerald-700"],
     ["Alertas enmienda", alertCount, "Requieren revisión", AlertTriangle, "text-amber-700"],
     ["Cierre 72h", closingSoonCount, "Prioridad operativa", CalendarClock, "text-rose-700"]
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="radar-console space-y-5">
       <div className="space-y-4">
         <PageHeader
           eyebrow="Radar Supervisor"
@@ -446,14 +449,54 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             </Button>
           }
         />
-        <ModuleSection className="flex flex-wrap gap-2 p-3 text-xs font-semibold">
-          <StatusBadge tone="neutral">Actualización: {scheduler?.enabled === false ? "manual" : `cada ${scheduler?.interval_minutes || 25} min`}</StatusBadge>
-          <StatusBadge tone={scheduler?.last_error ? "danger" : "ok"}>{scheduler?.running ? "Escaneando ahora" : scheduler?.last_error ? "Último escaneo con error" : "Scheduler listo"}</StatusBadge>
-          <StatusBadge tone="neutral">Último escaneo: {lastScan?.fecha || scheduler?.last_finished || "N/D"}</StatusBadge>
+        <ModuleSection className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: "Frecuencia",
+              value: scheduler?.enabled === false ? "Manual" : `Cada ${scheduler?.interval_minutes || 25} min`,
+              tone: "neutral" as const
+            },
+            {
+              label: "Estado",
+              value: scheduler?.running
+                ? "Escaneando ahora"
+                : scheduler?.last_error
+                  ? "Con error"
+                  : lastScan && !radarFlag(lastScan.escaneo_completo)
+                    ? "Escaneo incompleto"
+                    : scheduler?.stale
+                      ? "Pendiente"
+                      : "Al día",
+              tone: scheduler?.last_error
+                ? "danger" as const
+                : scheduler?.stale || (lastScan && !radarFlag(lastScan.escaneo_completo))
+                  ? "warn" as const
+                  : "ok" as const
+            },
+            {
+              label: "Último escaneo",
+              value: lastScan?.fecha || scheduler?.last_finished || "N/D",
+              tone: "neutral" as const
+            },
+            {
+              label: "Cobertura",
+              value: lastScan
+                ? `${radarFlag(lastScan.escaneo_completo) ? "Completa" : "Incompleta"} · ${numberValue(lastScan.paginas_recorridas)} pág. · ${numberValue(lastScan.total_detectadas_portal)} lic.`
+                : "Sin datos",
+              tone: lastScan && radarFlag(lastScan.escaneo_completo) ? "ok" as const : "warn" as const
+            }
+          ].map((item) => (
+            <div key={item.label} className="min-w-0 rounded-lg border border-line bg-slate-50 px-3 py-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{item.label}</div>
+              <div className="mt-1 flex min-w-0 items-start">
+                <StatusBadge tone={item.tone} className="max-w-full whitespace-normal break-words text-left">{item.value}</StatusBadge>
+              </div>
+            </div>
+          ))}
         </ModuleSection>
       </div>
 
-      <section className="grid gap-3 md:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map(([label, value, hint, Icon, tone]) => (
           <div key={label} className="app-stat-card p-4">
             <div className="flex items-center justify-between">
@@ -513,7 +556,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 onChange={(event) => setSortMode(event.target.value as SortMode)}
               >
                 <option value="publicacion">Publicación más reciente</option>
-                <option value="cierre">Cierre mas cercano</option>
+                <option value="cierre">Cierre más cercano</option>
               </select>
             </label>
           </div>
@@ -578,9 +621,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           <div className="m-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
         ) : null}
 
-        <div className="grid min-h-[34rem] xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
-          <div className="min-w-0 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:border-r xl:border-line">
-        <div className="grid gap-2 p-3 lg:hidden">
+        <div className="grid min-h-[34rem] 2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.18fr)]">
+          <div className="min-w-0 2xl:max-h-[calc(100vh-14rem)] 2xl:overflow-y-auto 2xl:border-r 2xl:border-line">
+        <div className="grid gap-2 p-3">
           {loading ? <div className="app-empty min-h-32">Cargando licitaciones del SLI...</div> : null}
           {!loading && !visibleRows.length ? <div className="app-empty min-h-32">No hay licitaciones con los filtros seleccionados.</div> : null}
           {!loading ? visibleRows.map((row) => {
@@ -588,114 +631,59 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             const hasAmendmentAlert = radarFlag(row.enmienda_alerta);
             const closeSoon = isClosingSoon(row);
             return (
-              <button key={row.id} type="button" onClick={() => selectRadarRow(row)} className={`app-row-button p-3 text-left ${selected ? "app-row-selected" : ""}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><div className="text-sm font-semibold text-brand">RFQ {row.numero_licitacion}</div><div className="mt-1 line-clamp-2 text-sm font-semibold text-ink">{row.objeto || "Sin objeto"}</div></div>
+              <button key={row.id} type="button" onClick={() => selectRadarRow(row)} className={`app-row-button w-full overflow-hidden p-3.5 text-left ${selected ? "app-row-selected" : ""}`}>
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold text-brand">RFQ {row.numero_licitacion}</div>
+                    <div className="mt-1 line-clamp-2 break-words text-sm font-semibold leading-5 text-ink">{row.objeto || "Sin objeto"}</div>
+                    <div className="mt-1 line-clamp-1 break-words text-xs text-muted">{row.categoria || "Categoría no clasificada"}</div>
+                  </div>
                   <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-brand" />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex min-w-0 flex-wrap gap-1.5">
                   {hasAmendmentAlert ? <StatusBadge tone="warn"><AlertTriangle className="h-3.5 w-3.5" />Enmienda</StatusBadge> : null}
                   {closeSoon ? <StatusBadge tone="danger"><Clock className="h-3.5 w-3.5" />{closeLabel(row)}</StatusBadge> : null}
                   <StatusBadge tone={row.estado_radar === "en_seguimiento" ? "info" : row.estado_radar === "descartada" ? "danger" : "neutral"}>{estadoLabel[String(row.estado_radar || "nueva")] || "Nueva"}</StatusBadge>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted"><span>Publicación<br /><strong className="text-ink">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</strong></span><span>Cierre<br /><strong className="text-ink">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</strong></span></div>
+                <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-2 2xl:grid-cols-1">
+                  <div className="min-w-0"><div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Publicación</div><div className="mt-0.5 break-words text-xs font-semibold text-ink">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</div></div>
+                  <div className="min-w-0"><div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Cierre</div><div className="mt-0.5 break-words text-xs font-semibold text-ink">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</div></div>
+                </div>
               </button>
             );
           }) : null}
         </div>
 
-        <div className="hidden overflow-hidden lg:block">
-          <table className="app-table">
-            <thead>
-              <tr>
-                {["Licitación / objeto", "Publicación", "Cierre", "Señales", "Estado"].map((heading) => (
-                  <th key={heading}>{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted">
-                    Cargando licitaciones del SLI...
-                  </td>
-                </tr>
-              ) : visibleRows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted">
-                    No hay licitaciones con los filtros seleccionados.
-                  </td>
-                </tr>
-              ) : (
-                visibleRows.map((row) => {
-                  const hasAmendmentAlert = radarFlag(row.enmienda_alerta);
-                  const closeSoon = isClosingSoon(row);
-                  return (
-                    <tr
-                      key={row.id}
-                      onClick={() => selectRadarRow(row)}
-                      className={`cursor-pointer hover:bg-slate-50/80 ${isSameRow(selectedRow, row) ? "app-row-selected" : rowVisualTone(row, false)}`}
-                    >
-                      <td className="max-w-[460px] px-4 py-3">
-                        <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="font-semibold text-brand">RFQ {row.numero_licitacion}</div><div className="mt-1 line-clamp-2 font-medium text-ink">{row.objeto || "Sin objeto"}</div><div className="mt-1 truncate text-xs text-muted">{row.categoria || "Categoría no clasificada"}</div></div><ChevronRight className="mt-1 h-4 w-4 shrink-0 text-brand" /></div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-ink">{formatCompactDate(row.fecha_apertura_iso, row.fecha_apertura)}</div>
-                        <div className="mt-1 text-xs text-muted">Publicación</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-ink">{formatCompactDate(row.fecha_cierre_iso, row.fecha_cierre)}</div>
-                        <div className={`mt-1 text-xs font-semibold ${closeSoon ? "text-rose-700" : "text-muted"}`}>{closeLabel(row)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1.5">
-                          {hasAmendmentAlert ? <StatusBadge tone="warn"><AlertTriangle className="h-3.5 w-3.5" />Enmienda {row.numero_enmienda || "nueva"}</StatusBadge> : null}
-                          {closeSoon ? <StatusBadge tone="danger"><Clock className="h-3.5 w-3.5" />{closeLabel(row)}</StatusBadge> : null}
-                          {!hasAmendmentAlert && !closeSoon ? <StatusBadge tone="neutral">Sin alertas</StatusBadge> : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone(row.estado_radar)}`}>
-                          {estadoLabel[String(row.estado_radar || "nueva")] || row.estado_radar || "Nueva"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
           </div>
-          <div ref={detailPanelRef} className={`${selectedRow ? "order-first" : "order-last"} min-w-0 scroll-mt-32 bg-slate-50/40 xl:order-none xl:sticky xl:top-32 xl:max-h-[calc(100vh-9rem)] xl:self-start xl:overflow-y-auto`}>
+          <div ref={detailPanelRef} className={`${selectedRow ? "order-first" : "order-last"} min-w-0 scroll-mt-32 bg-slate-50/40 2xl:order-none 2xl:sticky 2xl:top-32 2xl:max-h-[calc(100vh-9rem)] 2xl:self-start 2xl:overflow-y-auto`}>
 
-        {selectedRow ? <div className="border-b border-line p-3 xl:hidden"><Button type="button" onClick={() => setSelectedRow(null)} variant="secondary" size="md">Volver al listado</Button></div> : null}
+        {selectedRow ? <div className="border-b border-line p-3 2xl:hidden"><Button type="button" onClick={() => setSelectedRow(null)} variant="secondary" size="md">Volver al listado</Button></div> : null}
 
         {selectedRow ? (
           <div className="p-4">
-            <div className="grid gap-4 2xl:grid-cols-[1fr_0.8fr]">
-              <div className="rounded-xl border border-line bg-white p-4">
+            <div className="grid gap-4">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-line bg-white p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold uppercase tracking-wide text-brand">Detalle seleccionado</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">{selectedRow.numero_licitacion} | {selectedRow.objeto || "Sin objeto"}</div>
-                    <p className="mt-2 text-sm text-muted">{selectedRow.categoria || "Categoría no clasificada"}</p>
+                    <div className="mt-1 break-words text-lg font-semibold leading-7 text-slate-900">{selectedRow.numero_licitacion} | {selectedRow.objeto || "Sin objeto"}</div>
+                    <p className="mt-2 break-words text-sm leading-6 text-muted">{selectedRow.categoria || "Categoría no clasificada"}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusTone(selectedRow.estado_radar)}`}>
                     {estadoLabel[String(selectedRow.estado_radar || "nueva")] || selectedRow.estado_radar || "Nueva"}
                   </span>
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {[
-                    ["Publicacion", formatDate(selectedRow.fecha_apertura_iso, selectedRow.fecha_apertura)],
+                    ["Publicación", formatDate(selectedRow.fecha_apertura_iso, selectedRow.fecha_apertura)],
                     ["Cierre", formatDate(selectedRow.fecha_cierre_iso, selectedRow.fecha_cierre)],
                     ["Enmienda actual", selectedRow.numero_enmienda || "Sin enmienda"],
+                    ["Última revisión", formatDate(undefined, selectedRow.ultima_revision)],
                     ["Urgencia", closeLabel(selectedRow)]
                   ].map(([label, value]) => (
-                    <div key={label} className="app-data-card">
+                    <div key={label} className="app-data-card overflow-hidden">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                      <div className="mt-1 break-words text-sm font-semibold leading-5 text-slate-900">{value}</div>
                     </div>
                   ))}
                 </div>
@@ -737,7 +725,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     </StatusBadge>
                   </div>
                   {deepAnalysisAvailable ? (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {[
                         ["Códigos", String(historicoMatch?.codigo_matches?.length || 0)],
                         ["Renglones", String(historicoMatch?.summary?.renglones_detectados_count || 0)],
@@ -745,9 +733,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                         ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
                         ["Precio mín.", moneyValue(historicoMatch?.summary?.precio_min)]
                       ].map(([label, value]) => (
-                        <div key={label} className="rounded-lg border border-white/80 bg-white/80 p-3">
+                        <div key={label} className="min-w-0 overflow-hidden rounded-lg border border-white/80 bg-white/80 p-3">
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
-                          <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                          <div className="mt-1 break-words text-sm font-semibold text-slate-900">{value}</div>
                         </div>
                       ))}
                     </div>
@@ -772,8 +760,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="font-semibold">Revisar por enmienda nueva</div>
                     <p className="mt-1 leading-6">
-                      Esta licitación estaba {selectedRow.estado_radar === "descartada" ? "descartada" : "en seguimiento/revisada"} y recibió una enmienda.
-                      Anterior: {selectedRow.enmienda_anterior || "N/D"} | Actual: {selectedRow.numero_enmienda || "N/D"}.
+                      Esta licitación estaba {selectedRow.estado_radar === "descartada" ? "descartada" : "en seguimiento/revisada"} y recibió una enmienda o revisión nueva.
+                      Enmienda: {selectedRow.enmienda_anterior || "N/D"} → {selectedRow.numero_enmienda || "N/D"}.
+                      {selectedRow.revision_anterior || selectedRow.ultima_revision ? ` Revisión: ${selectedRow.revision_anterior || "N/D"} → ${selectedRow.ultima_revision || "N/D"}.` : ""}
                     </p>
                     {selectedRow.estado_radar === "descartada" ? (
                       <p className="mt-1 font-semibold">Conviene reabrir la revisión antes de mantenerla descartada.</p>
@@ -788,7 +777,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 ) : null}
               </div>
 
-              <div className="rounded-xl border border-line bg-white p-4">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-line bg-white p-4">
                 <div className="text-sm font-semibold text-slate-900">Acciones recomendadas</div>
                 {historicoMatch?.summary?.recomendacion_supervisor ? (
                   <div className={`mt-3 rounded-lg border p-3 ${recommendationTone(historicoMatch.summary.recomendacion_supervisor.tone)}`}>
@@ -796,8 +785,8 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                       Sugerencia supervisor | Prioridad {historicoMatch.summary.recomendacion_supervisor.prioridad || "Media"}
                     </div>
                     <div className="mt-1 text-base font-semibold">{historicoMatch.summary.recomendacion_supervisor.decision}</div>
-                    <p className="mt-1 text-sm leading-6">{historicoMatch.summary.recomendacion_supervisor.motivo}</p>
-                    <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm font-semibold">
+                    <p className="mt-1 break-words text-sm leading-6">{historicoMatch.summary.recomendacion_supervisor.motivo}</p>
+                    <div className="mt-2 break-words rounded-md bg-white/70 px-3 py-2 text-sm font-semibold leading-6">
                       {historicoMatch.summary.recomendacion_supervisor.accion}
                     </div>
                   </div>
@@ -818,7 +807,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 </label>
                 <div className="mt-3 grid gap-2">
                   <Button type="button" onClick={() => handleEnviarSeguimiento(selectedRow)} disabled={busy || selectedRow.estado_radar === "en_seguimiento"} variant="primary" size="md" className="w-full">{selectedRow.estado_radar === "en_seguimiento" ? <CheckCircle2 className="h-4 w-4" /> : <RefreshCcw className="h-4 w-4" />}{selectedRow.estado_radar === "en_seguimiento" ? "Ya está en seguimiento" : "Poner en seguimiento"}</Button>
-                  <Button type="button" onClick={() => setSelectedSliRfq(String(selectedRow.numero_licitacion || ""))} variant="secondary" size="md" className="w-full"><Search className="h-4 w-4" />Consultar detalle SLI/RFQ</Button>
                   {selectedRow.link_sli ? <a href={selectedRow.link_sli} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 w-full items-center justify-center gap-2 px-3 text-sm font-semibold">Abrir portal SLI<ExternalLink className="h-4 w-4" /></a> : null}
                   <Button type="button" onClick={() => handleEstado(selectedRow.id, (selectedRow.estado_radar as RadarEstado) || "nueva")} disabled={busy} variant="ghost" size="md" className="w-full">Guardar comentario</Button>
                   <Button type="button" onClick={() => handleEstado(selectedRow.id, "descartada")} disabled={busy || selectedRow.estado_radar === "descartada"} variant="danger" size="md" className="w-full">Descartar del radar operativo</Button>
@@ -856,7 +844,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
 
               <div className="border-t border-line p-4">
 
-              <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {[
                   {
                     label: "1. Detectada en SLI",
@@ -881,7 +869,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                     active: Boolean(historicoMatch?.summary?.requiere_revision_rfq)
                   },
                   {
-                    label: "4. Decision",
+                    label: "4. Decisión",
                     value: historicoMatch?.summary?.recomendacion_supervisor?.decision || "Calculando",
                     done: Boolean(historicoMatch?.summary?.recomendacion_supervisor),
                     active: loadingHistorico
@@ -894,7 +882,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[
                   ["Coincidencias", String(historicoMatch?.summary?.total || 0)],
                   ["Ganadas", String(historicoMatch?.summary?.ganadas || 0)],
@@ -902,9 +890,9 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                   ["Precio min.", moneyValue(historicoMatch?.summary?.precio_min)],
                   ["Promedio", moneyValue(historicoMatch?.summary?.precio_promedio)]
                 ].map(([label, value]) => (
-                  <div key={label} className="app-data-card">
+                  <div key={label} className="app-data-card overflow-hidden">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+                    <div className="mt-1 break-words text-sm font-semibold text-slate-900">{value}</div>
                   </div>
                 ))}
               </div>
@@ -952,52 +940,53 @@ export function RadarConsole({ user }: { user: AuthUser }) {
                 </div>
               ) : null}
 
-              {historicoMatch?.keywords?.length || historicoMatch?.codigo_matches?.length ? (
+              {historicoMatch?.codigo_matches?.length ? (
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                   {historicoMatch.codigo_matches.map((code) => (
                     <span key={code} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Codigo {code}</span>
                   ))}
-                  {historicoMatch.keywords.map((keyword) => (
-                    <span key={keyword} className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-slate-700">{keyword}</span>
-                  ))}
                 </div>
               ) : null}
 
-              <div className="mt-4 overflow-hidden rounded-lg border border-line">
-                <table className="app-table">
-                  <thead>
-                    <tr>
-                      {["Licitación", "Año", "Código ACP", "Cantidad", "Precio Proyelec", "Competencia", "Resultado", "Motivo"].map((heading) => (
-                        <th key={heading} className="border-b border-line px-3 py-3">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-            <tbody>
-                    {historicoMatch?.matches?.length ? (
-                      historicoMatch.matches.map((match, index) => (
-                        <tr key={`${match.numero_licitacion}-${match.codigo_acp}-${index}`} className="hover:bg-slate-50">
-                          <td className="px-3 py-3 font-semibold text-brand">{match.numero_licitacion || "N/D"}</td>
-                          <td className="px-3 py-3">{match.anio || "N/D"}</td>
-                          <td className="px-3 py-3">{match.codigo_acp || "N/D"}</td>
-                          <td className="px-3 py-3">{match.cantidad || "N/D"}</td>
-                          <td className="px-3 py-3">{moneyValue(match.precio_proyelec)}</td>
-                          <td className="px-3 py-3">{moneyValue(match.precio_competencia)}</td>
-                          <td className="px-3 py-3">{match.adjudicada_a_proyelec || "N/D"}</td>
-                          <td className="max-w-[280px] px-3 py-3">
-                            <div className="font-medium text-slate-800">{match.match_reason || "Coincidencia"}</div>
-                            {match.observaciones ? <div className="mt-1 truncate text-xs text-muted">{match.observaciones}</div> : null}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={8} className="px-3 py-6 text-center text-muted">
-                          {loadingHistorico ? "Buscando antecedentes..." : "No se encontraron antecedentes historicos claros."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="mt-4 grid gap-3">
+                {historicoMatch?.matches?.length ? (
+                  historicoMatch.matches.map((match, index) => (
+                    <article key={`${match.numero_licitacion}-${match.codigo_acp}-${index}`} className="min-w-0 overflow-hidden rounded-lg border border-line bg-white p-3.5">
+                      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Licitación anterior</div>
+                          <div className="mt-1 break-words text-sm font-bold text-brand">RFQ {match.numero_licitacion || "N/D"}</div>
+                        </div>
+                        <StatusBadge tone="info" className="self-start whitespace-normal break-words">ACP {match.codigo_acp || "N/D"}</StatusBadge>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {[
+                          ["Año", match.anio || "N/D"],
+                          ["Cantidad", match.cantidad || "N/D"],
+                          ["Precio Proyelec", moneyValue(match.precio_proyelec)],
+                          ["Competencia", moneyValue(match.precio_competencia)]
+                        ].map(([label, value]) => (
+                          <div key={label} className="min-w-0 rounded-md bg-slate-50 px-2.5 py-2">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+                            <div className="mt-0.5 break-words text-xs font-semibold text-ink">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 border-t border-line pt-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold text-muted">Resultado</span>
+                          <StatusBadge tone={String(match.adjudicada_a_proyelec || "").toLowerCase().includes("si") ? "ok" : "neutral"}>{match.adjudicada_a_proyelec || "N/D"}</StatusBadge>
+                        </div>
+                        <div className="mt-2 break-words text-sm font-medium leading-6 text-slate-800">{match.match_reason || "Coincidencia por código ACP"}</div>
+                        {match.observaciones ? <div className="mt-1 break-words text-xs leading-5 text-muted">{match.observaciones}</div> : null}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="app-empty grid min-h-24 place-items-center px-4 text-center text-sm">
+                    {loadingHistorico ? "Buscando antecedentes..." : "No se encontraron antecedentes históricos claros."}
+                  </div>
+                )}
               </div>
               </div>
             </details> : null}
@@ -1010,11 +999,6 @@ export function RadarConsole({ user }: { user: AuthUser }) {
           </div>
         ) : null}
 
-        {selectedSliRfq ? (
-          <div className="border-t border-line p-4">
-            <SliLookupPanel initialRfq={selectedSliRfq} />
-          </div>
-        ) : null}
           </div>
         </div>
       </section>
@@ -1023,7 +1007,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
         <summary className="flex cursor-pointer list-none flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-slate-900">Historial de escaneos</div>
-            <p className="mt-1 text-sm text-muted">Cobertura del scraper, paginas recorridas, total detectado y errores.</p>
+            <p className="mt-1 text-sm text-muted">Cobertura del scraper, páginas recorridas, total detectado y errores.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="rounded-full border border-line bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -1034,11 +1018,11 @@ export function RadarConsole({ user }: { user: AuthUser }) {
             </span>
           </div>
         </summary>
-        <div className="mx-5 mb-5 overflow-hidden rounded-lg border border-line">
-          <table className="app-table">
+        <div className="app-table-shell mx-5 mb-5 overflow-x-auto">
+          <table className="app-table min-w-[880px]">
             <thead>
               <tr>
-                {["Fecha", "Encontradas", "Nuevas", "Paginas", "Detectadas portal", "Metodo", "Completo", "Errores"].map((heading) => (
+                {["Fecha", "Encontradas", "Nuevas", "Páginas", "Detectadas portal", "Método", "Completo", "Errores"].map((heading) => (
                   <th key={heading} className="border-b border-line px-3 py-3">{heading}</th>
                 ))}
               </tr>

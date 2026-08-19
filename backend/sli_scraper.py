@@ -69,7 +69,7 @@ def parse_sli_datetime(value):
     text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     text = re.sub(r"\s+", " ", text.replace(".", " ")).strip()
     match = re.search(
-        r"(\d{1,2})[-/\s]([a-z]{3,})[-/\s](\d{4})\s+(\d{1,2}):(\d{2})(?:\s*([ap])\s*m?)?",
+        r"(\d{1,2})[-/\s]([a-z]{3,})[-/\s](\d{4})\s+(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*([ap])\s*m?)?",
         text,
         re.IGNORECASE,
     )
@@ -112,23 +112,39 @@ def _extraer_monto_texto(texto):
 
 def _extraer_max_pagina(soup):
     paginas = {1}
-    for link in soup.find_all("a", href=True):
-        href = link.get("href") or ""
-        if "BusquedaLicitacionesResultados" not in href or "pagina=" not in href:
-            continue
+    containers = soup.select(".pagination, .pager, nav[aria-label*='agin'], [class*='pagination']")
+    links = [link for container in containers for link in container.find_all("a")]
+    if not links:
+        links = soup.find_all("a")
+
+    for link in links:
+        href = str(link.get("href") or "")
+        text = link.get_text(" ", strip=True)
         qs = parse_qs(urlparse(href).query)
-        for value in qs.get("pagina", []):
-            if str(value).isdigit():
+        candidates = []
+        for key in ("pagina", "page", "Page", "PageNumber"):
+            candidates.extend(qs.get(key, []))
+        candidates.extend([link.get("data-page"), link.get("data-pagina")])
+        onclick = str(link.get("onclick") or "")
+        candidates.extend(re.findall(r"(?:pagina|page)\D{0,8}(\d{1,3})", onclick, re.IGNORECASE))
+        if text.isdigit():
+            candidates.append(text)
+        for value in candidates:
+            if str(value or "").isdigit() and 1 <= int(value) <= 500:
                 paginas.add(int(value))
     return max(paginas) if paginas else 1
 
 
 def _extraer_urls_paginacion(soup):
     urls = {}
-    for link in soup.find_all("a", href=True):
-        href = link.get("href") or ""
+    containers = soup.select(".pagination, .pager, nav[aria-label*='agin'], [class*='pagination']")
+    links = [link for container in containers for link in container.find_all("a", href=True)]
+    if not links:
+        links = soup.find_all("a", href=True)
+    for link in links:
+        href = str(link.get("href") or "")
         text = link.get_text(" ", strip=True)
-        if "BusquedaLicitacionesResultados" not in href and "pagina=" not in href:
+        if not href or href.lower().startswith("javascript:"):
             continue
         qs = parse_qs(urlparse(href).query)
         page_num = None
@@ -137,6 +153,11 @@ def _extraer_urls_paginacion(soup):
             if values and str(values[0]).isdigit():
                 page_num = int(values[0])
                 break
+        if page_num is None:
+            for value in (link.get("data-page"), link.get("data-pagina")):
+                if str(value or "").isdigit():
+                    page_num = int(value)
+                    break
         if page_num is None and text.isdigit():
             page_num = int(text)
         if page_num and page_num > 1:
@@ -161,6 +182,8 @@ def _scan_meta(metodo, paginas_recorridas=0, total_detectadas_portal=0, escaneo_
 def _click_visible_page_link(page, page_number):
     selectors = [
         f".pagination a[href*='pagina={page_number}']",
+        f".pagination a[data-page='{page_number}']",
+        f".pagination a[data-pagina='{page_number}']",
         f".pagination a:has-text('{page_number}')",
         f"nav a[href*='pagina={page_number}']",
         f"a[href*='pagina={page_number}']",
@@ -177,11 +200,18 @@ def _click_visible_page_link(page, page_number):
             const target = links.find(a => {
                 const text = (a.textContent || '').trim();
                 const href = a.getAttribute('href') || '';
+                const dataPage = a.getAttribute('data-page') || a.getAttribute('data-pagina') || '';
+                const onclick = a.getAttribute('onclick') || '';
                 const rect = a.getBoundingClientRect();
                 const style = window.getComputedStyle(a);
                 const visible = rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
                 const inHiddenMenu = !!a.closest('.bootstrap-select, .dropdown-menu, [aria-hidden="true"]');
-                return visible && !inHiddenMenu && (text === String(pageNumber) || href.includes('pagina=' + pageNumber));
+                return visible && !inHiddenMenu && (
+                    text === String(pageNumber) ||
+                    href.includes('pagina=' + pageNumber) ||
+                    dataPage === String(pageNumber) ||
+                    new RegExp('(?:pagina|page)\\D{0,8}' + pageNumber + '(?:\\D|$)', 'i').test(onclick)
+                );
             });
             if (!target) return false;
             target.click();
@@ -217,8 +247,12 @@ def _parsear_resultados_sli(soup):
 
         texto_completo = container.text
         apertura = ""
+        date_value_pattern = (
+            r"(\d{1,2}[-/\s][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,}[-/\s]\d{4}"
+            r"\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?\s*m\.?|[AP]M)?)"
+        )
         apertura_match = re.search(
-            r"Fecha\s+de\s+publicaci\S+n\s*([\d\-A-Za-z]+\s+[\d:]+\s+[APM]+)",
+            rf"Fecha\s+de\s+publicaci\S+n\s*{date_value_pattern}",
             texto_completo,
             re.IGNORECASE,
         )
@@ -227,12 +261,21 @@ def _parsear_resultados_sli(soup):
 
         cierre = ""
         cierre_match = re.search(
-            r"Fecha\s+y\s+hora\s+de\s+cierre\s*([\d\-A-Za-z]+\s+[\d:]+\s+[APM]+)",
+            rf"Fecha\s+y\s+hora\s+de\s+cierre\s*{date_value_pattern}",
             texto_completo,
             re.IGNORECASE,
         )
         if cierre_match:
             cierre = re.sub(r"\s+", " ", cierre_match.group(1).replace("\xa0", " ")).strip()
+
+        ultima_revision = ""
+        revision_match = re.search(
+            rf"[ÚU]ltima\s+revisi\S+n\s*{date_value_pattern}",
+            texto_completo,
+            re.IGNORECASE,
+        )
+        if revision_match:
+            ultima_revision = re.sub(r"\s+", " ", revision_match.group(1).replace("\xa0", " ")).strip()
 
         enmienda = ""
         enmienda_match = re.search(
@@ -270,6 +313,7 @@ def _parsear_resultados_sli(soup):
                 "moneda": "USD",
                 "fecha_apertura": apertura,
                 "fecha_cierre": cierre,
+                "ultima_revision": ultima_revision,
                 "numero_enmienda": enmienda,
                 "link_sli": link,
                 "es_prioritaria": es_prioritaria,
@@ -373,6 +417,7 @@ def escanear_licitaciones_abiertas_playwright(
     errores = []
     soups = []
     paginas_visitadas = set()
+    firmas_visitadas = set()
 
     print("[RADAR] Escaneo Playwright: abriendo SLI...")
     with sync_playwright() as p:
@@ -423,6 +468,14 @@ def escanear_licitaciones_abiertas_playwright(
             while pagina_actual <= int(max_paginas or 50):
                 page.wait_for_timeout(700)
                 soup = BeautifulSoup(page.content(), "html.parser")
+                firma = tuple(
+                    link.get_text(" ", strip=True)
+                    for link in soup.find_all("a", id="link_BiddingNumber")
+                )
+                if firma in firmas_visitadas:
+                    errores.append(f"El SLI repitio la pagina al intentar abrir la pagina {pagina_actual}.")
+                    break
+                firmas_visitadas.add(firma)
                 if pagina_actual not in paginas_visitadas:
                     soups.append(soup)
                     paginas_visitadas.add(pagina_actual)
@@ -435,9 +488,14 @@ def escanear_licitaciones_abiertas_playwright(
                     current_first = page.locator("#link_BiddingNumber").first.inner_text(timeout=3000)
                 except Exception:
                     current_first = ""
-                if not _click_visible_page_link(page, next_page):
+                page_urls = _extraer_urls_paginacion(soup)
+                direct_url = page_urls.get(next_page)
+                if direct_url:
+                    page.goto(direct_url, wait_until="domcontentloaded", timeout=30000)
+                elif not _click_visible_page_link(page, next_page):
                     errores.append(f"No se pudo abrir la pagina {next_page} de {max_detected}.")
                     break
+                page_changed = not current_first
                 try:
                     page.wait_for_load_state("networkidle", timeout=12000)
                 except Exception:
@@ -452,8 +510,12 @@ def escanear_licitaciones_abiertas_playwright(
                             current_first,
                             timeout=8000,
                         )
+                        page_changed = True
                 except Exception:
-                    pass
+                    page_changed = False
+                if not page_changed:
+                    errores.append(f"El contenido no cambio al abrir la pagina {next_page} de {max_detected}.")
+                    break
                 pagina_actual = next_page
 
         finally:
@@ -526,7 +588,7 @@ def _escanear_licitaciones_abiertas_requests(
     print(f"[RADAR] Paginas detectadas: {max_pagina}")
 
     for pagina in range(2, max_pagina + 1):
-        page_url = page_urls.get(pagina) or f"{SLI_RESULTS_URL}pagina={pagina}"
+        page_url = page_urls.get(pagina) or f"{SLI_RESULTS_URL}?pagina={pagina}"
         try:
             page_resp = session.get(page_url, timeout=45)
             page_resp.raise_for_status()
@@ -576,6 +638,22 @@ def escanear_licitaciones_abiertas_con_metadata(
     max_paginas=50,
 ):
     es_escaneo_global = not (palabra_clave or "").strip() and not re.sub(r"\D", "", str(numero_licitacion or "")) and (categoria or "TODOS").strip() == "TODOS"
+    requests_error = ""
+    try:
+        licitaciones, meta = _escanear_licitaciones_abiertas_requests(
+            palabra_clave=palabra_clave,
+            numero_licitacion=numero_licitacion,
+            categoria=categoria,
+            max_paginas=max_paginas,
+        )
+        cobertura_valida = bool(meta.get("escaneo_completo")) and not meta.get("errores")
+        if cobertura_valida and (licitaciones or not es_escaneo_global):
+            return licitaciones, meta
+        requests_error = str(meta.get("errores") or "El POST directo no confirmo cobertura completa.")
+    except Exception as exc:
+        requests_error = str(exc)
+
+    print(f"[RADAR] POST directo incompleto; se intentara Playwright: {requests_error}")
     try:
         licitaciones, meta = escanear_licitaciones_abiertas_playwright(
             palabra_clave=palabra_clave,
@@ -583,26 +661,16 @@ def escanear_licitaciones_abiertas_con_metadata(
             categoria=categoria,
             max_paginas=max_paginas,
         )
-        if es_escaneo_global and len(licitaciones) < 20:
-            raise RuntimeError(
-                f"Playwright devolvio solo {len(licitaciones)} licitaciones en escaneo global; se validara con POST directo."
-            )
+        if not meta.get("errores"):
+            meta["errores"] = f"POST directo incompleto: {requests_error}"
+        else:
+            meta["errores"] = f"POST directo incompleto: {requests_error}. {meta.get('errores')}"
         return licitaciones, meta
     except Exception as exc:
-        print(f"[RADAR] Playwright no disponible o fallo el escaneo completo: {exc}")
-        licitaciones, meta = _escanear_licitaciones_abiertas_requests(
-            palabra_clave=palabra_clave,
-            numero_licitacion=numero_licitacion,
-            categoria=categoria,
-            max_paginas=max_paginas,
+        return [], _scan_meta(
+            "error",
+            errores=f"POST directo incompleto: {requests_error}. Playwright fallo: {exc}",
         )
-        if meta.get("escaneo_completo") and not meta.get("errores"):
-            return licitaciones, meta
-        if not meta.get("errores"):
-            meta["errores"] = f"Playwright no completo: {exc}. Se uso POST directo del SLI."
-        else:
-            meta["errores"] = f"Playwright no completo: {exc}. {meta.get('errores')}"
-        return licitaciones, meta
 
 
 def escanear_licitaciones_abiertas(
@@ -655,6 +723,8 @@ def ejecutar_radar_detallado(db_module=None, palabra_clave="", numero_licitacion
                 fecha_cierre=lic["fecha_cierre"],
                 link_sli=lic["link_sli"],
                 es_prioritaria=lic["es_prioritaria"],
+                numero_enmienda=lic.get("numero_enmienda", ""),
+                ultima_revision=lic.get("ultima_revision", ""),
             )
             if fue_nueva:
                 nuevas += 1
