@@ -19,7 +19,7 @@ export const StatusBadge = memo(function StatusBadge({
     <span
       className={cn(
         `app-status-badge app-status-${tone}`,
-        "inline-flex max-w-full items-center gap-1 border px-2.5 py-1 text-xs font-semibold leading-4",
+        "inline-flex max-w-full items-center gap-1 border px-2.5 py-1 text-xs font-semibold leading-4 [overflow-wrap:anywhere]",
         tones[tone],
         className
       )}

@@ -2,7 +2,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 
-from api import _extract_radar_items_from_documents
+from api import _extract_radar_items_from_documents, _merge_radar_items
 from sli_scraper import _extraer_max_pagina, _extraer_urls_paginacion, parse_sli_datetime
 
 
@@ -43,6 +43,42 @@ class RadarAcpParserTests(unittest.TestCase):
             [item.get("codigo_acp") for item in items if item.get("codigo_acp")],
             ["LLF-LAM-00402", "PWR-BAT-00009"],
         )
+
+    def test_structured_rows_ignore_pdf_dates_and_clause_numbers(self):
+        structured = [
+            {"renglon_numero": str(number), "codigo_acp": None, "estado_codigo": "sin_codigo", "descripcion": f"Producto {number}"}
+            for number in range(1, 5)
+        ]
+        noisy_pdf = [
+            {"renglon_numero": "17", "codigo_acp": None, "estado_codigo": "sin_codigo", "descripcion": "ago-2026 03:50 PM"},
+            {"renglon_numero": "24", "codigo_acp": None, "estado_codigo": "sin_codigo", "descripcion": "ago-2026"},
+        ]
+
+        merged = _merge_radar_items(structured, noisy_pdf)
+
+        self.assertEqual([item["renglon_numero"] for item in merged], ["1", "2", "3", "4"])
+
+    def test_pdf_can_enrich_structured_row_with_confirmed_code(self):
+        structured = [
+            {"renglon_numero": "1", "codigo_acp": None, "codigo_articulo": None, "estado_codigo": "sin_codigo", "descripcion": "Battery"}
+        ]
+        pdf_rows = [
+            {
+                "renglon_numero": "1",
+                "codigo_acp": "PWR-BAT-00009",
+                "codigo_articulo": "PWR-BAT-00009",
+                "estado_codigo": "confirmado",
+                "descripcion": "Battery",
+                "documento": "Impresion RFQ",
+                "pagina": 2,
+                "evidencia": "1 PWR-BAT-00009 Battery",
+            }
+        ]
+
+        merged = _merge_radar_items(structured, pdf_rows)
+
+        self.assertEqual(merged[0]["codigo_acp"], "PWR-BAT-00009")
+        self.assertEqual(merged[0]["estado_codigo"], "confirmado")
 
 
 class RadarSliParsingTests(unittest.TestCase):

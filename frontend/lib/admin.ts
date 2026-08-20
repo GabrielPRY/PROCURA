@@ -28,6 +28,13 @@ export type ApiPricingRow = {
   updated_at: string;
 };
 
+export type TelegramNotificationStatus = {
+  enabled: boolean;
+  configured: boolean;
+  chat_configured: boolean;
+  token_configured: boolean;
+};
+
 export function getAdminUsers() {
   return apiRequest<{ status: string; users: AdminUser[] }>("/admin/users");
 }
@@ -45,6 +52,16 @@ export function updateAdminApiKeys(payload: { gemini_key?: string; tavily_key?: 
 
 export function getAdminApiPricing() {
   return apiRequest<{ status: string; pricing: ApiPricingRow[] }>("/admin/api-pricing");
+}
+
+export function getTelegramNotificationStatus() {
+  return apiRequest<{ status: string; telegram: TelegramNotificationStatus }>("/admin/notifications/telegram");
+}
+
+export function testTelegramNotification() {
+  return apiRequest<{ status: string; message_id?: number }>("/admin/notifications/telegram/test", {
+    method: "POST"
+  });
 }
 
 export function updateAdminUserApiKeys(username: string, payload: { gemini_key?: string; tavily_key?: string }) {

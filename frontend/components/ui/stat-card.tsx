@@ -37,7 +37,7 @@ export const StatCard = memo(function StatCard({
         <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
         {Icon ? <Icon className="h-4 w-4 text-brand" /> : null}
       </div>
-      <div className="mt-2 truncate text-xl font-semibold text-ink">{String(value)}</div>
+      <div className="mt-2 break-words text-xl font-semibold text-ink">{String(value)}</div>
       {hint ? <div className="mt-1 text-xs leading-5 text-muted">{hint}</div> : null}
     </div>
   );

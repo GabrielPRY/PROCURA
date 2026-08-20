@@ -29,18 +29,18 @@ export type NavigationItem = {
 
 export const navigationItems: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Resumen operativo del rol activo.", icon: Gauge, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
-  { id: "rfq", label: "RFQ", description: "Carga, analisis y matriz tecnica.", icon: FileText, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "rfq_email", label: "Correo RFQ", description: "Emision profesional de solicitudes.", icon: Mail, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "costos", label: "Comparativa de costos", description: "Precios historicos y referencias por renglon.", icon: BarChart3, permissions: ["Analista", "Supervisor", "Gerencia"] },
+  { id: "rfq", label: "RFQ", description: "Carga, análisis y matriz técnica.", icon: FileText, permissions: ["Analista", "Supervisor", "Gerencia"] },
+  { id: "rfq_email", label: "Correo RFQ", description: "Emisión profesional de solicitudes.", icon: Mail, permissions: ["Analista", "Supervisor", "Gerencia"] },
+  { id: "costos", label: "Comparativa de costos", description: "Precios históricos y referencias por renglón.", icon: BarChart3, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "radar", label: "Radar SLI", description: "Licitaciones abiertas, filtros y enmiendas.", icon: Radar, permissions: ["Supervisor", "Gerencia"] },
   { id: "seguimiento", label: "Seguimiento", description: "Estados SLI y comentarios de licitaciones.", icon: ClipboardList, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "proveedores", label: "Proveedores", description: "Sourcing global por renglon.", icon: PackageSearch, permissions: ["Analista", "Supervisor", "Gerencia"] },
+  { id: "proveedores", label: "Proveedores", description: "Sourcing global por renglón.", icon: PackageSearch, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "auditor_empresas", label: "Auditor IA", description: "Riesgo comercial de proveedores.", icon: ShieldCheck, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "historico", label: "Historico", description: "Precios y participaciones pasadas.", icon: Database, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
-  { id: "workspaces", label: "Espacios guardados", description: "Expedientes y analisis RFQ guardados.", icon: FolderOpen, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
-  { id: "logistica", label: "Logistica", description: "Comparación de transportistas dentro de Estados Unidos.", icon: Truck, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
-  { id: "metricas", label: "Metricas", description: "Consumo, errores y actividad.", icon: BarChart3, permissions: ["Gerencia", "Admin"] },
-  { id: "admin", label: "Admin", description: "Usuarios, roles y configuracion.", icon: Settings, permissions: ["Admin"] }
+  { id: "historico", label: "Histórico", description: "Precios y participaciones pasadas.", icon: Database, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
+  { id: "workspaces", label: "Espacios guardados", description: "Expedientes y análisis RFQ guardados.", icon: FolderOpen, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
+  { id: "logistica", label: "Logística", description: "Comparación de transportistas dentro de Estados Unidos.", icon: Truck, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
+  { id: "metricas", label: "Métricas", description: "Consumo, errores y actividad.", icon: BarChart3, permissions: ["Gerencia", "Admin"] },
+  { id: "admin", label: "Administración", description: "Usuarios, roles y configuración.", icon: Settings, permissions: ["Admin"] }
 ];
 
 export function getAllowedModules(user: AuthUser) {
@@ -56,6 +56,9 @@ export function getAllowedModules(user: AuthUser) {
 }
 
 export function canAccessModule(user: AuthUser, moduleId: ModuleId) {
+  if (moduleId === "evaluacion") {
+    return ["Analista", "Supervisor", "Gerencia"].includes(normalizeRole(user.role));
+  }
   return getAllowedModules(user).some((item) => item.id === moduleId);
 }
 
@@ -66,6 +69,7 @@ export function getDefaultModule(user: AuthUser): ModuleId {
 }
 
 export function getModuleLabel(moduleId: ModuleId) {
+  if (moduleId === "evaluacion") return "Evaluación técnica";
   return navigationItems.find((item) => item.id === moduleId)?.label ?? "Procura AI";
 }
 

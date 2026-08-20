@@ -13,6 +13,7 @@ import { canAccessModule, getModuleLabel, type ModuleId } from "@/lib/navigation
 type ModuleRouterProps = {
   moduleId: ModuleId;
   user: AuthUser;
+  active?: boolean;
   onModuleChange?: (moduleId: ModuleId) => void;
 };
 
@@ -28,7 +29,7 @@ function ModuleLoading() {
         <Loader2 className="h-4 w-4 animate-spin" />
       </span>
       <div>
-        <div className="font-semibold text-slate-950">Preparando modulo</div>
+        <div className="font-semibold text-slate-950">Preparando módulo</div>
         <div className="mt-1">Cargando datos y componentes de la vista.</div>
       </div>
     </ModuleSection>
@@ -53,44 +54,44 @@ const WorkspacesConsole = dynamic(() => import("@/components/workspaces-console"
 const moduleContent: Record<ModuleId, { eyebrow: string; subtitle: string; icon: typeof FileText; cards: ModuleCard[] }> = {
   dashboard: {
     eyebrow: "Inicio operativo",
-    subtitle: "Resumen por rol para entrar rapido a lo importante sin mezclar herramientas.",
+    subtitle: "Resumen por rol para entrar rápido a lo importante sin mezclar herramientas.",
     icon: BarChart3,
     cards: []
   },
   rfq: {
-    eyebrow: "Modulo RFQ",
+    eyebrow: "Módulo RFQ",
     subtitle: "Carga de pliegos, anexos, matriz de renglones, contacto ACP y correo de RFQ premium.",
     icon: FileText,
     cards: [
       { title: "Carga de pliego y anexos", copy: "Lectura multidocumento con regla de oro y control de versiones." },
-      { title: "Matriz de renglones", copy: "Codigo ACP, descripcion, marca, ficha/propuesta tecnica y restricciones." },
-      { title: "Correo dinamico", copy: "Borrador humano con lead time, Net 30 y adjuntos necesarios." }
+      { title: "Matriz de renglones", copy: "Código ACP, descripción, marca, ficha o propuesta técnica y restricciones." },
+      { title: "Correo dinámico", copy: "Borrador humano con lead time, Net 30 y adjuntos necesarios." }
     ]
   },
   evaluacion: {
-    eyebrow: "Modulo Evaluacion",
-    subtitle: "La propuesta del proveedor se cruza contra los requisitos tecnicos, anexos y cambios del RFQ.",
+    eyebrow: "Módulo Evaluación",
+    subtitle: "La propuesta del proveedor se cruza contra los requisitos técnicos, anexos y cambios del RFQ.",
     icon: ClipboardList,
     cards: [
       { title: "Cumple / parcial / no cumple", copy: "Marcado por requisito con evidencia del documento." },
       { title: "Anexos y enmiendas", copy: "Cambios posteriores al RFQ original se tratan como fuente prioritaria." },
-      { title: "Exportable", copy: "Salida lista para compartir con supervisor o expediente." }
+      { title: "Exportable", copy: "Salida lista para compartir con el supervisor o guardar en el expediente." }
     ]
   },
-  rfq_email: { eyebrow: "Correo RFQ", subtitle: "Genera correos editables con cumplimiento tecnico, condiciones comerciales y adjuntos.", icon: FileText, cards: [] },
-  ai_command: { eyebrow: "Centro AI", subtitle: "Modulo pausado para evitar consumo innecesario de tokens.", icon: FileText, cards: [] },
-  costos: { eyebrow: "Costos", subtitle: "Comparacion de precios historicos por renglon.", icon: BarChart3, cards: [] },
-  fichas: { eyebrow: "Fichas", subtitle: "Generacion de fichas por renglon usando cache.", icon: FileText, cards: [] },
-  radar: { eyebrow: "Radar SLI", subtitle: "Modulo conectado a FastAPI para escanear, filtrar y monitorear oportunidades.", icon: AlertTriangle, cards: [] },
-  seguimiento: { eyebrow: "Seguimiento", subtitle: "Control automatico con SLI, comentarios y avance operativo de procesos activos.", icon: ClipboardList, cards: [] },
+  rfq_email: { eyebrow: "Correo RFQ", subtitle: "Genera correos editables con cumplimiento técnico, condiciones comerciales y adjuntos.", icon: FileText, cards: [] },
+  ai_command: { eyebrow: "Centro IA", subtitle: "Módulo pausado para evitar consumo innecesario de tokens.", icon: FileText, cards: [] },
+  costos: { eyebrow: "Costos", subtitle: "Comparación de precios históricos por renglón.", icon: BarChart3, cards: [] },
+  fichas: { eyebrow: "Fichas", subtitle: "Generación de fichas por renglón usando caché.", icon: FileText, cards: [] },
+  radar: { eyebrow: "Radar SLI", subtitle: "Módulo conectado a FastAPI para escanear, filtrar y monitorear oportunidades.", icon: AlertTriangle, cards: [] },
+  seguimiento: { eyebrow: "Seguimiento", subtitle: "Control automático con SLI, comentarios y avance operativo de procesos activos.", icon: ClipboardList, cards: [] },
   proveedores: {
-    eyebrow: "Modulo Proveedores",
-    subtitle: "Sourcing global enfocado en precio agresivo, cumplimiento tecnico y riesgo controlado.",
+    eyebrow: "Módulo Proveedores",
+    subtitle: "Sourcing global enfocado en precio competitivo, cumplimiento técnico y riesgo controlado.",
     icon: PackageSearch,
     cards: [
-      { title: "Busqueda por renglon", copy: "Usa descripcion tecnica, marca, modelo, parte y equivalentes permitidos." },
+      { title: "Búsqueda por renglón", copy: "Usa descripción técnica, marca, modelo, parte y equivalentes permitidos." },
       { title: "Prompt personalizado", copy: "Instrucciones extra para buscar proveedores poco obvios pero reales." },
-      { title: "Riesgo comercial", copy: "Senales de empresa fantasma, reputacion, web, dominio y contacto verificable." }
+      { title: "Riesgo comercial", copy: "Señales de empresa fantasma, reputación, web, dominio y contacto verificable." }
     ]
   },
   auditor_empresas: {
@@ -98,40 +99,40 @@ const moduleContent: Record<ModuleId, { eyebrow: string; subtitle: string; icon:
     subtitle: "Preauditoria comercial para validar si una empresa parece real, trazable y segura.",
     icon: ShieldCheck,
     cards: [
-      { title: "Empresa real", copy: "Web, contacto, direccion, presencia digital y coherencia comercial." },
+      { title: "Empresa real", copy: "Web, contacto, dirección, presencia digital y coherencia comercial." },
       { title: "Alertas de fraude", copy: "Dominios dudosos, pagos riesgosos, datos inconsistentes y falta de trazabilidad." },
-      { title: "Decision operativa", copy: "Avanzar, pedir validacion, avanzar con cautela o descartar." }
+      { title: "Decisión operativa", copy: "Avanzar, pedir validación, avanzar con cautela o descartar." }
     ]
   },
-  historico: { eyebrow: "Historico", subtitle: "Consulta de historico corporativo desde Supabase.", icon: BarChart3, cards: [] },
+  historico: { eyebrow: "Histórico", subtitle: "Consulta del histórico corporativo desde Supabase.", icon: BarChart3, cards: [] },
   workspaces: { eyebrow: "Workspaces", subtitle: "Recupera matrices RFQ guardadas por usuario o equipo.", icon: FileText, cards: [] },
   logistica: {
-    eyebrow: "Modulo Logistica",
+    eyebrow: "Módulo Logística",
     subtitle: "Comparación de tarifas desde el proveedor hasta el forwarder dentro de Estados Unidos.",
     icon: Truck,
     cards: [
-      { title: "UPS", copy: "Tarifas de paqueteria y tiempos de entrega desde la cuenta corporativa." },
-      { title: "Forwarders", copy: "Destinos compartidos y administrados por Logistica." }
+      { title: "UPS", copy: "Tarifas de paquetería y tiempos de entrega desde la cuenta corporativa." },
+      { title: "Forwarders", copy: "Destinos compartidos y administrados por Logística." }
     ]
   },
   metricas: {
-    eyebrow: "Modulo Metricas",
-    subtitle: "Panel gerencial para tokens, costos API, errores por modulo y actividad por usuario.",
+    eyebrow: "Módulo Métricas",
+    subtitle: "Panel gerencial para tokens, costos API, errores por módulo y actividad por usuario.",
     icon: BarChart3,
     cards: [
-      { title: "Tokens y costos", copy: "Costo real por modelo, funcion, usuario y mes." },
+      { title: "Tokens y costos", copy: "Costo real por modelo, función, usuario y mes." },
       { title: "Errores", copy: "Fallos de API, scraper, login y guardado DB." },
-      { title: "Uso simultaneo", copy: "Actividad por hora para medir carga y adopcion." }
+      { title: "Uso simultáneo", copy: "Actividad por hora para medir carga y adopción." }
     ]
   },
   admin: {
-    eyebrow: "Modulo Admin",
-    subtitle: "Usuarios, roles, llaves, errores y configuracion critica del entorno.",
+    eyebrow: "Módulo Administración",
+    subtitle: "Usuarios, roles, llaves, errores y configuración crítica del entorno.",
     icon: Settings,
     cards: [
-      { title: "Usuarios y roles", copy: "Crear usuarios, cambiar rol y resetear contrasenas." },
-      { title: "Llaves API", copy: "Validacion de Gemini y futuros motores pagos." },
-      { title: "Salud operativa", copy: "Errores, procesos automaticos y estado de servicios." }
+      { title: "Usuarios y roles", copy: "Crear usuarios, cambiar rol y restablecer contraseñas." },
+      { title: "Llaves API", copy: "Validación de Gemini y futuros motores pagos." },
+      { title: "Salud operativa", copy: "Errores, procesos automáticos y estado de servicios." }
     ]
   }
 };
@@ -179,19 +180,19 @@ function ModulePlaceholder({ moduleId, user }: ModuleRouterProps) {
   );
 }
 
-export function ModuleRouter({ moduleId, user, onModuleChange }: ModuleRouterProps) {
+export function ModuleRouter({ moduleId, user, active = true, onModuleChange }: ModuleRouterProps) {
   if (!canAccessModule(user, moduleId)) {
-    return <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">Tu rol no tiene acceso al modulo {getModuleLabel(moduleId)}.</div>;
+    return <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">Tu rol no tiene acceso al módulo {getModuleLabel(moduleId)}.</div>;
   }
 
-  if (moduleId === "radar") return <RadarConsole user={user} />;
+  if (moduleId === "radar") return <RadarConsole user={user} active={active} />;
   if (moduleId === "rfq") return <RfqConsole user={user} onModuleChange={onModuleChange} />;
   if (moduleId === "evaluacion") return <EvaluationConsole user={user} />;
   if (moduleId === "rfq_email") return <RfqEmailConsole user={user} />;
   if (moduleId === "ai_command") return <ModulePlaceholder moduleId={moduleId} user={user} />;
   if (moduleId === "costos") return <CostAnalysisConsole user={user} />;
   if (moduleId === "fichas") return <DatasheetsConsole user={user} />;
-  if (moduleId === "seguimiento") return <SeguimientoConsole user={user} />;
+  if (moduleId === "seguimiento") return <SeguimientoConsole user={user} active={active} />;
   if (moduleId === "proveedores") return <ProvidersConsole user={user} onModuleChange={onModuleChange} />;
   if (moduleId === "auditor_empresas") return <CompanyAuditorConsole user={user} />;
   if (moduleId === "historico") return <HistoricoConsole user={user} />;

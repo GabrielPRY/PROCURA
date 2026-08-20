@@ -188,7 +188,7 @@ export type RadarStats = {
   cierre_72h: number;
 };
 
-/** Endpoint ligero â€” solo 4 nÃºmeros, sin cargar licitaciones completas */
+/** Endpoint ligero: solo cuatro números, sin cargar licitaciones completas. */
 export function getRadarStats() {
   return apiRequest<RadarStats>("/radar/stats");
 }

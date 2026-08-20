@@ -10,6 +10,23 @@ export type SourcingProvider = {
   tipo?: string;
   match_tecnico?: number;
   probabilidad_buen_precio?: string;
+  estado_tecnico?: "Confirmado" | "Compatible con validacion" | "No demostrado" | "No cumple" | string;
+  estado_precio?: "Precio publicado" | "Cotizacion requerida" | "Sin precio verificable" | string;
+  precio_publicado?: string;
+  moneda?: string;
+  disponibilidad?: string;
+  lead_time?: string;
+  nivel_evidencia?: "Suficiente" | "Parcial" | "Insuficiente" | string;
+  puntaje_ranking?: number;
+  requisitos_revisados?: number;
+  requisitos_esperados?: number;
+  requisitos_confirmados?: number;
+  verificaciones_tecnicas?: Array<{
+    requisito: string;
+    estado: "Confirmado" | "Compatible con validacion" | "No demostrado" | "No cumple" | string;
+    evidencia?: string;
+    fuente?: string;
+  }>;
   riesgo?: string;
   decision?: string;
   evidencia?: string;
@@ -38,6 +55,9 @@ export type SourcingItemPayload = {
   requiere_propuesta_tecnica?: boolean;
   requiere_ficha_tecnica?: boolean;
   evidencia_tecnica?: string;
+  restriccion_detectada?: string;
+  requiere_carta_fabricante?: boolean;
+  observaciones?: string;
 };
 
 export function searchProviders(payload: {

@@ -1,11 +1,9 @@
 "use client";
 
 import {
-  ArrowRight,
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   ExternalLink,
   Globe2,
   Loader2,
@@ -31,6 +29,7 @@ import {
   type RfqItem
 } from "@/lib/rfq";
 import { searchProviders, type SourcingProvider, type SourcingSearchPlan } from "@/lib/sourcing";
+import { saveSupplierEvaluationDraft } from "@/lib/evaluation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ModuleSection } from "@/components/ui/module-section";
@@ -113,13 +112,6 @@ function decisionTone(value?: string): BadgeTone {
   return "warn";
 }
 
-function savingTone(value?: string): BadgeTone {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("alta")) return "ok";
-  if (normalized.includes("baja")) return "danger";
-  return "info";
-}
-
 function providerCoverage(provider: SourcingProvider) {
   const declared = Number(provider.cobertura_renglones || 0);
   const listed = provider.renglones_cubiertos?.length || 0;
@@ -127,13 +119,34 @@ function providerCoverage(provider: SourcingProvider) {
 }
 
 function providerRankScore(provider: SourcingProvider, selectedCount: number) {
-  const technical = Math.max(0, Math.min(100, Number(provider.match_tecnico || 0)));
-  const coverage = selectedCount ? Math.min(1, providerCoverage(provider) / selectedCount) * 100 : 0;
-  const price = String(provider.probabilidad_buen_precio || "").toLowerCase().includes("alta") ? 100
-    : String(provider.probabilidad_buen_precio || "").toLowerCase().includes("media") ? 65 : 35;
-  const risk = String(provider.riesgo || "").toLowerCase().includes("bajo") ? 100
-    : String(provider.riesgo || "").toLowerCase().includes("alto") ? 15 : 55;
-  return Math.round((technical * 0.42) + (coverage * 0.28) + (price * 0.18) + (risk * 0.12));
+  const backendScore = Number(provider.puntaje_ranking);
+  if (Number.isFinite(backendScore)) return Math.max(0, Math.min(100, Math.round(backendScore)));
+
+  const technicalStatus = String(provider.estado_tecnico || "").toLowerCase();
+  const technical = technicalStatus.includes("confirmado") ? 50
+    : technicalStatus.includes("compatible") ? 32
+      : technicalStatus.includes("no cumple") ? 0 : 12;
+  const coverage = selectedCount ? Math.min(1, providerCoverage(provider) / selectedCount) * 15 : 0;
+  const priceStatus = String(provider.estado_precio || "").toLowerCase();
+  const price = priceStatus.includes("publicado") ? 20 : priceStatus.includes("cotizacion") ? 8 : 0;
+  const risk = String(provider.riesgo || "").toLowerCase().includes("bajo") ? 15
+    : String(provider.riesgo || "").toLowerCase().includes("alto") ? 0 : 7;
+  return Math.round(technical + coverage + price + risk);
+}
+
+function technicalTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("confirmado")) return "ok";
+  if (normalized.includes("no cumple")) return "danger";
+  if (normalized.includes("compatible")) return "warn";
+  return "neutral";
+}
+
+function priceTone(value?: string): BadgeTone {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("publicado")) return "ok";
+  if (normalized.includes("cotizacion")) return "info";
+  return "neutral";
 }
 
 function itemPayload(item: RfqItem) {
@@ -148,7 +161,10 @@ function itemPayload(item: RfqItem) {
     acepta_equivalente: asOptionalBool(item.acepta_equivalente),
     requiere_propuesta_tecnica: asBool(item.requiere_propuesta_tecnica),
     requiere_ficha_tecnica: asBool(item.requiere_ficha_tecnica),
-    evidencia_tecnica: cleanValue(item.evidencia_tecnica, "")
+    evidencia_tecnica: cleanValue(item.evidencia_tecnica, ""),
+    restriccion_detectada: cleanValue(item.restriccion_detectada || item.restriccion_marca, ""),
+    requiere_carta_fabricante: asBool(item.requiere_carta_fabricante),
+    observaciones: cleanValue(item.observaciones, "")
   };
 }
 
@@ -244,14 +260,28 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     });
     return filtered.sort((a, b) => {
       if (resultSort === "cobertura") return providerCoverage(b) - providerCoverage(a);
-      if (resultSort === "tecnico") return Number(b.match_tecnico || 0) - Number(a.match_tecnico || 0);
+      if (resultSort === "tecnico") {
+        const value = (provider: SourcingProvider) => {
+          const status = String(provider.estado_tecnico || "").toLowerCase();
+          return status.includes("confirmado") ? 4 : status.includes("compatible") ? 3 : status.includes("no demostrado") ? 2 : 1;
+        };
+        return value(b) - value(a);
+      }
       if (resultSort === "precio") {
-        const value = (provider: SourcingProvider) => String(provider.probabilidad_buen_precio || "").toLowerCase().includes("alta") ? 3 : String(provider.probabilidad_buen_precio || "").toLowerCase().includes("media") ? 2 : 1;
+        const value = (provider: SourcingProvider) => String(provider.estado_precio || "").toLowerCase().includes("publicado") ? 3 : String(provider.estado_precio || "").toLowerCase().includes("cotizacion") ? 2 : 1;
         return value(b) - value(a);
       }
       return providerRankScore(b, selectedItems.length) - providerRankScore(a, selectedItems.length);
     });
   }, [providers, resultFilter, resultSearch, resultSort, selectedItems.length, auditHistory]);
+
+  useEffect(() => {
+    setExpandedIndex((current) => {
+      if (!visibleProviders.length) return null;
+      if (current === null || current >= visibleProviders.length) return 0;
+      return current;
+    });
+  }, [visibleProviders.length]);
 
   useEffect(() => {
     if (!providers.length) {
@@ -277,6 +307,9 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
       return Boolean(providerName && auditName && (providerName === auditName || providerName.includes(auditName) || auditName.includes(providerName)));
     });
   }
+
+  const selectedProvider = visibleProviders[expandedIndex ?? 0] || null;
+  const selectedProviderAudit = selectedProvider ? auditForProvider(selectedProvider) : undefined;
 
   function sendProviderToAudit(provider: SourcingProvider) {
     const prior = auditForProvider(provider);
@@ -304,6 +337,16 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
       // El auditor permite completar los datos manualmente si el navegador bloquea almacenamiento local.
     }
     onModuleChange?.("auditor_empresas");
+  }
+
+  function sendProviderToEvaluation(provider: SourcingProvider) {
+    saveSupplierEvaluationDraft(user.username, {
+      supplier_name: provider.proveedor || "Proveedor seleccionado",
+      item_indexes: selectedIndexes,
+      provider_url: provider.url || "",
+      created_at: new Date().toISOString()
+    });
+    onModuleChange?.("evaluacion");
   }
 
   async function runSourcing() {
@@ -346,7 +389,7 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
           <PageHeader
             eyebrow="Sourcing global"
           title="Encuentra proveedores que sí pueden cotizar"
-          copy="Selecciona renglones, define el objetivo y compara candidatos globales por cobertura, ajuste técnico, precio y riesgo comercial."
+          copy="Selecciona renglones y compara candidatos globales por evidencia técnica, precio, cobertura y riesgo comercial."
           actions={
             <StatusBadge tone={loadingConfig ? "warn" : hasGeminiKey ? "ok" : "danger"}>
               {loadingConfig ? "Verificando IA" : hasGeminiKey ? `IA lista${geminiSource === "admin_global" ? " · Admin" : ""}` : "IA no configurada"}
@@ -477,10 +520,10 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-semibold text-ink">Ranking preliminar</h2>
+                      <h2 className="text-base font-semibold text-ink">Candidatos encontrados</h2>
                       <StatusBadge tone={grounded ? "ok" : "warn"}>{grounded ? "Búsqueda web activa" : "Sin grounding web confirmado"}</StatusBadge>
                     </div>
-                    <p className="mt-2 max-w-4xl text-sm leading-6 text-ink">{summary || "Resultados ordenados por cobertura, ajuste técnico, oportunidad de ahorro y riesgo."}</p>
+                    <p className="mt-2 max-w-4xl text-sm leading-6 text-ink">{summary || "Candidatos con fuente verificable, ordenados por evidencia técnica, precio, cobertura y riesgo."}</p>
                     {!grounded ? <p className="mt-2 text-xs leading-5 text-amber-700">Verifica manualmente URLs, existencia y disponibilidad. Esta ejecución pudo usar razonamiento del modelo sin búsqueda web.</p> : null}
                   </div>
                   <div className="flex gap-2">
@@ -506,64 +549,107 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                     <select value={resultSort} onChange={(event) => setResultSort(event.target.value as ResultSort)} className="app-input h-10">
                       <option value="recomendados">Mejor balance</option>
                       <option value="cobertura">Mayor cobertura</option>
-                      <option value="tecnico">Mayor ajuste técnico</option>
-                      <option value="precio">Mejor oportunidad de precio</option>
+                      <option value="tecnico">Mejor evidencia técnica</option>
+                      <option value="precio">Precio más verificable</option>
                     </select>
                   </label>
                 </div>
-                <div className="mt-3 text-xs text-muted">Mostrando {visibleProviders.length} de {providers.length} candidatos. El ranking es preliminar y no sustituye la cotización ni la auditoría.</div>
+                <div className="mt-3 text-xs text-muted">Mostrando {visibleProviders.length} de {providers.length} candidatos con fuente web. &quot;No demostrado&quot; significa que todavía falta evidencia; no equivale a incumplimiento.</div>
               </ModuleSection>
 
-              {visibleProviders.length ? visibleProviders.map((provider, index) => {
-                const prior = auditForProvider(provider);
-                const expanded = expandedIndex === index;
-                const coverage = providerCoverage(provider);
-                const rankScore = providerRankScore(provider, selectedItems.length);
-                return (
-                  <ModuleSection key={`${provider.proveedor}-${provider.url}-${index}`} className="min-w-0 p-0">
+              {visibleProviders.length && selectedProvider ? (
+                <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(290px,0.36fr)_minmax(0,0.64fr)]">
+                  <ModuleSection className="min-w-0 overflow-hidden p-0 xl:self-start">
+                    <div className="border-b border-line px-4 py-3">
+                      <div className="text-sm font-semibold text-ink">Candidatos</div>
+                      <p className="mt-1 text-xs text-muted">Selecciona una empresa para revisar su evidencia.</p>
+                    </div>
+                    <div className="max-h-[680px] overflow-y-auto p-2">
+                      {visibleProviders.map((provider, index) => {
+                        const active = index === (expandedIndex ?? 0);
+                        return (
+                          <button key={`${provider.proveedor}-${provider.url}-${index}`} type="button" onClick={() => setExpandedIndex(index)} aria-current={active ? "true" : undefined} className={`app-provider-row w-full p-3 text-left ${active ? "app-provider-row-active" : ""}`}>
+                            <div className="flex items-start gap-3">
+                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-ink">{index + 1}</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold text-ink">{provider.proveedor || "Proveedor sin nombre"}</span>
+                                <span className="mt-1 block truncate text-xs text-muted">{provider.pais_region || "Región no confirmada"} · {provider.tipo || "Tipo no confirmado"}</span>
+                              </span>
+                              <ChevronDown className={`mt-1 h-4 w-4 shrink-0 -rotate-90 text-muted transition-transform ${active ? "text-brand" : ""}`} />
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1.5 pl-11">
+                              <StatusBadge tone={technicalTone(provider.estado_tecnico)}>{provider.estado_tecnico || "No demostrado"}</StatusBadge>
+                              <StatusBadge tone={riskTone(provider.riesgo)}>Riesgo {provider.riesgo || "N/D"}</StatusBadge>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ModuleSection>
+
+                  <ModuleSection className="min-w-0 overflow-hidden p-0">
                     <div className="p-4 sm:p-5">
-                      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <button type="button" onClick={() => setExpandedIndex(expanded ? null : index)} className="min-w-0 flex-1 text-left">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-sm font-bold text-brand">{index + 1}</span>
-                            <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{provider.proveedor || "Proveedor sin nombre"}</h3>
-                            {expanded ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-sm font-bold text-brand">{(expandedIndex ?? 0) + 1}</span>
+                            <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{selectedProvider.proveedor || "Proveedor sin nombre"}</h3>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <StatusBadge tone="neutral">{provider.pais_region || "Región no confirmada"}</StatusBadge>
-                            <StatusBadge tone="neutral">{provider.tipo || "Tipo no confirmado"}</StatusBadge>
-                            <StatusBadge tone="info">Ajuste técnico {provider.match_tecnico ?? 0}%</StatusBadge>
-                            <StatusBadge tone={savingTone(provider.probabilidad_buen_precio)}>Ahorro: {provider.probabilidad_buen_precio || "Validar"}</StatusBadge>
-                            <StatusBadge tone={riskTone(provider.riesgo)}>Riesgo: {provider.riesgo || "Validar"}</StatusBadge>
-                            <StatusBadge tone={decisionTone(provider.decision)}>{provider.decision || "Validar"}</StatusBadge>
+                            <StatusBadge tone="neutral">{selectedProvider.pais_region || "Región no confirmada"}</StatusBadge>
+                            <StatusBadge tone="neutral">{selectedProvider.tipo || "Tipo no confirmado"}</StatusBadge>
+                            <StatusBadge tone={technicalTone(selectedProvider.estado_tecnico)}>Técnico: {selectedProvider.estado_tecnico || "No demostrado"}</StatusBadge>
+                            <StatusBadge tone={priceTone(selectedProvider.estado_precio)}>{selectedProvider.estado_precio || "Sin precio verificable"}</StatusBadge>
+                            <StatusBadge tone={riskTone(selectedProvider.riesgo)}>Riesgo: {selectedProvider.riesgo || "Validar"}</StatusBadge>
                           </div>
-                          <div className="mt-3 grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-center">
-                            <div className="rounded-lg border border-line bg-slate-50 px-3 py-2"><div className="text-xs font-semibold text-muted">Balance preliminar</div><div className="mt-1 text-lg font-bold text-ink">{rankScore}/100</div></div>
-                            <div className="text-sm leading-6 text-muted"><span className="font-semibold text-ink">Cobertura {coverage}/{selectedItems.length}:</span> {provider.renglones_cubiertos?.length ? provider.renglones_cubiertos.join(", ") : provider.cobertura_detalle || provider.renglon || "Por validar"}</div>
-                          </div>
-                        </button>
+                        </div>
                         <div className="flex shrink-0 flex-wrap gap-2">
-                          {provider.url ? <a href={provider.url} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 items-center justify-center gap-2 border px-3 text-sm font-semibold">Fuente <ExternalLink className="h-4 w-4" /></a> : null}
-                          <Button type="button" onClick={() => sendProviderToAudit(provider)} variant="primary"><ShieldCheck className="h-4 w-4" />Validar empresa <ArrowRight className="h-4 w-4" /></Button>
+                          {selectedProvider.url ? <a href={selectedProvider.url} target="_blank" rel="noreferrer" className="app-btn app-btn-secondary inline-flex h-10 items-center justify-center gap-2 border px-3 text-sm font-semibold">Fuente <ExternalLink className="h-4 w-4" /></a> : null}
+                          <Button type="button" onClick={() => sendProviderToEvaluation(selectedProvider)} variant="secondary"><CheckCircle2 className="h-4 w-4" />Evaluar oferta</Button>
+                          <Button type="button" onClick={() => sendProviderToAudit(selectedProvider)} variant="primary"><ShieldCheck className="h-4 w-4" />Validar empresa</Button>
                         </div>
                       </div>
                     </div>
 
-                    {expanded ? (
-                      <div className="grid border-t border-line bg-slate-50 lg:grid-cols-3 lg:divide-x lg:divide-line">
-                        <div className="p-4 sm:p-5"><div className="text-xs font-semibold text-muted">Por qué puede servir</div><p className="mt-2 text-sm leading-6 text-ink">{provider.evidencia || "Sin evidencia suficiente; validar fuente."}</p></div>
-                        <div className="border-t border-line p-4 sm:p-5 lg:border-t-0"><div className="text-xs font-semibold text-muted">Qué validar antes de cotizar</div><p className="mt-2 text-sm leading-6 text-ink">{provider.que_validar || "Ficha, precio, stock, lead time, Incoterm, garantía y empresa."}</p></div>
-                        <div className="border-t border-line p-4 sm:p-5 lg:border-t-0">
-                          <div className="text-xs font-semibold text-muted">Auditoría corporativa</div>
-                          {loadingAudits ? <div className="mt-2 flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Buscando antecedentes...</div> : prior ? (
-                            <div className="mt-2"><div className="text-lg font-semibold text-ink">{prior.score_final ?? 0}/100</div><div className="mt-2 flex flex-wrap gap-2"><StatusBadge tone={riskTone(prior.riesgo)}>Riesgo {prior.riesgo || "N/D"}</StatusBadge><StatusBadge tone={decisionTone(prior.decision)}>{prior.decision || "Revisar"}</StatusBadge></div></div>
-                          ) : <p className="mt-2 text-sm leading-6 text-muted">Sin auditoría previa. Usa Auditar antes de solicitar cotización.</p>}
-                        </div>
+                    <div className="grid border-y border-line bg-slate-50 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-line">
+                      {[
+                        ["Prioridad", `${providerRankScore(selectedProvider, selectedItems.length)}/100`],
+                        ["Cobertura", `${providerCoverage(selectedProvider)}/${selectedItems.length}`],
+                        ["Evidencia", selectedProvider.nivel_evidencia || "Insuficiente"],
+                        ["Decisión", selectedProvider.decision || "Validar"]
+                      ].map(([label, value]) => <div key={label} className="border-t border-line px-4 py-3 first:border-t-0 sm:[&:nth-child(-n+2)]:border-t-0 lg:border-t-0"><div className="text-xs font-semibold text-muted">{label}</div><div className="mt-1 text-sm font-bold text-ink">{value}</div></div>)}
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-line">
+                      <div className="p-4 sm:p-5"><div className="text-xs font-semibold uppercase text-muted">Por qué puede servir</div><p className="mt-2 text-sm leading-6 text-ink">{selectedProvider.evidencia || "Sin evidencia suficiente; validar fuente."}</p></div>
+                      <div className="border-t border-line p-4 sm:p-5 lg:border-t-0"><div className="text-xs font-semibold uppercase text-muted">Condición comercial</div><p className="mt-2 text-sm leading-6 text-ink">{selectedProvider.precio_publicado || selectedProvider.estado_precio || "Sin precio verificable"}</p><p className="mt-2 text-xs leading-5 text-muted">Disponibilidad: {selectedProvider.disponibilidad || "No confirmada"} · Lead time: {selectedProvider.lead_time || "No confirmado"}</p></div>
+                    </div>
+
+                    <div className="border-t border-line p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><div className="text-sm font-semibold text-ink">Comprobación técnica</div><p className="mt-1 text-xs text-muted">Evidencia observada para los requisitos seleccionados.</p></div>
+                        <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">{selectedProvider.requisitos_confirmados || 0}/{selectedProvider.requisitos_esperados || selectedProvider.requisitos_revisados || 0} confirmados</span><StatusBadge tone={technicalTone(selectedProvider.estado_tecnico)}>{selectedProvider.nivel_evidencia || "Evidencia insuficiente"}</StatusBadge></div>
                       </div>
-                    ) : null}
+                      {selectedProvider.verificaciones_tecnicas?.length ? (
+                        <div className="mt-3 overflow-hidden rounded-lg border border-line">
+                          {selectedProvider.verificaciones_tecnicas.map((check, checkIndex) => (
+                            <div key={`${check.requisito}-${checkIndex}`} className="grid gap-2 border-t border-line bg-panel p-3 first:border-t-0 lg:grid-cols-[minmax(170px,0.8fr)_auto_minmax(240px,1.2fr)] lg:items-start">
+                              <div className="text-sm font-semibold leading-5 text-ink">{check.requisito}</div>
+                              <StatusBadge tone={technicalTone(check.estado)}>{check.estado}</StatusBadge>
+                              <div className="min-w-0 text-sm leading-5 text-muted">{check.evidencia || "La fuente no muestra este dato."}{check.fuente ? <a className="ml-2 inline-flex items-center gap-1 font-semibold text-brand hover:underline" href={check.fuente} target="_blank" rel="noreferrer">Fuente <ExternalLink className="h-3.5 w-3.5" /></a> : null}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="mt-3 text-sm leading-6 text-muted">No hay evidencia técnica desglosada. Este candidato no debe tratarse como confirmado.</p>}
+                    </div>
+
+                    <div className="grid border-t border-line bg-slate-50 lg:grid-cols-2 lg:divide-x lg:divide-line">
+                      <div className="p-4 sm:p-5"><div className="text-xs font-semibold uppercase text-muted">Pendiente antes de cotizar</div><p className="mt-2 text-sm leading-6 text-ink">{selectedProvider.que_validar || "Confirmar ficha, precio, stock, lead time, garantía y trazabilidad de la empresa."}</p></div>
+                      <div className="border-t border-line p-4 sm:p-5 lg:border-t-0"><div className="text-xs font-semibold uppercase text-muted">Auditoría corporativa</div>{loadingAudits ? <div className="mt-2 flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Buscando antecedentes...</div> : selectedProviderAudit ? <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-lg font-semibold text-ink">{selectedProviderAudit.score_final ?? 0}/100</span><StatusBadge tone={riskTone(selectedProviderAudit.riesgo)}>Riesgo {selectedProviderAudit.riesgo || "N/D"}</StatusBadge><StatusBadge tone={decisionTone(selectedProviderAudit.decision)}>{selectedProviderAudit.decision || "Revisar"}</StatusBadge></div> : <p className="mt-2 text-sm leading-6 text-muted">Sin auditoría previa. Valida la empresa antes de solicitar cotización.</p>}</div>
+                    </div>
                   </ModuleSection>
-                );
-              }) : (
+                </div>
+              ) : (
                 <ModuleSection><EmptyState icon={Target} title={providers.length ? "Ningún candidato coincide con el filtro" : "No hay candidatos"} copy={providers.length ? "Limpia el filtro o cambia el orden para volver a mostrar resultados." : "Vuelve a Preparar búsqueda y ajusta los renglones o la instrucción."} /></ModuleSection>
               )}
 

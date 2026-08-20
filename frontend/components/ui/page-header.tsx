@@ -21,7 +21,7 @@ export function PageHeader({
         {title ? <h1 className="mt-1 text-xl font-semibold text-ink">{title}</h1> : null}
         {copy ? <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{copy}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">{actions}</div> : null}
     </div>
   );
 }

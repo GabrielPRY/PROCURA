@@ -81,8 +81,8 @@ function riskTone(risk: string) {
 function itemLabel(item: RfqItem, index: number) {
   const renglon = cleanValue(item.renglon, String(index + 1));
   const code = cleanValue(item.codigo_articulo, "S/C");
-  const desc = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "Sin descripcion");
-  return `Renglon ${renglon} | ${code} | ${desc.slice(0, 72)}`;
+  const desc = cleanValue(item.termino_de_busqueda_corto || item.descripcion || item.ficha_tecnica_completa, "Sin descripción");
+  return `Renglón ${renglon} | ${code} | ${desc.slice(0, 72)}`;
 }
 
 function isValidAcpCode(value: unknown) {
@@ -192,7 +192,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         });
         setSaveNotice(`Guardado en Supabase como workspace ${saved.licitacion}.`);
       } catch (saveErr) {
-        setSaveNotice(saveErr instanceof Error ? `Analisis listo, pero no se pudo guardar en Supabase: ${saveErr.message}` : "Analisis listo, pero no se pudo guardar en Supabase.");
+        setSaveNotice(saveErr instanceof Error ? `Análisis listo, pero no se pudo guardar en Supabase: ${saveErr.message}` : "Análisis listo, pero no se pudo guardar en Supabase.");
       }
       setSelectedIndex(0);
       setActiveTab("resumen");
@@ -227,11 +227,11 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
 
   const metrics = [
     ["Renglones", String(items.length)],
-    ["Propuesta tecnica", String(proposalCount)],
-    ["Ficha/catalogo", String(fichaCount)],
+    ["Propuesta técnica", String(proposalCount)],
+    ["Ficha / catálogo", String(fichaCount)],
     ["Marca/modelo", String(marcaCount)],
-    ["Codigos ACP", `${validCodeCount}/${items.length}`],
-    ["Atencion tecnica", technicalAttention]
+    ["Códigos ACP", `${validCodeCount}/${items.length}`],
+    ["Atención técnica", technicalAttention]
   ];
 
   const decisionStats = [
@@ -242,24 +242,24 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   ];
 
   const generalCards = [
-    ["No. licitacion", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
-    ["Garantia", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
-    ["Lugar entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
-    ["Tiempo entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
-    ["Req. prop. tecnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
-    ["Validez oferta", getCg(cg, ["validez_de_la_oferta", "validez_oferta", "validez"])],
+    ["N.º de licitación", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
+    ["Garantía", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
+    ["Lugar de entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
+    ["Tiempo de entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
+    ["Propuesta técnica", proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal],
+    ["Validez de la oferta", getCg(cg, ["validez_de_la_oferta", "validez_oferta", "validez"])],
     ["Encargado ACP", getCg(cg, ["persona_encargada_licitacion", "persona_encargada", "contacto_acp", "encargado_acp", "encargado"])],
     ["Correo", getCg(cg, ["correo_encargado_licitacion", "correo_acp", "email_acp", "correo"])],
-    ["Telefono", getCg(cg, ["telefono_encargado_licitacion", "telefono_acp", "telefono"])],
+    ["Teléfono", getCg(cg, ["telefono_encargado_licitacion", "telefono_acp", "telefono"])],
     ["Presencia local", presenceDecision.label],
     ["Empresa sugerida", presenceDecision.company]
   ];
 
   const simpleGeneralCards = [
-    ["No. licitacion", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
-    ["Garantia", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
-    ["Tiempo entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
-    ["Lugar entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
+    ["N.º de licitación", getCg(cg, ["numero_licitacion", "licitacion", "rfq_id"])],
+    ["Garantía", getCg(cg, ["garantia_exigida", "garantia", "garantias", "garantia_requerida"])],
+    ["Tiempo de entrega", getCg(cg, ["tiempo_de_entrega_global", "tiempo_entrega", "plazo_entrega", "lead_time"])],
+    ["Lugar de entrega", getCg(cg, ["lugar_de_entrega", "lugar_entrega", "entrega"])],
     ["Contacto ACP", contactName || "No especificado"],
     ["Correo ACP", contactEmail || "No especificado"]
   ];
@@ -292,17 +292,17 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const analysisState: DetailFlag[] = result
     ? [
         {
-          label: "Pliego leido",
-          value: getCg(cg, ["numero_licitacion"], "Numero no especificado"),
+          label: "Pliego leído",
+          value: getCg(cg, ["numero_licitacion"], "Número no especificado"),
           tone: getCg(cg, ["numero_licitacion"], "") ? "ok" : "warn"
         },
         {
-          label: "Codigos ACP",
+          label: "Códigos ACP",
           value: items.length ? `${validCodeCount}/${items.length} validados` : "Sin renglones",
           tone: items.length && validCodeCount === items.length ? "ok" : "warn"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: proposalGlobal,
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "ok" : "neutral"
         },
@@ -317,7 +317,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: presenceDecision.tone
         },
         {
-          label: "Atencion tecnica",
+          label: "Atención técnica",
           value: technicalAttention,
           tone: risk.toLowerCase() === "alto" || risk.toLowerCase() === "medio" ? "warn" : "ok"
         }
@@ -328,25 +328,25 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     ? [
         {
           label: "Marca / proveedor",
-          value: getCg(cg, ["restriccion_marca_proveedor"], "Sin restriccion detectada"),
+          value: getCg(cg, ["restriccion_marca_proveedor"], "Sin restricción detectada"),
           detail: cleanValue(cg.evidencia_restricciones, "Sin evidencia adicional."),
           tone: cleanValue(cg.restriccion_marca_proveedor, "") ? "warn" : "ok"
         },
         {
           label: "Equivalentes",
           value: boolLabel(cg.permite_equivalentes),
-          detail: "Indica si el pliego permite alternativas tecnicas o igual/superior.",
+          detail: "Indica si el pliego permite alternativas técnicas o productos iguales o superiores.",
           tone: asOptionalBool(cg.permite_equivalentes) === false ? "warn" : "neutral"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: proposalLines ? `${proposalGlobal} (${proposalLines})` : proposalGlobal,
           detail: cleanValue(cg.evidencia_propuesta_tecnica, "Sin evidencia textual capturada."),
           tone: proposalGlobal.toLowerCase().startsWith("si") ? "warn" : "neutral"
         },
         {
-          label: "Ficha / catalogo",
-          value: fichaCount ? `${fichaCount} renglon(es)` : "No pedida aparte",
+          label: "Ficha / catálogo",
+          value: fichaCount ? `${fichaCount} renglón(es)` : "No pedida aparte",
           detail: "Solo cuenta entregables documentales, no simples especificaciones.",
           tone: fichaCount ? "warn" : "neutral"
         },
@@ -358,8 +358,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         },
         {
           label: "Partes obsoletas / cartas",
-          value: obsolCount ? `${obsolCount} renglon(es) a revisar` : "Sin alerta",
-          detail: asBool(cg.permite_carta_obsolescencia) ? "El pliego permite carta de fabricante." : "No se detecto permiso especifico de carta.",
+          value: obsolCount ? `${obsolCount} renglón(es) a revisar` : "Sin alerta",
+          detail: asBool(cg.permite_carta_obsolescencia) ? "El pliego permite carta de fabricante." : "No se detectó permiso específico para una carta.",
           tone: obsolCount || asBool(cg.permite_carta_obsolescencia) ? "warn" : "neutral"
         }
       ]
@@ -382,7 +382,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
   const detailFlags: DetailFlag[] = selectedItem
     ? [
         {
-          label: "Codigo ACP",
+          label: "Código ACP",
           value: isValidAcpCode(selectedItem.codigo_articulo) ? cleanValue(selectedItem.codigo_articulo) : "S/C",
           tone: isValidAcpCode(selectedItem.codigo_articulo) ? "ok" : "neutral"
         },
@@ -392,12 +392,12 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
           tone: "neutral"
         },
         {
-          label: "Propuesta tecnica",
+          label: "Propuesta técnica",
           value: asBool(selectedItem.requiere_propuesta_tecnica) ? "Requerida" : "No requerida",
           tone: asBool(selectedItem.requiere_propuesta_tecnica) ? "warn" : "neutral"
         },
         {
-          label: "Ficha / catalogo",
+          label: "Ficha / catálogo",
           value: asBool(selectedItem.requiere_ficha_tecnica) ? "Requerida" : "No pedida aparte",
           tone: asBool(selectedItem.requiere_ficha_tecnica) ? "warn" : "neutral"
         },
@@ -408,7 +408,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
         },
         {
           label: "Partes obsoletas / cartas",
-          value: asBool(selectedItem.posible_obsolescencia) ? "Revisar actualizacion" : "Sin alerta",
+          value: asBool(selectedItem.posible_obsolescencia) ? "Revisar actualización" : "Sin alerta",
           tone: asBool(selectedItem.posible_obsolescencia) ? "warn" : "neutral"
         }
       ]
@@ -423,7 +423,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
     {
       id: "resumen" as const,
       label: "Resumen",
-      detail: result ? rfqNumber || "Analisis listo" : "Pendiente"
+      detail: result ? rfqNumber || "Análisis listo" : "Pendiente"
     },
     {
       id: "renglones" as const,
@@ -648,9 +648,9 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                   <p className="mt-1 text-xs leading-5">{presenceDecision.note}</p>
                 </div>
                 <div className="app-data-card">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Restriccion / equivalentes</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Restricción / equivalentes</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {getCg(cg, ["restriccion_marca_proveedor"], "Sin restriccion detectada")}
+                    {getCg(cg, ["restriccion_marca_proveedor"], "Sin restricción detectada")}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-muted">
                     Equivalentes: {boolLabel(cg.permite_equivalentes)} | Carta obsolescencia: {asBool(cg.permite_carta_obsolescencia) ? "Si" : "No"}
@@ -674,7 +674,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               <div className="mt-5 rounded-xl border border-line bg-white p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
                   <ShieldAlert className="h-4 w-4 text-brand" />
-                  Estado del analisis
+                  Estado del análisis
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
                   {analysisState.map((flag) => (
@@ -691,13 +691,13 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
                   {cleanValue(cg.evidencia_propuesta_tecnica, "") ? (
                     <div className="rounded-lg border border-line bg-slate-50 p-4">
-                      <div className="text-sm font-semibold">Evidencia propuesta tecnica</div>
+                      <div className="text-sm font-semibold">Evidencia de propuesta técnica</div>
                       <p className="mt-2 text-sm leading-6 text-slate-700">{cleanValue(cg.evidencia_propuesta_tecnica)}</p>
                     </div>
                   ) : null}
                   {cleanValue(cg.evidencia_restricciones, "") ? (
                     <div className="rounded-lg border border-line bg-slate-50 p-4">
-                      <div className="text-sm font-semibold">Evidencia tecnica general</div>
+                      <div className="text-sm font-semibold">Evidencia técnica general</div>
                       <p className="mt-2 text-sm leading-6 text-slate-700">{cleanValue(cg.evidencia_restricciones)}</p>
                     </div>
                   ) : null}
@@ -755,8 +755,8 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
                 <thead>
                 <tr>
                   {(viewMode === "advanced"
-                    ? ["Renglon", "Codigo ACP", "Descripcion", "Cantidad", "Unidad", "Prop. tecnica", "Ficha", "Marca / restriccion", "Equiv.", "Obsol."]
-                    : ["Renglon", "Codigo ACP", "Descripcion", "Cantidad", "Estado"]
+                    ? ["Renglón", "Código ACP", "Descripción", "Cantidad", "Unidad", "Prop. técnica", "Ficha", "Marca / restricción", "Equiv.", "Obsol."]
+                    : ["Renglón", "Código ACP", "Descripción", "Cantidad", "Estado"]
                   ).map((heading) => (
                     <th key={heading} className="border-b border-line px-4 py-3 font-semibold">
                       {heading}
@@ -824,7 +824,7 @@ export function RfqConsole({ user, onModuleChange }: { user: AuthUser; onModuleC
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <details className="rounded-lg border border-line bg-slate-50 p-4">
-                  <summary className="cursor-pointer text-sm font-semibold">Ver especificacion tecnica</summary>
+                  <summary className="cursor-pointer text-sm font-semibold">Ver especificación técnica</summary>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                     {cleanValue(selectedItem.ficha_tecnica_completa || selectedItem.descripcion)}
                   </p>

@@ -41,10 +41,20 @@ function isRetryableStatus(status: number) {
 }
 
 function friendlyApiError(status: number, detail: string) {
-  if (detail) return detail;
-  if (status === 408 || status === 504) return "La operacion tardo demasiado. Intenta de nuevo o reduce el alcance.";
-  if (status === 429) return "El servicio esta recibiendo muchas solicitudes. Espera un momento e intenta otra vez.";
-  if (status === 502 || status === 503) return "El servicio esta temporalmente ocupado o no disponible.";
+  const normalized = detail.toLowerCase();
+  if (normalized.includes("api_key_invalid") || normalized.includes("api key not valid") || normalized.includes("clientid is invalid")) {
+    return "La credencial del servicio no es válida. Solicita al administrador que revise la API configurada.";
+  }
+  if (normalized.includes("high demand") || normalized.includes("currently experiencing high demand")) {
+    return "El modelo de IA tiene alta demanda en este momento. Espera unos segundos e intenta nuevamente.";
+  }
+  if (status === 400) return "La solicitud contiene datos incompletos o inválidos.";
+  if (status === 401 || status === 403) return "Tu sesión no tiene permiso para completar esta acción.";
+  if (status === 404) return "No se encontró la información solicitada.";
+  if (status === 408 || status === 504) return "La operación tardó demasiado. Intenta de nuevo o reduce el alcance.";
+  if (status === 429) return "El servicio está recibiendo muchas solicitudes. Espera un momento e intenta otra vez.";
+  if (status === 502 || status === 503) return "El servicio está temporalmente ocupado o no disponible.";
+  if (detail && detail.length <= 280) return detail;
   return `API error ${status}`;
 }
 
@@ -106,7 +116,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
         await sleep(600 * (attempt + 1));
         continue;
       }
-      if (isAbort) throw new Error("La operacion tardo demasiado. Intenta de nuevo o reduce el alcance.");
+      if (isAbort) throw new Error("La operación tardó demasiado. Intenta de nuevo o reduce el alcance.");
+      if (error instanceof TypeError) throw new Error("No se pudo conectar con el servidor. Verifica la conexión e intenta nuevamente.");
       throw error;
     } finally {
       globalThis.clearTimeout(timer);

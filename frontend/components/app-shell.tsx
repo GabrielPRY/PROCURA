@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/ui/cn";
-import { getAllowedModules, type ModuleId } from "@/lib/navigation";
+import { canAccessModule, getAllowedModules, type ModuleId } from "@/lib/navigation";
 
 const primaryByRole: Record<string, ModuleId[]> = {
   Analista: ["dashboard", "rfq", "costos", "proveedores", "seguimiento"],
@@ -27,6 +27,10 @@ function productName(role: string) {
   if (role === "Admin") return "Administración";
   if (role === "Logistica") return "Logística";
   return "Sourcing Console";
+}
+
+function visibleRole(role: string) {
+  return role === "Logistica" ? "Logística" : role;
 }
 
 export function AppShell({
@@ -65,10 +69,10 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!visibleItems.some((item) => item.id === activeModule) && visibleItems[0]) {
+    if (!canAccessModule(user, activeModule) && visibleItems[0]) {
       onModuleChange(visibleItems[0].id);
     }
-  }, [activeModule, onModuleChange, visibleItems]);
+  }, [activeModule, onModuleChange, user, visibleItems]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -206,7 +210,7 @@ export function AppShell({
         {mobileOpen ? (
           <nav className="app-mobile-nav border-t border-line p-3 xl:hidden" aria-label="Navegación móvil">
             <div className="flex items-center justify-between gap-3 px-1 pb-3">
-              <div><div className="text-sm font-semibold text-ink">Navegación</div><div className="mt-0.5 text-xs text-muted">{role}</div></div>
+              <div><div className="text-sm font-semibold text-ink">Navegación</div><div className="mt-0.5 text-xs text-muted">{visibleRole(role)}</div></div>
               <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-muted">{visibleItems.length} módulos</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">

@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, ClipboardList, Download, FileText, Loader2, Search, UploadCloud, XCircle } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { evaluateSupplierProposal, type EvaluationResultValue, type SupplierEvaluationRow } from "@/lib/evaluation";
+import { evaluateSupplierProposal, loadSupplierEvaluationDraft, type EvaluationResultValue, type SupplierEvaluationRow } from "@/lib/evaluation";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 import { asBool, cleanValue, getUserConfig, loadActiveRfqContext, loadLastRfq, type ActiveRfqItemContext, type RfqAnalysisResponse, type RfqItem } from "@/lib/rfq";
 import { Button } from "@/components/ui/button";
@@ -10,18 +10,12 @@ import { ModuleSection } from "@/components/ui/module-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type Scope = "Todos los renglones" | "Renglon seleccionado desde RFQ" | "Solo renglones con propuesta tecnica" | "Solo renglones con ficha/catalogo";
+type Scope = "Todos los renglones" | "Renglones seleccionados en Proveedores" | "Renglón seleccionado desde RFQ" | "Solo renglones con propuesta técnica" | "Solo renglones con ficha/catálogo";
 type ResultFilter = "Todos" | EvaluationResultValue;
 type EvaluationTab = "preparar" | "resultado";
 
 const resultOptions: EvaluationResultValue[] = ["Cumple", "No cumple", "Cumple parcialmente", "No encontrado"];
-const actionOptions = ["Aceptar", "Pedir aclaracion", "Rechazar", "Revisar manualmente"];
-
-const preparationSteps = [
-  ["1", "Subir propuesta", "Archivo recibido del proveedor."],
-  ["2", "Elegir alcance", "Renglones que se van a comparar."],
-  ["3", "Evaluar", "IA cruza oferta vs requisitos ACP."]
-];
+const actionOptions = ["Aceptar", "Pedir aclaración", "Rechazar", "Revisar manualmente"];
 
 function statusTone(status: string) {
   if (status === "Cumple") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -30,14 +24,17 @@ function statusTone(status: string) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function filterItems(items: RfqItem[], scope: Scope, activeIndex = 0) {
-  if (scope === "Renglon seleccionado desde RFQ") {
+function filterItems(items: RfqItem[], scope: Scope, activeIndex = 0, providerIndexes: number[] = []) {
+  if (scope === "Renglones seleccionados en Proveedores") {
+    return providerIndexes.filter((index) => items[index]).map((index) => items[index]);
+  }
+  if (scope === "Renglón seleccionado desde RFQ") {
     return items[activeIndex] ? [items[activeIndex]] : [];
   }
-  if (scope === "Solo renglones con propuesta tecnica") {
+  if (scope === "Solo renglones con propuesta técnica") {
     return items.filter((item) => asBool(item.requiere_propuesta_tecnica));
   }
-  if (scope === "Solo renglones con ficha/catalogo") {
+  if (scope === "Solo renglones con ficha/catálogo") {
     return items.filter((item) => asBool(item.requiere_ficha_tecnica));
   }
   return items;
@@ -77,21 +74,31 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
   const [rows, setRows] = useState<SupplierEvaluationRow[]>([]);
   const [activeTab, setActiveTab] = useState<EvaluationTab>("preparar");
   const [activeRfqContext, setActiveRfqContext] = useState<ActiveRfqItemContext | null>(null);
+  const [providerItemIndexes, setProviderItemIndexes] = useState<number[]>([]);
 
   useEffect(() => {
     const savedRfq = loadLastRfq(user.username);
     const context = loadActiveRfqContext(user.username);
+    const providerDraft = loadSupplierEvaluationDraft(user.username);
     setRfq(savedRfq);
     setActiveRfqContext(context?.target_module === "evaluacion" ? context : null);
-    if (savedRfq?.items?.length && context?.target_module === "evaluacion") {
-      setScope("Renglon seleccionado desde RFQ");
+    if (savedRfq?.items?.length && providerDraft?.item_indexes?.length) {
+      const validIndexes = providerDraft.item_indexes.filter((index) => savedRfq.items?.[index]);
+      setProviderItemIndexes(validIndexes);
+      setSupplier(providerDraft.supplier_name || "");
+      setScope("Renglones seleccionados en Proveedores");
+      if (providerDraft.provider_url) {
+        setEvaluationNotes((current) => current || `Proveedor seleccionado desde sourcing: ${providerDraft.provider_url}`);
+      }
+    } else if (savedRfq?.items?.length && context?.target_module === "evaluacion") {
+      setScope("Renglón seleccionado desde RFQ");
       setEvaluationNotes((current) =>
         current ||
         [
-          `Evaluar contra el renglon ${context.renglon || context.item_index + 1}.`,
+          `Evaluar contra el renglón ${context.renglon || context.item_index + 1}.`,
           context.codigo_acp ? `Codigo ACP: ${context.codigo_acp}` : "",
-          context.requiere_propuesta_tecnica ? "El RFQ marca propuesta tecnica requerida para este renglon." : "",
-          context.requiere_ficha_tecnica ? "El RFQ marca ficha/catalogo requerido para este renglon." : "",
+          context.requiere_propuesta_tecnica ? "El RFQ marca propuesta técnica requerida para este renglón." : "",
+          context.requiere_ficha_tecnica ? "El RFQ marca ficha/catálogo requerido para este renglón." : "",
           context.evidencia_tecnica ? `Evidencia RFQ: ${context.evidencia_tecnica}` : ""
         ].filter(Boolean).join("\n")
       );
@@ -120,22 +127,24 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
   const cg = rfq?.condiciones_generales || {};
   const allItems = useMemo(() => rfq?.items || [], [rfq]);
   const activeItemIndex = activeRfqContext?.target_module === "evaluacion" ? Number(activeRfqContext.item_index) || 0 : 0;
-  const scopedItems = useMemo(() => filterItems(allItems, scope, activeItemIndex), [activeItemIndex, allItems, scope]);
+  const scopedItems = useMemo(() => filterItems(allItems, scope, activeItemIndex, providerItemIndexes), [activeItemIndex, allItems, providerItemIndexes, scope]);
   const licitacion = cleanValue(cg.numero_licitacion, "Sin RFQ cargado");
   const counts = {
     cumple: rows.filter((row) => row.resultado === "Cumple").length,
     parcial: rows.filter((row) => row.resultado === "Cumple parcialmente").length,
-    no: rows.filter((row) => row.resultado === "No cumple" || row.resultado === "No encontrado").length,
+    noCumple: rows.filter((row) => row.resultado === "No cumple").length,
+    noEncontrado: rows.filter((row) => row.resultado === "No encontrado").length,
     total: rows.length
   };
-  const riskRows = rows.filter((row) => row.resultado !== "Cumple");
   const visibleRows = useMemo(() => {
     const indexed = rows.map((row, index) => ({ row, index }));
     if (resultFilter === "Todos") return indexed;
     return indexed.filter(({ row }) => row.resultado === resultFilter);
   }, [resultFilter, rows]);
-  const decisionLabel = counts.no > 0
-    ? "Requiere correccion o aclaracion"
+  const decisionLabel = counts.noCumple > 0
+    ? "Existe incumplimiento técnico"
+    : counts.noEncontrado > 0
+      ? "Falta evidencia para decidir"
     : counts.parcial > 0
       ? "Puede avanzar con aclaraciones"
       : counts.total > 0
@@ -145,7 +154,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
   async function runEvaluation() {
     setError(null);
     if (!rfq || !scopedItems.length) {
-      setError("Primero analiza un RFQ con renglones tecnicos.");
+      setError("Primero analiza un RFQ con renglones técnicos.");
       return;
     }
     if (!files.length) {
@@ -188,7 +197,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
     const headers = [
       "Proveedor",
       "RFQ",
-      "Renglon",
+      "Renglón",
       "Codigo ACP",
       "Descripcion",
       "Resultado",
@@ -196,7 +205,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
       "Requisito ACP",
       "Oferta proveedor",
       "Faltante o riesgo",
-      "Accion sugerida",
+      "Acción sugerida",
       "Evidencia"
     ];
     const lines = [
@@ -234,7 +243,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
     {
       id: "resultado" as const,
       label: "Resultado",
-      detail: rows.length ? `${counts.no + counts.parcial} por revisar` : "Sin evaluar"
+      detail: rows.length ? `${counts.noCumple + counts.noEncontrado + counts.parcial} por revisar` : "Sin evaluar"
     }
   ];
 
@@ -242,9 +251,9 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Modulo Evaluacion"
+          eyebrow="Módulo Evaluación"
           title="Propuesta del proveedor vs RFQ"
-          copy="Compara la oferta del proveedor contra lo que exige ACP. Si algo no esta evidenciado, queda marcado para pedir aclaracion antes de ofertar."
+          copy="Compara la oferta del proveedor contra lo que exige ACP. Si algo no está evidenciado, queda marcado para pedir aclaración antes de ofertar."
           actions={
             <>
               <StatusBadge tone={hasGeminiKey ? "ok" : "warn"}>{loadingConfig ? "Validando IA" : hasGeminiKey ? "Gemini lista" : "Gemini pendiente"}</StatusBadge>
@@ -265,7 +274,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                 type="button"
                 onClick={() => !disabled && setActiveTab(tab.id)}
                 disabled={disabled}
-                className={`rounded-lg border px-4 py-3 text-left transition ${active ? "border-blue-200 bg-blue-50 text-brand" : disabled ? "border-transparent bg-white text-slate-400" : "border-transparent bg-white text-slate-700 hover:border-blue-100 hover:bg-slate-50"}`}
+                className={`app-tab-button ${active ? "app-tab-button-active" : ""}`}
               >
                 <span className="block text-sm font-semibold">{tab.label}</span>
                 <span className="mt-1 block text-xs leading-5 text-muted">{tab.detail}</span>
@@ -277,15 +286,15 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
 
       {!rfq ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
-          Primero analiza un RFQ en el modulo RFQ. Cuando termines, vuelve aqui y la matriz tecnica se cargara automaticamente.
+          Primero analiza un RFQ en el módulo RFQ. Cuando termines, vuelve aquí y la matriz técnica se cargará automáticamente.
         </section>
       ) : (
         <>
           {activeTab === "preparar" ? (
-          <section className="grid gap-4 xl:grid-cols-[0.38fr_0.62fr]">
-            <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-              <div className="text-base font-semibold">1. Propuesta del proveedor</div>
-              <p className="mt-2 text-sm leading-6 text-muted">Sube la cotizacion, ficha, catalogo o documento tecnico que envio el proveedor.</p>
+          <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.42fr)_minmax(0,0.58fr)]">
+            <ModuleSection className="min-w-0">
+              <div className="text-base font-semibold">Propuesta del proveedor</div>
+              <p className="mt-2 text-sm leading-6 text-muted">Sube la cotización, ficha, catálogo o documento técnico que envió el proveedor.</p>
 
               <label className="mt-5 grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center transition hover:border-brand hover:bg-blue-50">
                 <UploadCloud className="h-8 w-8 text-brand" />
@@ -322,7 +331,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   onChange={(event) => setEvaluationNotes(event.target.value)}
                   rows={4}
                   className="w-full resize-none rounded-lg border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                  placeholder="Ej: Enmienda 1 cambia cantidad; solo aplica para lineas 3 y 4; requiere carta de fabricante; el proveedor ofrece alternativa tecnica..."
+                  placeholder="Ej: Enmienda 1 cambia cantidad; solo aplica para líneas 3 y 4; requiere carta de fabricante; el proveedor ofrece alternativa técnica..."
                 />
               </label>
 
@@ -334,9 +343,10 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   className="app-input"
                 >
                   <option>Todos los renglones</option>
-                  {activeRfqContext ? <option>Renglon seleccionado desde RFQ</option> : null}
-                  <option>Solo renglones con propuesta tecnica</option>
-                  <option>Solo renglones con ficha/catalogo</option>
+                  {providerItemIndexes.length ? <option>Renglones seleccionados en Proveedores</option> : null}
+                  {activeRfqContext ? <option>Renglón seleccionado desde RFQ</option> : null}
+                  <option>Solo renglones con propuesta técnica</option>
+                  <option>Solo renglones con ficha/catálogo</option>
                 </select>
               </label>
 
@@ -346,47 +356,34 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
               </Button>
 
               {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
-            </div>
+            </ModuleSection>
 
-            <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-              <div className="text-base font-semibold">2. Matriz que se va a validar</div>
-              <p className="mt-2 text-sm text-muted">El sistema cruza la propuesta contra los requisitos tecnicos extraidos del ultimo RFQ.</p>
+            <ModuleSection className="min-w-0">
+              <div className="text-base font-semibold">Alcance de la evaluación</div>
+              <p className="mt-2 text-sm text-muted">El sistema cruza la propuesta contra los requisitos técnicos extraídos del último RFQ.</p>
               {activeRfqContext ? (
                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-                  <div className="font-semibold">Renglon recibido desde RFQ</div>
-                  Renglon {activeRfqContext.renglon || activeRfqContext.item_index + 1} | {activeRfqContext.codigo_acp || "S/C"} |{" "}
+                  <div className="font-semibold">Renglón recibido desde RFQ</div>
+                  Renglón {activeRfqContext.renglon || activeRfqContext.item_index + 1} | {activeRfqContext.codigo_acp || "S/C"} |{" "}
                   {activeRfqContext.descripcion || "Sin descripcion"}
                 </div>
               ) : null}
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-5 overflow-hidden rounded-lg border border-line bg-slate-50 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-line">
                 {[
                   ["RFQ", licitacion],
                   ["Renglones", String(scopedItems.length)],
-                  ["Proveedor", supplier || "No indicado"],
-                  ["API", hasGeminiKey ? "Gemini lista" : "Falta Gemini"]
+                  ["Proveedor", supplier || "No indicado"]
                 ].map(([label, value]) => (
-                  <div key={label} className="app-data-card">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-                    <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
+                  <div key={label} className="border-t border-line px-4 py-3 first:border-t-0 sm:border-t-0">
+                    <div className="text-xs font-semibold text-muted">{label}</div>
+                    <div className="mt-1 break-words text-sm font-semibold text-slate-900">{value}</div>
                   </div>
                 ))}
               </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
-                {preparationSteps.map(([number, title, copy]) => (
-                  <div key={title} className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-brand text-xs font-black text-white">{number}</div>
-                    <div className="mt-3 text-sm font-semibold text-slate-950">{title}</div>
-                    <p className="mt-1 text-xs leading-5 text-muted">{copy}</p>
-                  </div>
-                ))}
+              <div className="mt-5 border-l-2 border-blue-500 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+                <span className="font-semibold">Criterio de lectura:</span> la falta de evidencia queda como No encontrado, no como incumplimiento. Los anexos y enmiendas tienen prioridad sobre el RFQ original.
               </div>
-              <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                Criterio: si la propuesta no muestra evidencia del requisito, se marca como No encontrado o Cumple parcialmente. Esto protege la oferta antes de enviarla.
-              </div>
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                Anexos y enmiendas tienen prioridad sobre el RFQ original. Usa la caja de notas solo cuando exista un cambio o aclaracion relevante.
-              </div>
-            </div>
+            </ModuleSection>
           </section>
           ) : null}
 
@@ -395,8 +392,8 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
               <div className="border-b border-line p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <div className="text-base font-semibold">Resultado de la evaluacion</div>
-                    <p className="mt-1 text-sm text-muted">Vista resumida para decidir rapido. Abre el detalle solo cuando necesites auditar evidencia.</p>
+                    <div className="text-base font-semibold">Resultado de la evaluación</div>
+                    <p className="mt-1 text-sm text-muted">Vista resumida para decidir rápido. Abre el detalle solo cuando necesites auditar evidencia.</p>
                   </div>
                   <Button type="button" onClick={downloadCsv} variant="secondary" size="md">
                     <Download className="h-4 w-4" />
@@ -404,25 +401,27 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                   </Button>
                 </div>
                 <div className={`mt-4 rounded-xl border p-4 ${
-                  counts.no > 0
+                  counts.noCumple > 0
                     ? "border-rose-200 bg-rose-50 text-rose-900"
-                    : counts.parcial > 0
+                    : counts.noEncontrado > 0 || counts.parcial > 0
                       ? "border-amber-200 bg-amber-50 text-amber-900"
                       : "border-emerald-200 bg-emerald-50 text-emerald-900"
                 }`}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Conclusion</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Conclusión</div>
                       <div className="mt-1 text-xl font-semibold">{decisionLabel}</div>
                       <p className="mt-2 max-w-3xl text-sm leading-6">
-                        {counts.no > 0
-                          ? "No avances sin pedir correccion o evidencia al proveedor."
+                        {counts.noCumple > 0
+                          ? "La oferta contradice al menos un requisito. Revisa el detalle antes de continuar."
+                          : counts.noEncontrado > 0
+                            ? "La propuesta no demuestra todos los requisitos. Solicita la evidencia faltante antes de decidir."
                           : counts.parcial > 0
                             ? "Puede continuar, pero conviene cerrar las aclaraciones antes de ofertar."
                             : "La propuesta luce favorable contra los requisitos evaluados."}
                       </p>
                     </div>
-                    <div className="grid min-w-0 grid-cols-3 gap-2 text-center">
+                    <div className="grid min-w-0 grid-cols-2 gap-2 text-center sm:grid-cols-4">
                       <div className="rounded-lg bg-white/70 p-3">
                         <div className="text-xs font-semibold opacity-70">Cumple</div>
                         <div className="mt-1 text-2xl font-semibold">{counts.cumple}</div>
@@ -432,45 +431,15 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                         <div className="mt-1 text-2xl font-semibold">{counts.parcial}</div>
                       </div>
                       <div className="rounded-lg bg-white/70 p-3">
-                        <div className="text-xs font-semibold opacity-70">Riesgo</div>
-                        <div className="mt-1 text-2xl font-semibold">{counts.no}</div>
+                        <div className="text-xs font-semibold opacity-70">No demostrado</div>
+                        <div className="mt-1 text-2xl font-semibold">{counts.noEncontrado}</div>
+                      </div>
+                      <div className="rounded-lg bg-white/70 p-3">
+                        <div className="text-xs font-semibold opacity-70">No cumple</div>
+                        <div className="mt-1 text-2xl font-semibold">{counts.noCumple}</div>
                       </div>
                     </div>
                   </div>
-                </div>
-                {riskRows.length ? (
-                  <div className="mt-4 rounded-lg border border-line bg-slate-50 p-4">
-                    <div className="text-sm font-semibold text-slate-900">Prioridad de revision</div>
-                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                      {riskRows.slice(0, 4).map((row, index) => (
-                        <div key={`${row.renglon}-${index}-risk`} className="app-data-card bg-white">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-xs font-semibold uppercase tracking-wide text-brand">Renglon {cleanValue(row.renglon, "-")}</div>
-                              <div className="mt-1 text-sm font-semibold text-slate-900">{shortText(row.descripcion, "Sin descripcion", 80)}</div>
-                            </div>
-                            <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${statusTone(row.resultado)}`}>
-                              {row.resultado}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">{shortText(row.faltante_o_riesgo, "Revisar evidencia del proveedor.", 150)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                  {[
-                    ["Total evaluado", String(counts.total)],
-                    ["Cumple", String(counts.cumple)],
-                    ["Parcial", String(counts.parcial)],
-                    ["No cumple / no encontrado", String(counts.no)]
-                  ].map(([label, value]) => (
-                    <div key={label} className="app-data-card">
-                      <div className="text-xs text-muted">{label}</div>
-                      <div className="mt-1 text-xl font-semibold">{value}</div>
-                    </div>
-                  ))}
                 </div>
                 <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_260px]">
                   {summary ? <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{summary}</div> : <div />}
@@ -490,7 +459,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
               <div className="grid gap-3 p-4">
                 {visibleRows.map(({ row, index }) => {
                   const isOk = row.resultado === "Cumple";
-                  const isBad = row.resultado === "No cumple" || row.resultado === "No encontrado";
+                  const isBad = row.resultado === "No cumple";
                   const ResultIcon = isOk ? CheckCircle2 : isBad ? XCircle : AlertTriangle;
                   return (
                     <article key={`${row.renglon}-${index}`} className="rounded-xl border border-line bg-white p-4 shadow-sm">
@@ -498,7 +467,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-brand">
-                              Renglon {cleanValue(row.renglon, "-")}
+                              Renglón {cleanValue(row.renglon, "-")}
                             </span>
                             <span className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
                               {cleanValue(row.codigo_articulo, "S/C")}
@@ -523,7 +492,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                             </div>
                           </label>
                           <label className="block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Accion</span>
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Acción</span>
                             <select
                               value={row.accion_sugerida || "Revisar manualmente"}
                               onChange={(event) => updateRow(index, { accion_sugerida: event.target.value })}
@@ -539,7 +508,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
                         <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-700 lg:grid-cols-3">
                           <div><b>Requisito ACP:</b><br />{cleanValue(row.requisito_acp)}</div>
                           <div><b>Oferta proveedor:</b><br />{cleanValue(row.oferta_proveedor)}</div>
-                          <div><b>Evidencia:</b><br />{cleanValue(row.evidencia)}</div>
+                          <div><b>Evidencia:</b><br />{cleanValue(row.evidencia)}{row.documento_fuente || row.pagina_fuente ? <><br /><span className="text-xs text-muted">Fuente: {cleanValue(row.documento_fuente, "Documento no identificado")}{row.pagina_fuente ? ` · Página ${row.pagina_fuente}` : ""}</span></> : null}</div>
                         </div>
                       </details>
                     </article>
@@ -551,7 +520,7 @@ export function EvaluationConsole({ user }: { user: AuthUser }) {
 
           {activeTab === "resultado" && !rows.length ? (
             <section className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-muted">
-              Todavia no hay resultado. Sube la propuesta del proveedor en Preparar y ejecuta la evaluacion.
+              Todavía no hay resultado. Sube la propuesta del proveedor en Preparar y ejecuta la evaluación.
             </section>
           ) : null}
         </>

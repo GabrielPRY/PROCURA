@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Activity, AlertTriangle, BarChart3, KeyRound, Loader2, RefreshCw, Save, Search, Settings, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BellRing, KeyRound, Loader2, RefreshCw, Save, Search, Send, Settings, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createAdminUser,
@@ -8,13 +8,16 @@ import {
   getAdminApiPricing,
   getAdminApiKeys,
   getAdminUsers,
+  getTelegramNotificationStatus,
   resetAdminUserPassword,
   updateAdminApiKeys,
   updateAdminUserApiKeys,
   updateAdminUserRole,
+  testTelegramNotification,
   type AdminApiKeyStatus,
   type AdminUser,
-  type ApiPricingRow
+  type ApiPricingRow,
+  type TelegramNotificationStatus
 } from "@/lib/admin";
 import { type AuthUser } from "@/lib/auth";
 import { getUsageMetrics, type UsageSummary } from "@/lib/metrics";
@@ -27,17 +30,17 @@ const roles = ["Analista", "Supervisor", "Gerencia", "Admin", "Logistica"];
 const adminTabs = [
   { id: "resumen", label: "Resumen", description: "Consumo, errores y salud operativa." },
   { id: "apis", label: "APIs", description: "Gemini global y estado de llaves." },
-  { id: "usuarios", label: "Usuarios", description: "Roles, contrasenas y accesos." }
+  { id: "usuarios", label: "Usuarios", description: "Roles, contraseñas y accesos." }
 ] as const;
 
 type AdminTab = (typeof adminTabs)[number]["id"];
 
 const roleHelp: Record<string, string> = {
-  Analista: "RFQ, proveedores, historico, costos, seguimiento y logistica.",
-  Supervisor: "Funciones de analista mas Radar SLI y seguimiento supervisor.",
-  Gerencia: "Vista gerencial, metricas, radar, historico y modulos operativos.",
-  Admin: "Administracion, usuarios, roles, configuracion critica y metricas.",
-  Logistica: "Dashboard, logistica, historico y espacios guardados. Puede actualizar tarifas globales."
+  Analista: "RFQ, proveedores, histórico, costos, seguimiento y logística.",
+  Supervisor: "Funciones de analista más Radar SLI y seguimiento supervisor.",
+  Gerencia: "Vista gerencial, métricas, Radar, histórico y módulos operativos.",
+  Admin: "Administración, usuarios, roles, configuración crítica y métricas.",
+  Logistica: "Dashboard, logística, histórico y espacios guardados. Puede actualizar tarifas globales."
 };
 
 function normalizeRole(role: string) {
@@ -72,6 +75,9 @@ export function AdminConsole({ user }: { user: AuthUser }) {
   const [metricsDays, setMetricsDays] = useState(30);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("resumen");
+  const [telegramStatus, setTelegramStatus] = useState<TelegramNotificationStatus | null>(null);
+  const [testingTelegram, setTestingTelegram] = useState(false);
+  const [telegramNotice, setTelegramNotice] = useState<string | null>(null);
 
   async function loadMetrics(days = metricsDays) {
     setLoadingMetrics(true);
@@ -79,7 +85,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
       const metrics = await getUsageMetrics({ days });
       setUsage(metrics.summary);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar las metricas.");
+      setError(err instanceof Error ? err.message : "No se pudieron cargar las métricas.");
     } finally {
       setLoadingMetrics(false);
     }
@@ -89,16 +95,18 @@ export function AdminConsole({ user }: { user: AuthUser }) {
     setError(null);
     setLoading(true);
     try {
-      const [response, apiKeys, metrics, pricingResponse] = await Promise.all([
+      const [response, apiKeys, metrics, pricingResponse, telegramResponse] = await Promise.all([
         getAdminUsers(),
         getAdminApiKeys(),
         getUsageMetrics({ days: metricsDays }),
-        getAdminApiPricing()
+        getAdminApiPricing(),
+        getTelegramNotificationStatus()
       ]);
       setUsers((response.users || []).map((item) => ({ ...item, Nivel: normalizeRole(item.Nivel) })));
       setApiStatus(apiKeys.gemini);
       setUsage(metrics.summary);
       setPricing(pricingResponse.pricing || []);
+      setTelegramStatus(telegramResponse.telegram);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los usuarios.");
     } finally {
@@ -121,6 +129,20 @@ export function AdminConsole({ user }: { user: AuthUser }) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la API Key global.");
     } finally {
       setSavingApiKey(false);
+    }
+  }
+
+  async function sendTelegramTest() {
+    setError(null);
+    setTelegramNotice(null);
+    setTestingTelegram(true);
+    try {
+      await testTelegramNotification();
+      setTelegramNotice("Mensaje de prueba enviado al grupo ACP ALERTAS.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar la prueba a Telegram.");
+    } finally {
+      setTestingTelegram(false);
     }
   }
 
@@ -161,7 +183,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
   async function resetPassword(username: string) {
     const password = resetPasswords[username] || "";
     if (!password.trim()) {
-      setError("Escribe una contrasena nueva antes de resetear.");
+      setError("Escribe una contraseña nueva antes de restablecerla.");
       return;
     }
     setError(null);
@@ -169,7 +191,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
       await resetAdminUserPassword(username, password);
       setResetPasswords((current) => ({ ...current, [username]: "" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo resetear la contrasena.");
+      setError(err instanceof Error ? err.message : "No se pudo restablecer la contraseña.");
     }
   }
 
@@ -228,9 +250,9 @@ export function AdminConsole({ user }: { user: AuthUser }) {
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Modulo Admin"
-          title="Administracion del sistema"
-          copy="Usuarios, roles, llaves API, costos, errores y mantenimiento basico conectado a Supabase por FastAPI."
+          eyebrow="Módulo Administración"
+          title="Administración del sistema"
+          copy="Usuarios, roles, llaves API, costos, errores y mantenimiento básico conectado a Supabase por FastAPI."
           actions={
             <>
               <StatusBadge tone={apiStatus?.configured ? "ok" : "warn"}>Gemini global: {apiStatus?.configured ? "activa" : "pendiente"}</StatusBadge>
@@ -293,7 +315,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               <Activity className="h-4 w-4 text-brand" />
               Monitoreo de consumo y errores
             </div>
-            <p className="mt-2 text-sm leading-6 text-muted">Actividad real del sistema por usuario, modulo, tokens, costos estimados y errores recientes.</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Actividad real del sistema por usuario, módulo, tokens, costos estimados y errores recientes.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -301,10 +323,10 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               onChange={(event) => setMetricsDays(Number(event.target.value))}
               className="h-10 rounded-lg border border-line bg-white px-3 text-sm outline-none"
             >
-              <option value={7}>7 dias</option>
-              <option value={30}>30 dias</option>
-              <option value={90}>90 dias</option>
-              <option value={180}>180 dias</option>
+              <option value={7}>7 días</option>
+              <option value={30}>30 días</option>
+              <option value={90}>90 días</option>
+              <option value={180}>180 días</option>
             </select>
             {loadingMetrics ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : null}
           </div>
@@ -315,7 +337,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             ["Eventos", String(usage?.total_events || 0), "Actividad registrada", BarChart3],
             ["Usuarios activos", String(usage?.active_users || 0), "En el periodo", Users],
             ["Costo estimado", money(usage?.estimated_cost_usd), "APIs IA", KeyRound],
-            ["Errores", String(usage?.errors || 0), "Fallos por modulo", AlertTriangle]
+            ["Errores", String(usage?.errors || 0), "Fallos por módulo", AlertTriangle]
           ].map(([label, value, hint, Icon]) => (
             <div key={String(label)} className="rounded-lg border border-line bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -333,7 +355,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             <div>
               <div className="text-sm font-semibold text-blue-900">Base real del costo API</div>
               <p className="mt-1 text-sm leading-6 text-blue-800">
-                El costo se calcula con tokens reales reportados por Gemini y tarifas guardadas en la tabla api_pricing. Los eventos antiguos sin separacion de entrada/salida se excluyen del costo para no inventar gasto.
+                El costo se calcula con tokens reales reportados por Gemini y tarifas guardadas en la tabla api_pricing. Los eventos antiguos sin separación de entrada y salida se excluyen del costo para no inventar gasto.
               </p>
               {usage?.uncosted_events ? (
                 <div className="mt-2 text-xs font-semibold text-blue-900">
@@ -356,12 +378,12 @@ export function AdminConsole({ user }: { user: AuthUser }) {
 
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <div className="app-workflow-card p-4">
-            <div className="text-sm font-semibold text-slate-900">Uso por modulo</div>
+            <div className="text-sm font-semibold text-slate-900">Uso por módulo</div>
             <div className="mt-3 overflow-hidden rounded-lg border border-line">
               <table className="w-full table-fixed border-collapse text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-muted">
                   <tr>
-                    <th className="border-b border-line px-3 py-2">Modulo</th>
+                    <th className="border-b border-line px-3 py-2">Módulo</th>
                     <th className="border-b border-line px-3 py-2">Eventos</th>
                     <th className="border-b border-line px-3 py-2">Errores</th>
                     <th className="border-b border-line px-3 py-2">Costo</th>
@@ -378,7 +400,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
                   ))}
                   {!moduleUsage.length ? (
                     <tr>
-                      <td colSpan={4} className="px-3 py-5 text-center text-muted">Sin metricas registradas aun.</td>
+                      <td colSpan={4} className="px-3 py-5 text-center text-muted">Sin métricas registradas aún.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -392,7 +414,7 @@ export function AdminConsole({ user }: { user: AuthUser }) {
               {recentErrors.slice(0, 6).map((row, index) => (
                 <div key={index} className="rounded-lg border border-rose-100 bg-rose-50 p-3">
                   <div className="text-sm font-semibold text-rose-800">
-                    {String(row.module || row.Modulo || "Modulo")} | {String(row.action || row.Accion || "Accion")}
+                    {String(row.module || row.Modulo || "Módulo")} | {String(row.action || row.Accion || "Acción")}
                   </div>
                   <div className="mt-1 text-xs text-rose-700">{String(row.error_message || row.error || row.Error || "Sin detalle")}</div>
                 </div>
@@ -456,6 +478,26 @@ export function AdminConsole({ user }: { user: AuthUser }) {
             </Button>
           </div>
           </div>
+        </div>
+        <div className="mt-5 flex flex-col gap-4 border-t border-line pt-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <BellRing className="h-4 w-4 text-brand" />
+              Alertas operativas por Telegram
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Enmiendas, cambios de cierre y procesos en seguimiento. Las credenciales permanecen protegidas en Railway.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StatusBadge tone={telegramStatus?.enabled ? "ok" : "warn"}>{telegramStatus?.enabled ? "Servicio activo" : "Servicio desactivado"}</StatusBadge>
+              <StatusBadge tone={telegramStatus?.configured ? "ok" : "warn"}>{telegramStatus?.configured ? "Grupo configurado" : "Configuración incompleta"}</StatusBadge>
+            </div>
+            {telegramNotice ? <div className="mt-3 text-sm font-semibold text-emerald-700" role="status">{telegramNotice}</div> : null}
+          </div>
+          <Button type="button" onClick={sendTelegramTest} disabled={testingTelegram || !telegramStatus?.configured || !telegramStatus?.enabled} variant="secondary" className="shrink-0">
+            {testingTelegram ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {testingTelegram ? "Enviando..." : "Enviar mensaje de prueba"}
+          </Button>
         </div>
       </section>
 

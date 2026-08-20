@@ -20,7 +20,7 @@ import {
   Warehouse
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type AuthUser } from "@/lib/auth";
+import { normalizeRole, type AuthUser } from "@/lib/auth";
 import {
   deleteLogisticsCalculation,
   getAddressSuggestions,
@@ -255,7 +255,7 @@ function AddressAutocompleteInput({
         ) : null}
       </div>
       {autocompleteError ? <p className="mt-1.5 text-xs font-medium text-rose-700">Autocompletado: {autocompleteError}</p> : null}
-      {!enabled ? <p className="mt-1.5 text-xs text-amber-700">Autocompletado no disponible; puedes ingresar la dirección manualmente.</p> : null}
+      {!enabled ? <p className="mt-1.5 text-xs text-muted">Ingresa la dirección manualmente.</p> : null}
     </div>
   );
 }
@@ -397,8 +397,8 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
   const [savingForwarder, setSavingForwarder] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  const role = String(user.role || "");
-  const canManageLogistics = ["Logistica", "Logística", "Admin"].includes(role);
+  const role = normalizeRole(user.role);
+  const canManageLogistics = role === "Logistica" || role === "Admin";
 
   useEffect(() => {
     const saved = loadLastRfq(user.username);

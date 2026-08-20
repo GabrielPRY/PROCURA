@@ -28,6 +28,10 @@ export type RfqItem = {
   acepta_equivalente?: boolean | string | number | null;
   posible_obsolescencia?: boolean | string | number | null;
   evidencia_tecnica?: string | null;
+  restriccion_detectada?: string | null;
+  restriccion_marca?: string | null;
+  requiere_carta_fabricante?: boolean | string | number | null;
+  observaciones?: string | null;
 };
 
 export type RfqAnalysisResponse = {

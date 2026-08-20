@@ -92,7 +92,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
   }, [days, username, module, refreshTick]);
 
   const errorRate = numberValue(summary?.total_events) ? (numberValue(summary?.errors) / numberValue(summary?.total_events)) * 100 : 0;
-  const healthLabel = errorRate === 0 ? "Estable" : errorRate <= 5 ? "Atencion" : "Critico";
+  const healthLabel = errorRate === 0 ? "Estable" : errorRate <= 5 ? "Atención" : "Crítico";
   const healthTone = errorRate === 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : errorRate <= 5 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-rose-200 bg-rose-50 text-rose-800";
   const cards: Array<[string, string, LucideIcon, string]> = [
     ["Eventos", numberValue(summary?.total_events).toLocaleString(), Activity, "Acciones registradas"],
@@ -107,9 +107,9 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
     <div className="space-y-5">
       <ModuleSection>
         <PageHeader
-          eyebrow="Modulo Metricas"
+          eyebrow="Módulo Métricas"
           title="Consumo y salud operativa"
-          copy="Datos reales de usage_metrics: tokens, costos API, errores, usuarios activos y actividad por modulo."
+          copy="Datos reales de usage_metrics: tokens, costos API, errores, usuarios activos y actividad por módulo."
           actions={
             <>
               <StatusBadge tone={errorRate === 0 ? "ok" : errorRate <= 5 ? "warn" : "danger"}><ShieldCheck className="h-3.5 w-3.5" /> Salud: {healthLabel}</StatusBadge>
@@ -146,7 +146,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
           </select>
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-800">
-          Modulo
+          Módulo
           <select value={module} onChange={(event) => setModule(event.target.value)} className="app-input h-11">
             {(options.modules || ["Todos"]).map((value) => (
               <option key={value} value={value}>
@@ -206,7 +206,7 @@ export function MetricsConsole({ user }: { user: AuthUser }) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <TopTable title="Consumo por modulo" rows={summary?.by_module || []} columns={["module", "action", "tokens"]} />
+        <TopTable title="Consumo por módulo" rows={summary?.by_module || []} columns={["module", "action", "tokens"]} />
         <TopTable title="Consumo por usuario" rows={summary?.by_user || []} columns={["username", "eventos", "tokens"]} />
         <TopTable title="Costo mensual" rows={summary?.by_month || []} columns={["month", "tokens", "costo_estimado"]} />
         <TopTable title="Estados / errores" rows={summary?.by_status || []} columns={["status", "eventos"]} />

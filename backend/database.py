@@ -341,11 +341,27 @@ def init_db():
         nuevas INTEGER DEFAULT 0,
         errores TEXT
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS notification_events (
+        id SERIAL PRIMARY KEY,
+        event_key TEXT UNIQUE NOT NULL,
+        channel TEXT DEFAULT 'telegram',
+        event_type TEXT NOT NULL,
+        numero_licitacion TEXT,
+        owner_username TEXT,
+        payload_json JSONB DEFAULT '{}'::jsonb,
+        status TEXT DEFAULT 'pending',
+        attempts INTEGER DEFAULT 1,
+        last_error TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        sent_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    )''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_notification_events_tender ON notification_events(numero_licitacion)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_notification_events_status ON notification_events(status, updated_at DESC)")
     c.execute('''CREATE TABLE IF NOT EXISTS radar_document_analyses (
         radar_id INTEGER PRIMARY KEY,
         numero_licitacion TEXT NOT NULL,
         numero_enmienda TEXT DEFAULT '',
-        ultima_revision TEXT DEFAULT '',
         ultima_revision TEXT DEFAULT '',
         document_fingerprint TEXT DEFAULT '',
         status TEXT DEFAULT 'completed',
@@ -363,6 +379,8 @@ def init_db():
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS fecha_enmienda_alerta TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS ultima_revision TEXT DEFAULT ''")
     c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS revision_anterior TEXT DEFAULT ''")
+    c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS activo_portal BOOLEAN DEFAULT TRUE")
+    c.execute("ALTER TABLE radar_licitaciones ADD COLUMN IF NOT EXISTS fecha_salida_portal TEXT DEFAULT ''")
     for ddl in [
         "ALTER TABLE radar_escaneos ADD COLUMN IF NOT EXISTS paginas_recorridas INTEGER DEFAULT 0",
         "ALTER TABLE radar_escaneos ADD COLUMN IF NOT EXISTS total_detectadas_portal INTEGER DEFAULT 0",
@@ -490,11 +508,14 @@ def _to_int_or_none(value):
 def normalize_historico_excel_df(df):
     df = df.rename(columns=lambda x: str(x).strip())
     rename_map = {
+        "N° DE LIC": "numero_licitacion",
+        "Nº DE LIC": "numero_licitacion",
         "NÂ° DE LIC": "numero_licitacion",
         "NÃ‚Â° DE LIC": "numero_licitacion",
         "NÂº DE LIC": "numero_licitacion",
         "CODIGO ACP": "codigo_acp",
         "MES": "mes",
+        "AÑO": "anio",
         "AÃ‘O": "anio",
         "AÃƒâ€˜O": "anio",
         "CANT": "cantidad",
@@ -1655,7 +1676,7 @@ def save_history(username, licitacion, items_count):
 def get_user_history_df(username):
     conn = get_connection()
     df = pd.read_sql_query(
-        'SELECT licitacion as "NÂº LicitaciÃ³n", fecha as "Fecha Proceso", items as "Renglones" FROM history WHERE username=%s ORDER BY id DESC',
+        'SELECT licitacion as "Nº Licitación", fecha as "Fecha Proceso", items as "Renglones" FROM history WHERE username=%s ORDER BY id DESC',
         conn, params=(username,))
     conn.close()
     return df
@@ -1865,6 +1886,88 @@ def get_seguimientos(username="", role="Analista"):
         )
     conn.close()
     return df
+
+def get_tracking_notification_candidates():
+    """Cruza procesos en seguimiento con su ultima lectura del Radar SLI."""
+    conn = get_connection()
+    df = pd.read_sql_query(
+        """SELECT
+               s.id AS seguimiento_id,
+               s.numero_licitacion,
+               s.owner_username,
+               s.responsable,
+               s.objeto AS seguimiento_objeto,
+               s.estado AS seguimiento_estado,
+               s.link_sli AS seguimiento_link_sli,
+               s.sli_snapshot_json,
+               s.sli_checked_at,
+               r.objeto AS radar_objeto,
+               r.fecha_cierre,
+               r.link_sli AS radar_link_sli,
+               r.numero_enmienda,
+               r.ultima_revision,
+               r.enmienda_alerta,
+               r.fecha_enmienda_alerta,
+               COALESCE(r.activo_portal, TRUE) AS activo_portal,
+               r.fecha_salida_portal
+           FROM seguimiento_licitaciones s
+           LEFT JOIN radar_licitaciones r
+             ON r.numero_licitacion = s.numero_licitacion
+           ORDER BY s.fecha_registro DESC""",
+        conn,
+    )
+    conn.close()
+    return df
+
+def claim_notification_event(event_key, event_type, numero_licitacion="", owner_username="", payload=None):
+    """Reserva un evento una sola vez; permite hasta tres reintentos si fallo."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO notification_events
+               (event_key, channel, event_type, numero_licitacion, owner_username,
+                payload_json, status, attempts, created_at, updated_at)
+           VALUES (%s, 'telegram', %s, %s, %s, %s::jsonb, 'pending', 1, NOW(), NOW())
+           ON CONFLICT (event_key) DO UPDATE SET
+               status='pending',
+               attempts=notification_events.attempts + 1,
+               last_error='',
+               updated_at=NOW()
+           WHERE notification_events.status='failed'
+             AND notification_events.attempts < 3
+           RETURNING id""",
+        (
+            str(event_key),
+            str(event_type),
+            str(numero_licitacion or ""),
+            str(owner_username or ""),
+            json.dumps(payload or {}, ensure_ascii=False, default=str),
+        ),
+    )
+    row = c.fetchone()
+    conn.commit()
+    conn.close()
+    return int(row[0]) if row else None
+
+def complete_notification_event(event_id, sent, error=""):
+    conn = get_connection()
+    c = conn.cursor()
+    if sent:
+        c.execute(
+            """UPDATE notification_events
+               SET status='sent', sent_at=NOW(), updated_at=NOW(), last_error=''
+               WHERE id=%s""",
+            (int(event_id),),
+        )
+    else:
+        c.execute(
+            """UPDATE notification_events
+               SET status='failed', updated_at=NOW(), last_error=%s
+               WHERE id=%s""",
+            (str(error or "")[:1000], int(event_id)),
+        )
+    conn.commit()
+    conn.close()
 
 def actualizar_estado(licitacion_id, nuevo_estado, nota, registrado_por):
     conn = get_connection()
@@ -2317,8 +2420,9 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
         c.execute("""INSERT INTO radar_licitaciones
             (numero_licitacion, objeto, categoria, monto_estimado, moneda,
              fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
-             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'nueva')
+             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo,
+             score_interes, estado_radar, activo_portal, fecha_salida_portal)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'nueva', TRUE, '')
             ON CONFLICT (numero_licitacion) DO UPDATE SET
                 objeto = EXCLUDED.objeto,
                 categoria = EXCLUDED.categoria,
@@ -2330,6 +2434,8 @@ def guardar_licitacion_radar(numero_licitacion, objeto, categoria, monto_estimad
                 numero_enmienda = EXCLUDED.numero_enmienda,
                 ultima_revision = EXCLUDED.ultima_revision,
                 fecha_ultimo_escaneo = EXCLUDED.fecha_ultimo_escaneo,
+                activo_portal = TRUE,
+                fecha_salida_portal = '',
                 score_interes = EXCLUDED.score_interes,
                 monto_estimado = CASE WHEN EXCLUDED.monto_estimado > 0 THEN EXCLUDED.monto_estimado ELSE radar_licitaciones.monto_estimado END
         """, (numero_licitacion, objeto, categoria, monto_estimado, moneda,
@@ -2425,6 +2531,8 @@ def guardar_licitaciones_radar_bulk(licitaciones):
             fecha,
             score,
             "nueva",
+            True,
+            "",
         ))
 
     if not values:
@@ -2435,7 +2543,8 @@ def guardar_licitaciones_radar_bulk(licitaciones):
         INSERT INTO radar_licitaciones
             (numero_licitacion, objeto, categoria, monto_estimado, moneda,
              fecha_apertura, fecha_cierre, link_sli, es_prioritaria,
-             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo, score_interes, estado_radar)
+             numero_enmienda, ultima_revision, fecha_descubierta, fecha_ultimo_escaneo,
+             score_interes, estado_radar, activo_portal, fecha_salida_portal)
         VALUES %s
         ON CONFLICT (numero_licitacion) DO UPDATE SET
             objeto = EXCLUDED.objeto,
@@ -2448,6 +2557,8 @@ def guardar_licitaciones_radar_bulk(licitaciones):
             numero_enmienda = EXCLUDED.numero_enmienda,
             ultima_revision = EXCLUDED.ultima_revision,
             fecha_ultimo_escaneo = EXCLUDED.fecha_ultimo_escaneo,
+            activo_portal = TRUE,
+            fecha_salida_portal = '',
             score_interes = EXCLUDED.score_interes,
             monto_estimado = CASE WHEN EXCLUDED.monto_estimado > 0 THEN EXCLUDED.monto_estimado ELSE radar_licitaciones.monto_estimado END
     """, values)
@@ -2462,7 +2573,7 @@ def get_licitaciones_radar(solo_nuevas=False, solo_hoy=False):
     """Retorna las licitaciones del radar."""
     conn = get_connection()
     query = "SELECT * FROM radar_licitaciones"
-    conditions = []
+    conditions = ["COALESCE(activo_portal, TRUE) = TRUE"]
     if solo_nuevas:
         conditions.append("estado_radar = 'nueva'")
     if solo_hoy:
@@ -2515,18 +2626,28 @@ def eliminar_licitaciones_radar(ids):
 
 
 def eliminar_radar_fuera_de_numeros(numeros):
-    """Elimina del radar licitaciones que ya no aparecen en el escaneo completo de abiertas."""
+    """Archiva licitaciones que ya no aparecen en el escaneo completo de abiertas."""
     numeros = [str(n).strip() for n in numeros if str(n).strip()]
     if not numeros:
         return 0
     conn = get_connection()
     c = conn.cursor()
     placeholders = ",".join(["%s"] * len(numeros))
-    c.execute(f"DELETE FROM radar_licitaciones WHERE numero_licitacion NOT IN ({placeholders})", tuple(numeros))
-    deleted = c.rowcount
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute(f"""
+        UPDATE radar_licitaciones
+        SET activo_portal=FALSE,
+            fecha_salida_portal=CASE
+                WHEN COALESCE(activo_portal, TRUE)=TRUE THEN %s
+                ELSE fecha_salida_portal
+            END
+        WHERE numero_licitacion NOT IN ({placeholders})
+          AND COALESCE(activo_portal, TRUE)=TRUE
+    """, (fecha, *numeros))
+    archived = c.rowcount
     conn.commit()
     conn.close()
-    return deleted
+    return archived
 
 
 def registrar_escaneo_radar(total, nuevas, errores="", paginas_recorridas=0,

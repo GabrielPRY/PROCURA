@@ -18,6 +18,10 @@ GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite
 RADAR_AUTO_SCAN_ENABLED=true
 RADAR_AUTO_SCAN_INTERVAL_MINUTES=25
 RADAR_AUTO_SCAN_ON_STARTUP=true
+TELEGRAM_NOTIFICATIONS_ENABLED=true
+TELEGRAM_BOT_TOKEN=TOKEN_SECRETO_ENTREGADO_POR_BOTFATHER
+TELEGRAM_CHAT_ID=-5584468781
+TELEGRAM_CLOSE_ALERT_HOURS=72,24,1
 BRAVE_SEARCH_API_KEY=
 GEOAPIFY_API_KEY=PEGAR_API_KEY_DE_GEOAPIFY
 SHIPSTATION_API_KEY=PEGAR_API_KEY_DE_SHIPSTATION
@@ -32,6 +36,7 @@ Notas:
 - `BRAVE_SEARCH_API_KEY` puede quedar vacio por ahora.
 - `GEOAPIFY_API_KEY` habilita el autocompletado de direcciones de Estados Unidos.
 - `SHIPSTATION_API_KEY` habilita la comparación de tarifas. Usa primero una clave sandbox con prefijo `TEST_`.
+- `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` pertenecen exclusivamente al backend y habilitan las alertas del grupo ACP ALERTAS.
 - Las claves de Geoapify y ShipStation pertenecen solo al backend; no deben agregarse al frontend ni subirse a GitHub.
 
 ## Frontend service

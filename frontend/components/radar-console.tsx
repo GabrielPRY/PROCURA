@@ -140,7 +140,7 @@ function isClosingSoon(row: RadarLicitacion) {
   return time >= now && time <= now + 72 * 60 * 60 * 1000;
 }
 
-export function RadarConsole({ user }: { user: AuthUser }) {
+export function RadarConsole({ user, active = true }: { user: AuthUser; active?: boolean }) {
   const [rows, setRows] = useState<RadarLicitacion[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -269,36 +269,38 @@ export function RadarConsole({ user }: { user: AuthUser }) {
   }, [autoRefresh, dateField, dateFrom, dateTo, filterMode, filtersHydrated, hideDiscarded, search, sortMode]);
 
   useEffect(() => {
+    if (!active) return;
     const timer = window.setTimeout(loadRadar, 250);
     return () => window.clearTimeout(timer);
-  }, [search, filterMode]);
+  }, [active, search, filterMode]);
 
   useEffect(() => {
+    if (!active) return;
     void loadRadarHealth();
-  }, []);
+  }, [active]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!active || !autoRefresh) return;
     const intervalMs = Math.max(1, Number(scheduler?.interval_minutes || 25)) * 60 * 1000;
     const timer = window.setInterval(() => {
       void loadRadar();
       void loadRadarHealth();
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [autoRefresh, scheduler?.interval_minutes, search, filterMode]);
+  }, [active, autoRefresh, scheduler?.interval_minutes, search, filterMode]);
 
   useEffect(() => {
-    if (!scheduler?.running && !scheduler?.stale) return;
+    if (!active || (!scheduler?.running && !scheduler?.stale)) return;
     const timer = window.setInterval(async () => {
       await loadRadarHealth();
       await loadRadar();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [scheduler?.running, scheduler?.stale, search, filterMode]);
+  }, [active, scheduler?.running, scheduler?.stale, search, filterMode]);
 
   useEffect(() => {
     let mounted = true;
-    if (!selectedRow?.id) {
+    if (!active || !selectedRow?.id) {
       setHistoricoMatch(null);
       setHistoricoError(null);
       return;
@@ -319,7 +321,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
     return () => {
       mounted = false;
     };
-  }, [selectedRow?.id]);
+  }, [active, selectedRow?.id]);
 
   useEffect(() => {
     setSupervisorNote(selectedRow?.notas || "");
@@ -943,7 +945,7 @@ export function RadarConsole({ user }: { user: AuthUser }) {
               {historicoMatch?.codigo_matches?.length ? (
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                   {historicoMatch.codigo_matches.map((code) => (
-                    <span key={code} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Codigo {code}</span>
+                    <span key={code} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Código {code}</span>
                   ))}
                 </div>
               ) : null}

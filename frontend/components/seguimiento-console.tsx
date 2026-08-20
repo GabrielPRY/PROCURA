@@ -8,13 +8,15 @@ import {
   ExternalLink,
   Loader2,
   MessageSquareText,
+  Plus,
   RefreshCcw,
   Search,
   Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type AuthUser } from "@/lib/auth";
+import { normalizeRole, type AuthUser } from "@/lib/auth";
 import {
+  createSeguimiento,
   deleteSeguimiento,
   getSeguimientoHistorial,
   getSeguimientos,
@@ -162,14 +164,19 @@ function matchesSearch(item: Seguimiento, query: string) {
     .every((term) => haystack.includes(term));
 }
 
-export function SeguimientoConsole({ user }: { user: AuthUser }) {
-  const isGlobalViewer = user.role === "Supervisor" || user.role === "Gerencia";
+export function SeguimientoConsole({ user, active = true }: { user: AuthUser; active?: boolean }) {
+  const normalizedRole = normalizeRole(user.role);
+  const isGlobalViewer = normalizedRole === "Supervisor" || normalizedRole === "Gerencia";
   const [items, setItems] = useState<Seguimiento[]>([]);
   const [selected, setSelected] = useState<Seguimiento | null>(null);
   const [history, setHistory] = useState<SeguimientoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [newTenderNumber, setNewTenderNumber] = useState("");
+  const [newTenderName, setNewTenderName] = useState("");
+  const [addingTender, setAddingTender] = useState(false);
+  const [addNotice, setAddNotice] = useState<{ tone: "success" | "warning"; message: string } | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [alertsOnly, setAlertsOnly] = useState(false);
@@ -211,12 +218,13 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
   }
 
   useEffect(() => {
+    if (!active) return;
     initialSyncRef.current = false;
     setSelected(null);
     setSliResults({});
     setSyncMeta({});
     void refresh();
-  }, [user.role, user.username]);
+  }, [active, user.role, user.username]);
 
   async function loadHistory(itemId: number) {
     try {
@@ -258,7 +266,7 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
     const rfq = cleanRfq(item.numero_licitacion);
     if (!rfq) {
       setSliErrors((current) => ({ ...current, [item.id]: "Número de licitación inválido." }));
-      return;
+      return false;
     }
     setSliLoading((current) => ({ ...current, [item.id]: true }));
     setSliErrors((current) => {
@@ -293,10 +301,78 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
         setSelected((current) => current?.id === item.id ? updated : current);
         if (selected?.id === item.id) await loadHistory(item.id);
       }
+      return true;
     } catch (err) {
       setSliErrors((current) => ({ ...current, [item.id]: err instanceof Error ? err.message : "No se pudo consultar el SLI." }));
+      return false;
     } finally {
       setSliLoading((current) => ({ ...current, [item.id]: false }));
+    }
+  }
+
+  async function addTenderToTracking(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const numero = cleanRfq(newTenderNumber);
+    const nombre = newTenderName.trim();
+    setError(null);
+    setAddNotice(null);
+
+    if (numero.length < 4 || numero.length > 12) {
+      setError("Ingresa un número de licitación válido del SLI.");
+      return;
+    }
+
+    if (nombre.length < 3) {
+      setError("Escribe el nombre u objeto de la licitación.");
+      return;
+    }
+
+    const existing = items.find((item) => {
+      const sameTender = cleanRfq(item.numero_licitacion) === numero;
+      const owner = String(item.owner_username || item.responsable || "").trim().toLowerCase();
+      return sameTender && owner === user.username.trim().toLowerCase();
+    });
+    if (existing) {
+      setSelected(existing);
+      setAddNotice({ tone: "warning", message: `La licitación ${numero} ya está en tu seguimiento.` });
+      void openItem(existing);
+      return;
+    }
+
+    setAddingTender(true);
+    try {
+      const response = await createSeguimiento({
+        numero_licitacion: numero,
+        owner_username: user.username,
+        objeto: nombre,
+        responsable: user.username,
+        notas: "Agregada manualmente para seguimiento y sincronización automática con el SLI."
+      });
+      const created = response.seguimiento;
+      if (!created?.id) throw new Error("La licitación se guardó, pero no fue posible recuperar el registro.");
+
+      setItems((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+      setSelected(created);
+      setNewTenderNumber("");
+      setNewTenderName("");
+      setAddNotice({
+        tone: "success",
+        message: `Licitación ${numero} añadida. Consultando sus datos en el SLI...`
+      });
+      void (async () => {
+        const synced = await checkSli(created, true);
+        await refresh();
+        setAddNotice({
+          tone: synced ? "success" : "warning",
+          message: synced
+            ? `Licitación ${numero} añadida y sincronizada con el SLI.`
+            : `Licitación ${numero} añadida. El SLI no respondió; puedes sincronizarla nuevamente desde la lista.`
+        });
+      })();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo añadir la licitación al seguimiento.");
+    } finally {
+      setAddingTender(false);
     }
   }
 
@@ -325,16 +401,17 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
   }
 
   useEffect(() => {
-    if (loading || initialSyncRef.current || !items.length) return;
+    if (!active || loading || initialSyncRef.current || !items.length) return;
     initialSyncRef.current = true;
     const timer = window.setTimeout(() => void syncItems(nextAutomaticBatch()), 600);
     return () => window.clearTimeout(timer);
-  }, [items.length, loading]);
+  }, [active, items.length, loading]);
 
   useEffect(() => {
+    if (!active) return;
     const interval = window.setInterval(() => void syncItems(nextAutomaticBatch()), 25 * 60 * 1000);
     return () => window.clearInterval(interval);
-  }, [user.role, user.username]);
+  }, [active, user.role, user.username]);
 
   async function removeItem(item: Seguimiento) {
     if (!window.confirm(`¿Eliminar la licitación ${item.numero_licitacion} de tu seguimiento?`)) return;
@@ -386,13 +463,68 @@ export function SeguimientoConsole({ user }: { user: AuthUser }) {
               variant="primary"
             >
               {bulkSync.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              {bulkSync.running ? `${bulkSync.done}/${bulkSync.total}` : "Sincronizar SLI"}
+              {bulkSync.running ? `Sincronizando ${bulkSync.done} de ${bulkSync.total}` : "Sincronizar SLI"}
             </Button>
           }
         />
       </ModuleSection>
 
       {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{error}</div> : null}
+
+      <ModuleSection>
+        <form onSubmit={addTenderToTracking} className="space-y-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-ink">Añadir una licitación</h2>
+            <p className="mt-1 text-sm leading-6 text-muted">Identifica el proceso con su número y nombre. El estado, las fechas y los cambios se consultan automáticamente en el SLI.</p>
+          </div>
+          <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(180px,0.34fr)_minmax(260px,1fr)_auto] lg:items-end">
+            <label className="min-w-0">
+              <span className="mb-2 block text-xs font-semibold text-ink">Número de licitación</span>
+              <input
+                value={newTenderNumber}
+                onChange={(event) => {
+                  setNewTenderNumber(event.target.value.replace(/\D/g, ""));
+                  setAddNotice(null);
+                }}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="Ej. 214490"
+                className="app-input h-11 w-full"
+                aria-label="Número de licitación"
+                disabled={addingTender}
+              />
+            </label>
+            <label className="min-w-0">
+              <span className="mb-2 block text-xs font-semibold text-ink">Nombre u objeto de la licitación</span>
+              <input
+                value={newTenderName}
+                onChange={(event) => {
+                  setNewTenderName(event.target.value);
+                  setAddNotice(null);
+                }}
+                autoComplete="off"
+                placeholder="Ej. Suministro de bombas de diafragma"
+                className="app-input h-11 w-full"
+                aria-label="Nombre u objeto de la licitación"
+                maxLength={240}
+                disabled={addingTender}
+              />
+            </label>
+            <Button type="submit" variant="primary" disabled={addingTender || !cleanRfq(newTenderNumber) || newTenderName.trim().length < 3} className="shrink-0">
+              {addingTender ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {addingTender ? "Añadiendo..." : "Añadir"}
+            </Button>
+          </div>
+        </form>
+        {addNotice ? (
+          <div
+            className={`mt-4 rounded-lg border px-4 py-3 text-sm ${addNotice.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}
+            role="status"
+          >
+            {addNotice.message}
+          </div>
+        ) : null}
+      </ModuleSection>
 
       <ModuleSection className="p-0">
         <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
