@@ -9,8 +9,25 @@ export type SliActa = {
   menciona_proyelec?: boolean;
   menciona_ep_international?: boolean;
   posible_adjudicacion_propia?: boolean;
+  adjudicacion?: SliAwardResult;
   cumplimiento_tecnico?: "cumple" | "no_cumple" | "indeterminado";
   error?: string | null;
+};
+
+export type SliAwardResult = {
+  confirmada?: boolean;
+  empresa_adjudicada?: string;
+  monto_adjudicado?: string;
+  moneda?: string;
+  evidencia?: string;
+  es_propia?: boolean;
+};
+
+export type SliAcpStatus = {
+  code?: string;
+  label?: string;
+  final?: boolean;
+  stage?: string;
 };
 
 export type SliDetectedItem = {
@@ -30,6 +47,8 @@ export type SliLookupResult = {
   ultima_revision?: string | null;
   numero_enmienda?: string | null;
   agente_compras?: string | null;
+  estado_acp?: SliAcpStatus;
+  adjudicacion?: SliAwardResult;
   codigos_acp_detectados?: string[];
   renglones_detectados?: SliDetectedItem[];
   renglones_detectados_count?: number;

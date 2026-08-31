@@ -225,6 +225,103 @@ def _tracking_snapshot(value):
         return {}
 
 
+def _fold_sli_text(value: Any) -> str:
+    raw = str(value or "").strip()
+    return "".join(
+        char for char in unicodedata.normalize("NFD", raw.upper())
+        if unicodedata.category(char) != "Mn"
+    )
+
+
+SLI_STATUS_DEFINITIONS = {
+    "ABIERTAS": {"label": "Abiertas", "final": False, "stage": "open"},
+    "ANUNCIO_VENCIDO": {"label": "Anuncio vencido", "final": False, "stage": "pending_result"},
+    "CANCELACION_DEL_ACTO": {"label": "Cancelación del acto", "final": True, "stage": "cancelled"},
+    "EVALUACION": {"label": "Evaluación", "final": False, "stage": "evaluation"},
+    "ENMENDADA": {"label": "Enmendada", "final": False, "stage": "amended"},
+    "ACTO_DESIERTO": {"label": "Acto desierto", "final": True, "stage": "deserted"},
+    "ADJUDICACION": {"label": "Adjudicación", "final": True, "stage": "award"},
+    "PRECALIFICACION_CONCLUIDA": {"label": "Precalificación concluida", "final": False, "stage": "prequalification"},
+}
+
+
+def _normalize_sli_status(value: Any) -> Dict[str, Any]:
+    text = _fold_sli_text(value)
+    checks = [
+        ("CANCELACION DEL ACTO", "CANCELACION_DEL_ACTO"),
+        ("ACTO DESIERTO", "ACTO_DESIERTO"),
+        ("PRECALIFICACION CONCLUIDA", "PRECALIFICACION_CONCLUIDA"),
+        ("ANUNCIO VENCIDO", "ANUNCIO_VENCIDO"),
+        ("ADJUDICACION", "ADJUDICACION"),
+        ("EVALUACION", "EVALUACION"),
+        ("ENMENDADA", "ENMENDADA"),
+        ("ABIERT", "ABIERTAS"),
+    ]
+    for marker, code in checks:
+        if marker in text:
+            return {"code": code, **SLI_STATUS_DEFINITIONS[code]}
+    return {"code": "DESCONOCIDO", "label": str(value or "No identificado").strip() or "No identificado", "final": False, "stage": "unknown"}
+
+
+def _clean_award_company(value: str) -> str:
+    candidate = re.sub(r"\s+", " ", str(value or "")).strip(" .,:;|-\t\r\n")
+    candidate = re.sub(r"^(?:a\s+)?(?:la\s+)?(?:empresa|sociedad|firma|proveedor|proponente)\s+", "", candidate, flags=re.IGNORECASE)
+    candidate = re.split(r"\s+(?:por|para|conforme|seg[uú]n|mediante)\s+", candidate, maxsplit=1, flags=re.IGNORECASE)[0]
+    if len(candidate) < 3 or len(candidate) > 180:
+        return ""
+    if _fold_sli_text(candidate) in {"LA EMPRESA", "EL PROVEEDOR", "EL PROPONENTE", "N/A", "NO APLICA"}:
+        return ""
+    return candidate
+
+
+def _extract_award_result(texto_acta: str) -> Dict[str, Any]:
+    """Extrae solo adjudicaciones explicitamente respaldadas por un acta o resultado SLI."""
+    source = re.sub(r"\s+", " ", str(texto_acta or "")).strip()
+    empty = {
+        "confirmada": False,
+        "empresa_adjudicada": "",
+        "monto_adjudicado": "",
+        "moneda": "",
+        "evidencia": "",
+        "es_propia": False,
+    }
+    if not source:
+        return empty
+
+    patterns = [
+        r"(?:empresa|proveedor|proponente|contratista)\s+(?:adjudicad[oa]|ganador(?:a)?|seleccionad[oa])\s*[:\-]\s*([^\n.;]{3,180})",
+        r"(?:se\s+)?adjudica(?:\s+(?:la|el)\s+(?:licitaci[oó]n|contrato|acto|proceso|rengl[oó]n|orden(?:\s+de\s+compra)?))?\s+(?:a|al)\s+([^\n.;]{3,180})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, source, flags=re.IGNORECASE)
+        if not match:
+            continue
+        company = _clean_award_company(match.group(1))
+        if not company:
+            continue
+        start = max(0, match.start() - 120)
+        end = min(len(source), match.end() + 180)
+        evidence = source[start:end].strip()
+        amount_match = re.search(r"(?:USD|US\$|B/\.|PAB|\$)\s*[\d]{1,3}(?:[,.][\d]{3})*(?:[,.]\d{2})?", evidence, flags=re.IGNORECASE)
+        amount = amount_match.group(0) if amount_match else ""
+        currency = ""
+        amount_upper = amount.upper()
+        if "USD" in amount_upper or "US$" in amount_upper or "$" in amount_upper:
+            currency = "USD"
+        elif "B/." in amount_upper or "PAB" in amount_upper:
+            currency = "PAB"
+        company_folded = _fold_sli_text(company)
+        return {
+            "confirmada": True,
+            "empresa_adjudicada": company,
+            "monto_adjudicado": amount,
+            "moneda": currency,
+            "evidencia": evidence[:650],
+            "es_propia": "PROYELEC" in company_folded or "EP INTERNATIONAL" in company_folded,
+        }
+    return empty
+
+
 def _notification_bool(value, default=True):
     if value is None:
         return default
@@ -317,9 +414,12 @@ def process_tracking_notifications():
         amendment_flag = _notification_bool(row.get("enmienda_alerta"), default=False)
         snapshots = [_tracking_snapshot(item.get("sli_snapshot_json")) for item in rows]
         previous = next((snapshot for snapshot in snapshots if snapshot), {})
-        previous_amendment = str(previous.get("numero_enmienda") or "").strip()
-        previous_revision = str(previous.get("ultima_revision") or "").strip()
-        previous_close = str(previous.get("fecha_cierre") or "").strip()
+        previous_amendments = [str(snapshot.get("numero_enmienda") or "").strip() for snapshot in snapshots if snapshot]
+        previous_revisions = [str(snapshot.get("ultima_revision") or "").strip() for snapshot in snapshots if snapshot]
+        previous_closes = [str(snapshot.get("fecha_cierre") or "").strip() for snapshot in snapshots if snapshot]
+        previous_amendment = next((value for value in previous_amendments if value and value != enmienda), "") or str(previous.get("numero_enmienda") or "").strip()
+        previous_revision = next((value for value in previous_revisions if value and value != revision), "") or str(previous.get("ultima_revision") or "").strip()
+        previous_close = next((value for value in previous_closes if value and value != cierre), "") or str(previous.get("fecha_cierre") or "").strip()
         transitions_ok = True
 
         amendment_changed = bool(
@@ -328,13 +428,14 @@ def process_tracking_notifications():
             or (revision and previous_revision and revision != previous_revision)
         )
         if amendment_changed:
-            value = enmienda or revision or str(row.get("fecha_enmienda_alerta") or "cambio")
+            detected_at = str(row.get("fecha_enmienda_alerta") or "").strip()
+            value = f"enmienda={enmienda}|revision={revision}|detectado={detected_at}"
             text = "\n".join([
                 "NUEVA ENMIENDA O REVISION", "", f"Licitacion: {numero}", f"Objeto: {objeto}",
                 f"Cambio: {previous_amendment or previous_revision or 'version anterior'} -> {enmienda or revision or 'nueva revision'}",
                 f"Cierre: {cierre or 'No especificado'}", f"Dirigida a: {destinatarios}", "", f"Revisar SLI: {link}",
             ])
-            transitions_ok = deliver(numero, rows, "amendment", value, text, {"enmienda": enmienda, "revision": revision, "cierre": cierre}) and transitions_ok
+            transitions_ok = deliver(numero, rows, "amendment", value, text, {"enmienda": enmienda, "revision": revision, "detectado": detected_at, "cierre": cierre}) and transitions_ok
 
         if previous_close and cierre and previous_close != cierre:
             text = "\n".join([
@@ -342,7 +443,7 @@ def process_tracking_notifications():
                 f"Cierre anterior: {previous_close}", f"Nuevo cierre: {cierre}",
                 f"Dirigida a: {destinatarios}", "", f"Revisar SLI: {link}",
             ])
-            transitions_ok = deliver(numero, rows, "close_changed", cierre, text, {"anterior": previous_close, "nuevo": cierre}) and transitions_ok
+            transitions_ok = deliver(numero, rows, "close_changed", f"{previous_close}->{cierre}", text, {"anterior": previous_close, "nuevo": cierre}) and transitions_ok
 
         if not active:
             left_at = str(row.get("fecha_salida_portal") or "sin_fecha").strip()
@@ -376,6 +477,178 @@ def process_tracking_notifications():
                 db.guardar_snapshot_sli(int(item["seguimiento_id"]), merged)
 
     return stats
+
+
+def _snapshot_acp_status(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    state = snapshot.get("estado_acp") if isinstance(snapshot, dict) else None
+    if isinstance(state, dict) and state.get("code"):
+        return state
+    return _normalize_sli_status((snapshot or {}).get("estatus"))
+
+
+def _tracking_internal_status(state_code: str) -> str:
+    return {
+        "EVALUACION": "En Evaluacion ACP",
+        "ANUNCIO_VENCIDO": "Pendiente de resultado",
+        "ADJUDICACION": "Adjudicacion publicada",
+        "ACTO_DESIERTO": "Desierta",
+        "CANCELACION_DEL_ACTO": "Cancelada",
+        "PRECALIFICACION_CONCLUIDA": "Precalificacion concluida",
+    }.get(state_code, "")
+
+
+def _tracking_recipients(rows: List[Dict[str, Any]]) -> str:
+    owners = sorted({
+        str(row.get("owner_username") or row.get("responsable") or "").strip()
+        for row in rows
+        if str(row.get("owner_username") or row.get("responsable") or "").strip()
+    })
+    return ", ".join(owners) or "Equipo de Procura"
+
+
+def _send_tracking_status_event(numero: str, rows: List[Dict[str, Any]], event_type: str, event_value: str, text: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    return notification_service.send_telegram_once(
+        db,
+        event_key=_notification_event_key("telegram", numero, event_type, event_value),
+        event_type=event_type,
+        numero_licitacion=numero,
+        owner_username=_tracking_recipients(rows),
+        text=text,
+        payload=payload,
+    )
+
+
+def _apply_tracked_sli_result(numero: str, rows: List[Dict[str, Any]], result: Dict[str, Any], *, persist: bool, apply_status: bool = True) -> Dict[str, int]:
+    """Compara una lectura directa del SLI contra el último snapshot y notifica transiciones reales."""
+    stats = {"sent": 0, "duplicates": 0, "errors": 0, "updated": 0}
+    if not result or result.get("error"):
+        return stats
+
+    current_state = result.get("estado_acp") if isinstance(result.get("estado_acp"), dict) else _normalize_sli_status(result.get("estatus"))
+    current_code = str(current_state.get("code") or "DESCONOCIDO")
+    if current_code == "DESCONOCIDO":
+        return stats
+
+    snapshots = [_tracking_snapshot(row.get("sli_snapshot_json")) for row in rows]
+    known_states = [_snapshot_acp_status(snapshot).get("code") for snapshot in snapshots if snapshot]
+    prior_code = next((code for code in known_states if code and code != current_code), "")
+    has_baseline = bool(known_states)
+    object_name = str(rows[0].get("seguimiento_objeto") or result.get("descripcion") or "Sin nombre registrado").strip()
+    recipients = _tracking_recipients(rows)
+    link = str(result.get("url") or rows[0].get("seguimiento_link_sli") or rows[0].get("radar_link_sli") or "").strip()
+    award = result.get("adjudicacion") if isinstance(result.get("adjudicacion"), dict) else {}
+    award_company = str(award.get("empresa_adjudicada") or "").strip()
+    award_amount = str(award.get("monto_adjudicado") or "").strip()
+    state_changed = bool(has_baseline and prior_code and prior_code != current_code)
+
+    def deliver(event_type: str, event_value: str, text: str, payload: Dict[str, Any]):
+        delivery = _send_tracking_status_event(numero, rows, event_type, event_value, text, payload)
+        if delivery.get("duplicate"):
+            stats["duplicates"] += 1
+        elif delivery.get("ok"):
+            stats["sent"] += 1
+        elif not delivery.get("skipped"):
+            stats["errors"] += 1
+            logger.warning(f"[TELEGRAM] Fallo evento {event_type} RFQ {numero}: {delivery.get('error')}")
+
+    # ENMENDADA se comunica mediante la alerta especializada de enmienda del Radar.
+    if state_changed and current_code not in {"ABIERTAS", "ENMENDADA"}:
+        lines = [
+            "ESTADO ACP ACTUALIZADO", "", f"Licitacion: {numero}", f"Objeto: {object_name}",
+            f"Cambio: {_normalize_sli_status(prior_code).get('label', prior_code)} -> {current_state.get('label', current_code)}",
+        ]
+        if current_code == "ADJUDICACION":
+            if award.get("confirmada") and award_company:
+                lines.append(f"Empresa adjudicada: {award_company}")
+                if award_amount:
+                    lines.append(f"Monto identificado: {award_amount}")
+            else:
+                lines.append("Resultado publicado; pendiente de confirmar empresa adjudicada en el acta.")
+        lines.extend([f"Dirigida a: {recipients}", "", f"Revisar SLI: {link}"])
+        deliver("sli_status", f"{prior_code}->{current_code}", "\n".join(lines), {"anterior": prior_code, "actual": current_code, "adjudicacion": award})
+
+    previous_closes = [str(snapshot.get("fecha_cierre") or "").strip() for snapshot in snapshots if snapshot]
+    current_close = str(result.get("fecha_cierre") or "").strip()
+    prior_close = next((value for value in previous_closes if value and value != current_close), "")
+    if has_baseline and prior_close and current_close and prior_close != current_close and not state_changed:
+        deliver(
+            "close_changed",
+            f"{prior_close}->{current_close}",
+            "\n".join([
+                "CAMBIO DE FECHA DE CIERRE", "", f"Licitacion: {numero}", f"Objeto: {object_name}",
+                f"Cierre anterior: {prior_close}", f"Nuevo cierre: {current_close}",
+                f"Dirigida a: {recipients}", "", f"Revisar SLI: {link}",
+            ]),
+            {"anterior": prior_close, "nuevo": current_close},
+        )
+
+    previous_awards = {
+        "|".join([
+            str((snapshot.get("adjudicacion") or {}).get("empresa_adjudicada") or "").strip().lower(),
+            str((snapshot.get("adjudicacion") or {}).get("monto_adjudicado") or "").strip().lower(),
+        ])
+        for snapshot in snapshots
+        if snapshot
+    }
+    award_signature = f"{award_company.lower()}|{award_amount.lower()}"
+    if has_baseline and current_code == "ADJUDICACION" and award.get("confirmada") and award_company and not state_changed and award_signature not in previous_awards:
+        lines = [
+            "RESULTADO DE ADJUDICACION", "", f"Licitacion: {numero}", f"Objeto: {object_name}",
+            f"Empresa adjudicada: {award_company}",
+        ]
+        if award_amount:
+            lines.append(f"Monto identificado: {award_amount}")
+        lines.extend([f"Dirigida a: {recipients}", "", f"Revisar SLI: {link}"])
+        deliver("award_result", award_signature, "\n".join(lines), {"empresa": award_company, "monto": award_amount, "evidencia": award.get("evidencia", "")})
+
+    next_internal_status = _tracking_internal_status(current_code)
+    for row in rows:
+        tracking_id = int(row["seguimiento_id"])
+        if apply_status and next_internal_status and str(row.get("seguimiento_estado") or "") != next_internal_status:
+            note = f"Estado ACP sincronizado: {current_state.get('label', current_code)}."
+            if current_code == "ADJUDICACION" and award.get("confirmada") and award_company:
+                note += f" Empresa adjudicada: {award_company}."
+            db.actualizar_estado(tracking_id, next_internal_status, note, "Sistema SLI")
+            stats["updated"] += 1
+        if persist:
+            db.guardar_snapshot_sli(tracking_id, result)
+    return stats
+
+
+def sync_tracked_tenders_from_sli() -> Dict[str, int]:
+    """Consulta el detalle SLI por número para cada proceso seguido, incluso si ya salió de abiertas."""
+    totals = {"checked": 0, "sent": 0, "duplicates": 0, "errors": 0, "updated": 0}
+    try:
+        candidates = db.get_tracking_notification_candidates()
+    except Exception as exc:
+        logger.warning(f"[SEGUIMIENTO SLI] No se pudieron cargar seguimientos: {exc}")
+        totals["errors"] += 1
+        return totals
+    if candidates is None or candidates.empty:
+        return totals
+
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for row in candidates.to_dict(orient="records"):
+        numero = "".join(filter(str.isdigit, str(row.get("numero_licitacion") or "")))
+        if numero:
+            grouped.setdefault(numero, []).append(row)
+
+    max_per_scan = max(1, int(os.getenv("SEGUIMIENTO_SLI_MAX_PER_SCAN", "20") or 20))
+    for numero, rows in list(grouped.items())[:max_per_scan]:
+        try:
+            result = consultar_sli(numero, _token=INTERNAL_API_TOKEN)
+            result_stats = _apply_tracked_sli_result(numero, rows, result, persist=True)
+            totals["checked"] += 1
+            for key in ("sent", "duplicates", "errors", "updated"):
+                totals[key] += result_stats[key]
+        except HTTPException as exc:
+            totals["errors"] += 1
+            logger.warning(f"[SEGUIMIENTO SLI] RFQ {numero}: {exc.detail}")
+        except Exception as exc:
+            totals["errors"] += 1
+            logger.exception(f"[SEGUIMIENTO SLI] Error consultando RFQ {numero}: {exc}")
+    return totals
+
 
 def verify_internal_token(x_internal_token: str = Header(None)):
     if x_internal_token != INTERNAL_API_TOKEN:
@@ -479,6 +752,11 @@ def run_radar_auto_scan(source="scheduler"):
         logger.info(f"[RADAR AUTO] Iniciando escaneo SLI ({source}).")
         result = sli_scraper.ejecutar_radar_detallado(db_module=db)
         result_summary = {key: value for key, value in result.items() if key != "licitaciones"}
+        try:
+            result_summary["seguimiento_sli"] = sync_tracked_tenders_from_sli()
+        except Exception as tracking_error:
+            logger.exception(f"[SEGUIMIENTO SLI] No se pudieron sincronizar procesos seguidos: {tracking_error}")
+            result_summary["seguimiento_sli"] = {"checked": 0, "sent": 0, "errors": 1, "error": str(tracking_error)[:500]}
         try:
             result_summary["notifications"] = process_tracking_notifications()
         except Exception as notification_error:
@@ -5112,6 +5390,22 @@ def seguimiento_save_sli_snapshot(
     serialized = json.dumps(req.snapshot or {}, ensure_ascii=False, default=str)
     if len(serialized) > 250_000:
         raise HTTPException(status_code=413, detail="La respuesta del SLI excede el tamaño permitido.")
+    try:
+        candidates = db.get_tracking_notification_candidates()
+        if candidates is not None and not candidates.empty:
+            matching_rows = [
+                row for row in candidates.to_dict(orient="records")
+                if int(row.get("seguimiento_id") or 0) == int(licitacion_id)
+            ]
+            if matching_rows:
+                numero = "".join(filter(str.isdigit, str(matching_rows[0].get("numero_licitacion") or "")))
+                related_rows = [
+                    row for row in candidates.to_dict(orient="records")
+                    if "".join(filter(str.isdigit, str(row.get("numero_licitacion") or ""))) == numero
+                ]
+                _apply_tracked_sli_result(numero, related_rows, req.snapshot or {}, persist=False, apply_status=False)
+    except Exception as exc:
+        logger.warning(f"[SEGUIMIENTO SLI] No se pudo evaluar cambio manual para {licitacion_id}: {exc}")
     saved = db.guardar_snapshot_sli(licitacion_id, req.snapshot)
     if not saved:
         raise HTTPException(status_code=404, detail="El seguimiento no existe.")
@@ -5333,16 +5627,14 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
         )
         menciona_proyelec = "proyelec" in texto_normalizado
         menciona_ep = bool(re.search(r"\bep\s+international\b", texto_normalizado))
+        adjudicacion = _extract_award_result(texto_acta)
         contextos_empresa = re.findall(
             r".{0,180}(?:proyelec|ep\s+international).{0,180}",
             texto_normalizado,
             flags=re.IGNORECASE,
         )
         contexto_empresa = " ".join(contextos_empresa)
-        posible_adjudicacion = bool(
-            contexto_empresa
-            and re.search(r"adjudicad[oa]|se\s+adjudica|orden\s+adjudicada", contexto_empresa)
-        )
+        posible_adjudicacion = bool(adjudicacion.get("confirmada") and adjudicacion.get("es_propia"))
         if contexto_empresa and re.search(r"no\s+cumple|incumple|no\s+conforme|descalific", contexto_empresa):
             cumplimiento_tecnico = "no_cumple"
         elif contexto_empresa and re.search(r"\bcumple\b|\bconforme\b|cumplimiento\s+tecnico", contexto_empresa):
@@ -5385,6 +5677,7 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
             "menciona_proyelec": menciona_proyelec,
             "menciona_ep_international": menciona_ep,
             "posible_adjudicacion_propia": posible_adjudicacion,
+            "adjudicacion": adjudicacion,
             "cumplimiento_tecnico": cumplimiento_tecnico,
             "error": None
         }
@@ -5683,6 +5976,11 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
                 "Verifica el número de licitación o intenta más tarde."
             )
 
+        estado_acp = _normalize_sli_status(resultado.get("estatus"))
+        adjudicacion = (resultado.get("resumen_acta") or {}).get("adjudicacion") or _extract_award_result("")
+        resultado["estado_acp"] = estado_acp
+        resultado["adjudicacion"] = adjudicacion
+
         logger.info(
             f"Consulta SLI {rfq_id}: "
             f"estatus={resultado['estatus']} | "
@@ -5697,8 +5995,10 @@ def consultar_sli(rfq_id: str, _token: str = Depends(verify_internal_token)):
             duration_ms=int((time.perf_counter() - started_at) * 1000),
             metadata={
                 "estatus": resultado.get("estatus"),
+                "estado_acp": estado_acp.get("code"),
                 "descripcion_detectada": bool(resultado.get("descripcion")),
                 "acta_disponible": bool((resultado.get("resumen_acta") or {}).get("disponible")),
+                "adjudicacion_confirmada": bool(adjudicacion.get("confirmada")),
                 "codigos_acp_detectados": len(codigos_acp_detectados),
                 "renglones_detectados": len(renglones_detectados)
             }

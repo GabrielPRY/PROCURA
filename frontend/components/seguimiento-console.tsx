@@ -48,11 +48,11 @@ type BadgeTone = "neutral" | "info" | "ok" | "warn" | "danger";
 
 function statusTone(status?: string | null): BadgeTone {
   const normalized = normalizeStatus(status);
-  if (normalized.includes("no cumple") || normalized.includes("no adjudicada") || normalized.includes("desierta")) return "danger";
+  if (normalized.includes("no cumple") || normalized.includes("no adjudicada") || normalized.includes("desierta") || normalized.includes("cancelacion") || normalized.includes("cancelada")) return "danger";
   if (normalized.includes("adjudicada") || normalized.includes("cumple")) return "ok";
   if (normalized.includes("evaluacion") || normalized.includes("enviada")) return "info";
   if (normalized.includes("anuncio") || normalized.includes("abierta")) return "ok";
-  if (normalized.includes("cerrada") || normalized.includes("adjudicacion")) return "warn";
+  if (normalized.includes("cerrada") || normalized.includes("adjudicacion") || normalized.includes("enmendada") || normalized.includes("precalificacion") || normalized.includes("pendiente")) return "warn";
   return "neutral";
 }
 
@@ -124,13 +124,20 @@ function displayStatus(value?: string | null) {
 
 function suggestedEstadoFromSli(result?: SliLookupResult | null, current = "En Preparacion") {
   const acta = result?.resumen_acta;
-  if (acta?.posible_adjudicacion_propia) return "Adjudicada";
+  const acpCode = result?.estado_acp?.code || "";
+  if (acpCode === "ACTO_DESIERTO") return "Desierta";
+  if (acpCode === "CANCELACION_DEL_ACTO") return "Cancelada";
+  if (acpCode === "EVALUACION") return "En Evaluacion ACP";
+  if (acpCode === "ANUNCIO_VENCIDO") return "Pendiente de resultado";
+  if (acpCode === "PRECALIFICACION_CONCLUIDA") return "Precalificacion concluida";
+  if (acpCode === "ADJUDICACION") return acta?.posible_adjudicacion_propia ? "Adjudicada" : "Adjudicacion publicada";
   if (acta?.cumplimiento_tecnico === "no_cumple") return "No Cumple Tecnicamente";
   if (acta?.cumplimiento_tecnico === "cumple") return "Cumple Tecnicamente";
   const status = normalizeStatus(result?.estatus);
   if (status.includes("no adjudicada") || status.includes("no adjudicado")) return "No Adjudicada";
   if (status.includes("adjudicada") || status.includes("adjudicado")) return "Adjudicada";
-  if (status.includes("adjudicacion") || status.includes("evalu") || status.includes("cerrada")) return "En Evaluacion Economica";
+  if (status.includes("adjudicacion")) return "Adjudicacion publicada";
+  if (status.includes("evalu") || status.includes("cerrada")) return "En Evaluacion ACP";
   if (status.includes("desierta") || status.includes("acto desierto")) return "Desierta";
   if (status.includes("anuncio")) return "ANUNCIO";
   if (status.includes("abierta")) return current.includes("Oferta Enviada") ? current : "ABIERTA";
@@ -141,6 +148,13 @@ function sliOperationalAlert(item: Seguimiento, result?: SliLookupResult | null)
   if (!result) return "";
   if (result.error) return result.error;
   const acta = result.resumen_acta;
+  const acpCode = result.estado_acp?.code;
+  if (acpCode === "ADJUDICACION" && result.adjudicacion?.confirmada) return `Resultado publicado: ${result.adjudicacion.empresa_adjudicada || "empresa adjudicada detectada"}.`;
+  if (acpCode === "ADJUDICACION") return "ACP publicó la adjudicación; falta confirmar la empresa en el acta disponible.";
+  if (acpCode === "ANUNCIO_VENCIDO") return "El anuncio venció. Se mantiene en monitoreo hasta que ACP publique el resultado.";
+  if (acpCode === "EVALUACION") return "El proceso está en evaluación ACP.";
+  if (acpCode === "ACTO_DESIERTO") return "ACP marcó el proceso como acto desierto.";
+  if (acpCode === "CANCELACION_DEL_ACTO") return "ACP marcó el proceso como cancelado.";
   if (acta?.posible_adjudicacion_propia) return "El acta menciona una posible adjudicación a Proyelec/EP. Verifica el documento oficial.";
   if (acta?.cumplimiento_tecnico === "no_cumple") return "El acta contiene una posible observación de no cumplimiento técnico para Proyelec/EP.";
   const hours = hoursUntil(result.fecha_cierre);
@@ -592,7 +606,7 @@ export function SeguimientoConsole({ user, active = true }: { user: AuthUser; ac
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-base font-semibold text-brand">{item.numero_licitacion}</span>
                           <StatusBadge tone={statusTone(item.estado)}>{displayStatus(item.estado) || "Pendiente SLI"}</StatusBadge>
-                          {result?.estatus ? <StatusBadge tone={statusTone(result.estatus)}>SLI: {displayStatus(result.estatus)}</StatusBadge> : null}
+                          {result?.estado_acp?.label ? <StatusBadge tone={statusTone(result.estado_acp.label)}>ACP: {result.estado_acp.label}</StatusBadge> : result?.estatus ? <StatusBadge tone={statusTone(result.estatus)}>SLI: {displayStatus(result.estatus)}</StatusBadge> : null}
                         </div>
                         <div className="mt-2 line-clamp-2 break-words text-sm font-semibold leading-6 text-ink">{item.objeto || "Sin objeto registrado"}</div>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
@@ -655,7 +669,7 @@ export function SeguimientoConsole({ user, active = true }: { user: AuthUser; ac
                   </div>
                   <dl className="grid gap-3 text-sm sm:grid-cols-2">
                     {[
-                      ["Estado SLI", sliResults[selected.id]?.estatus || sliErrors[selected.id] || "N/D"],
+                       ["Estado ACP", sliResults[selected.id]?.estado_acp?.label || sliResults[selected.id]?.estatus || sliErrors[selected.id] || "N/D"],
                       ["Cierre", sliResults[selected.id]?.fecha_cierre || "N/D"],
                       ["Publicación", sliResults[selected.id]?.fecha_publicacion || "N/D"],
                       ["Última revisión", sliResults[selected.id]?.ultima_revision || "N/D"],
@@ -668,6 +682,25 @@ export function SeguimientoConsole({ user, active = true }: { user: AuthUser; ac
                       </div>
                     ))}
                   </dl>
+                </div>
+               ) : null}
+
+              {sliResults[selected.id]?.estado_acp?.code === "ADJUDICACION" ? (
+                <div className={`rounded-lg border p-4 ${sliResults[selected.id]?.adjudicacion?.confirmada ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-ink">Resultado de adjudicación</h3>
+                    <StatusBadge tone={sliResults[selected.id]?.adjudicacion?.confirmada ? "ok" : "warn"}>
+                      {sliResults[selected.id]?.adjudicacion?.confirmada ? "Confirmado en acta" : "Pendiente de confirmar"}
+                    </StatusBadge>
+                  </div>
+                  {sliResults[selected.id]?.adjudicacion?.confirmada ? (
+                    <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                      <div><div className="text-xs font-semibold text-muted">Empresa adjudicada</div><div className="mt-1 break-words font-semibold text-ink">{sliResults[selected.id]?.adjudicacion?.empresa_adjudicada}</div></div>
+                      <div><div className="text-xs font-semibold text-muted">Monto identificado</div><div className="mt-1 font-semibold text-ink">{sliResults[selected.id]?.adjudicacion?.monto_adjudicado || "No especificado"}</div></div>
+                    </div>
+                  ) : <p className="mt-2 text-sm leading-6 text-ink">El SLI indica adjudicación, pero el acta aún no presenta una empresa identificable de forma confiable.</p>}
+                  {sliResults[selected.id]?.adjudicacion?.evidencia ? <p className="mt-3 border-l-2 border-current/20 pl-3 text-xs leading-5 text-muted">{sliResults[selected.id]?.adjudicacion?.evidencia}</p> : null}
+                  {sliResults[selected.id]?.adjudicacion?.es_propia ? <StatusBadge tone="ok" className="mt-3">Adjudicación propia detectada</StatusBadge> : null}
                 </div>
               ) : null}
 
