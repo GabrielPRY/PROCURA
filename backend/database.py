@@ -476,6 +476,26 @@ def init_db():
 def _clean_codigo_match(value):
     return "".join(ch for ch in str(value or "").upper() if ch.isascii() and ch.isalnum())
 
+
+def _confirmed_radar_acp_codes(sli_items):
+    """Acepta códigos del Radar solo si pertenecen a un renglón confirmado con evidencia."""
+    codes = []
+    for item in sli_items if isinstance(sli_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("estado_codigo") or "").strip().lower() != "confirmado":
+            continue
+        code = str(item.get("codigo_acp") or item.get("codigo_articulo") or "").strip().upper()
+        evidence = str(item.get("evidencia") or item.get("evidencia_codigo") or "").upper()
+        if not re.fullmatch(r"[A-Z]{3}-[A-Z]{3}-\d{5}", code):
+            continue
+        # La evidencia evita que un valor heredado o una lectura resumida cree un cruce falso.
+        if code not in evidence:
+            continue
+        codes.append(code)
+    return list(dict.fromkeys(codes))
+
+
 def _is_acp_code(value):
     """Identifica un codigo ACP completo para evitar busquedas textuales ambiguas."""
     return bool(re.fullmatch(r"[A-Z]{3}-[A-Z]{3}-\d{5}", str(value or "").strip().upper()))
@@ -913,7 +933,6 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
 
         numero, objeto, categoria = radar
         sli_detail = sli_detail or {}
-        sli_codes = sli_detail.get("codigos_acp_detectados") or []
         sli_items = sli_detail.get("renglones_detectados") or []
         sli_text_parts = [sli_detail.get("texto_visible") or ""]
         for item in sli_items if isinstance(sli_items, list) else []:
@@ -932,17 +951,11 @@ def get_radar_historico_matches(radar_id, limit=12, sli_detail=None):
             str(numero or ""),
             str(objeto or ""),
             str(categoria or ""),
-            " ".join(str(code or "") for code in sli_codes),
+            " ".join(_confirmed_radar_acp_codes(sli_items)),
             " ".join(str(part or "") for part in sli_text_parts),
         ])
         if sli_detail:
-            strict_codes = [str(code or "").upper() for code in sli_codes]
-            for item in sli_items if isinstance(sli_items, list) else []:
-                if not isinstance(item, dict):
-                    continue
-                code = item.get("codigo_acp") or item.get("codigo_articulo")
-                if code and str(item.get("estado_codigo") or "confirmado") == "confirmado":
-                    strict_codes.append(str(code).upper())
+            strict_codes = _confirmed_radar_acp_codes(sli_items)
             codigo_matches = [
                 _clean_codigo_match(code)
                 for code in strict_codes

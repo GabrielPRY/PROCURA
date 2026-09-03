@@ -436,6 +436,23 @@ export function RadarConsole({ user, active = true }: { user: AuthUser; active?:
     ["Alertas enmienda", alertCount, "Requieren revisión", AlertTriangle, "text-amber-700"],
     ["Cierre 72h", closingSoonCount, "Prioridad operativa", CalendarClock, "text-rose-700"]
   ];
+  const monitorStatus = scheduler?.running
+    ? "Escaneando ahora"
+    : scheduler?.last_error
+      ? "Requiere atención"
+      : lastScan && !radarFlag(lastScan.escaneo_completo)
+        ? "Escaneo parcial"
+        : scheduler?.stale
+          ? "Actualización pendiente"
+          : "Al día";
+  const monitorTone = scheduler?.last_error
+    ? "danger" as const
+    : scheduler?.stale || (lastScan && !radarFlag(lastScan.escaneo_completo))
+      ? "warn" as const
+      : "ok" as const;
+  const scanCoverage = lastScan
+    ? `${numberValue(lastScan.paginas_recorridas)} pág. / ${numberValue(lastScan.total_detectadas_portal)} lic.`
+    : "Sin datos de cobertura";
 
   return (
     <div className="radar-console space-y-5">
@@ -451,50 +468,18 @@ export function RadarConsole({ user, active = true }: { user: AuthUser; active?:
             </Button>
           }
         />
-        <ModuleSection className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            {
-              label: "Frecuencia",
-              value: scheduler?.enabled === false ? "Manual" : `Cada ${scheduler?.interval_minutes || 25} min`,
-              tone: "neutral" as const
-            },
-            {
-              label: "Estado",
-              value: scheduler?.running
-                ? "Escaneando ahora"
-                : scheduler?.last_error
-                  ? "Con error"
-                  : lastScan && !radarFlag(lastScan.escaneo_completo)
-                    ? "Escaneo incompleto"
-                    : scheduler?.stale
-                      ? "Pendiente"
-                      : "Al día",
-              tone: scheduler?.last_error
-                ? "danger" as const
-                : scheduler?.stale || (lastScan && !radarFlag(lastScan.escaneo_completo))
-                  ? "warn" as const
-                  : "ok" as const
-            },
-            {
-              label: "Último escaneo",
-              value: lastScan?.fecha || scheduler?.last_finished || "N/D",
-              tone: "neutral" as const
-            },
-            {
-              label: "Cobertura",
-              value: lastScan
-                ? `${radarFlag(lastScan.escaneo_completo) ? "Completa" : "Incompleta"} · ${numberValue(lastScan.paginas_recorridas)} pág. · ${numberValue(lastScan.total_detectadas_portal)} lic.`
-                : "Sin datos",
-              tone: lastScan && radarFlag(lastScan.escaneo_completo) ? "ok" as const : "warn" as const
-            }
-          ].map((item) => (
-            <div key={item.label} className="min-w-0 rounded-lg border border-line bg-slate-50 px-3 py-2.5">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{item.label}</div>
-              <div className="mt-1 flex min-w-0 items-start">
-                <StatusBadge tone={item.tone} className="max-w-full whitespace-normal break-words text-left">{item.value}</StatusBadge>
-              </div>
+        <ModuleSection className="p-0">
+          <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <span className="text-sm font-semibold text-ink">Monitor SLI</span>
+              <StatusBadge tone={monitorTone}>{monitorStatus}</StatusBadge>
+              <span className="text-xs text-muted">{scheduler?.enabled === false ? "Actualización manual" : `Cada ${scheduler?.interval_minutes || 25} min`}</span>
             </div>
-          ))}
+            <dl className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+              <div className="flex min-w-0 gap-1.5"><dt className="font-semibold text-muted">Último:</dt><dd className="truncate text-ink">{lastScan?.fecha || scheduler?.last_finished || "Pendiente"}</dd></div>
+              <div className="flex min-w-0 gap-1.5"><dt className="font-semibold text-muted">Cobertura:</dt><dd className="truncate text-ink">{scanCoverage}</dd></div>
+            </dl>
+          </div>
         </ModuleSection>
       </div>
 

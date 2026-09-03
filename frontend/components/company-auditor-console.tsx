@@ -49,7 +49,7 @@ function decisionTone(value?: string): BadgeTone {
   const normalized = String(value || "").toLowerCase();
   if (normalized.includes("descartar")) return "danger";
   if (normalized.includes("avanzar") && !normalized.includes("cautela")) return "ok";
-  if (normalized.includes("validacion") || normalized.includes("validación")) return "danger";
+  if (normalized.includes("validacion") || normalized.includes("validación")) return "warn";
   return "warn";
 }
 
@@ -99,9 +99,11 @@ function daysLabel(value?: number | null) {
 
 function scoreLabel(score?: number) {
   if (typeof score !== "number") return "Sin puntuación";
-  if (score >= 75) return "Base favorable";
+  if (score >= 82) return "Perfil sólido";
+  if (score >= 65) return "Base favorable";
   if (score >= 50) return "Requiere validación";
-  return "Riesgo elevado";
+  if (score >= 30) return "Riesgo elevado";
+  return "No recomendado";
 }
 
 export function CompanyAuditorConsole({ user }: { user: AuthUser }) {

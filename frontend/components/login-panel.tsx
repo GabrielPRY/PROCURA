@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { FormEvent, useState } from "react";
@@ -46,8 +46,8 @@ export function LoginPanel({ onLogin }: LoginPanelProps) {
               alt="Proyelec International"
               className="h-16 w-auto object-contain"
             />
-            <h1 className="mt-5 text-xl font-semibold tracking-tight text-slate-950">Procura AI</h1>
-            <p className="mt-1 text-sm text-slate-500">Acceso interno</p>
+            <h1 className="mt-5 text-xl font-semibold tracking-tight text-slate-950">Proyelec Int</h1>
+            <p className="mt-1 text-sm text-slate-500">Sistema de Procura</p>
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>

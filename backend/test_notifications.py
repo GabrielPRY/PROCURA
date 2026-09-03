@@ -45,7 +45,8 @@ class DeduplicatingDatabase:
 
 class TrackingDatabase:
     def __init__(self, record):
-        self.records = [dict(record)]
+        source_records = record if isinstance(record, list) else [record]
+        self.records = [dict(item) for item in source_records]
         self.snapshots = []
         self.status_updates = []
 
@@ -321,6 +322,55 @@ class SliStatusMonitorTests(unittest.TestCase):
         self.assertEqual(stats["sent"], 1)
         self.assertEqual(len(deliveries), 1)
         self.assertIn("Empresa adjudicada: ABC Industrial LLC", deliveries[0]["text"])
+
+    def test_uses_most_recent_snapshot_when_multiple_users_follow_same_tender(self):
+        database = TrackingDatabase([
+            {
+                **self.record,
+                "seguimiento_id": 31,
+                "sli_checked_at": "2026-09-01 08:00:00",
+                "sli_snapshot_json": {"estado_acp": {"code": "EVALUACION", "label": "Evaluación"}},
+            },
+            {
+                **self.record,
+                "seguimiento_id": 32,
+                "owner_username": "Maria",
+                "sli_checked_at": "2026-09-01 09:00:00",
+                "sli_snapshot_json": {"estado_acp": {"code": "ADJUDICACION", "label": "Adjudicación"}},
+            },
+        ])
+        deliveries = []
+        result = {
+            "rfq_id": "214148",
+            "url": "https://apps.pancanal.com/sli/214148",
+            "estatus": "ADJUDICACIÓN",
+            "estado_acp": api._normalize_sli_status("ADJUDICACIÓN"),
+            "adjudicacion": {},
+        }
+
+        with patch.object(api, "db", database), patch.object(
+            api.notification_service, "send_telegram_once", side_effect=lambda *_args, **kwargs: deliveries.append(kwargs) or {"ok": True}
+        ):
+            stats = api._apply_tracked_sli_result("214148", database.records, result, persist=True)
+
+        self.assertEqual(stats["sent"], 0)
+        self.assertEqual(deliveries, [])
+
+
+class RadarScanIsolationTests(unittest.TestCase):
+    def test_direct_tracking_continues_when_open_radar_scan_fails(self):
+        tracking_result = {"checked": 2, "sent": 1, "duplicates": 0, "errors": 0, "updated": 1}
+
+        with patch("sli_scraper.ejecutar_radar_detallado", side_effect=RuntimeError("SLI temporalmente no disponible")), patch.object(
+            api, "sync_tracked_tenders_from_sli", return_value=tracking_result
+        ) as sync, patch.object(api, "process_tracking_notifications") as notifications_flow:
+            result = api.run_radar_auto_scan(source="test")
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["result"]["seguimiento_sli"], tracking_result)
+        self.assertTrue(result["result"]["notifications"]["skipped"])
+        sync.assert_called_once()
+        notifications_flow.assert_not_called()
 
 
 if __name__ == "__main__":

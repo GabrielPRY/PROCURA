@@ -69,7 +69,7 @@ export function ProcuraApp() {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-100 text-sm font-medium text-muted">
         <div className="grid gap-3 text-center">
-          <div>Cargando Procura AI...</div>
+          <div>Cargando Proyelec Int...</div>
           {bootSlow ? <div className="text-xs text-slate-500">Recuperando tu sesión...</div> : null}
         </div>
       </main>

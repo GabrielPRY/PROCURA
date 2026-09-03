@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, FileText, FolderOpen, Mail, PackageSearch, Radar, ShieldCheck, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ClipboardList, DollarSign, FileText, FolderOpen, Gauge, PackageSearch, Radar, Settings, ShieldCheck, Truck, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModuleSection } from "@/components/ui/module-section";
@@ -14,6 +14,8 @@ import { getLogisticsCalculations, getLogisticsCarriersStatus, getLogisticsSetti
 import { loadLastRfq, type RfqAnalysisResponse } from "@/lib/rfq";
 import { getSeguimientos } from "@/lib/seguimiento";
 import { listWorkspaces } from "@/lib/workspaces";
+import { getUsageMetrics } from "@/lib/metrics";
+import { getAdminUsers, getTelegramNotificationStatus } from "@/lib/admin";
 
 type DashboardAction = {
   module: ModuleId;
@@ -26,7 +28,6 @@ const actions: Record<ModuleId, DashboardAction> = {
   dashboard: { module: "dashboard", title: "Dashboard", copy: "Resumen de trabajo.", icon: BarChart3 },
   rfq: { module: "rfq", title: "Analizar RFQ", copy: "Carga el pliego y revisa sus renglones.", icon: FileText },
   evaluacion: { module: "evaluacion", title: "Evaluación", copy: "Compara propuestas.", icon: ShieldCheck },
-  rfq_email: { module: "rfq_email", title: "Preparar correo", copy: "Genera la solicitud de cotización.", icon: Mail },
   ai_command: { module: "ai_command", title: "Centro IA", copy: "Consulta de procura.", icon: ShieldCheck },
   costos: { module: "costos", title: "Comparar costos", copy: "Revisa precios y participaciones anteriores.", icon: BarChart3 },
   fichas: { module: "fichas", title: "Fichas", copy: "Documentación técnica.", icon: FileText },
@@ -43,8 +44,9 @@ const actions: Record<ModuleId, DashboardAction> = {
 
 function dashboardDefinition(role: string) {
   if (role === "Supervisor") return { title: "Prioridades del equipo", copy: "Revisa oportunidades, cambios del SLI y procesos que requieren atención.", primary: "radar" as ModuleId };
-  if (role === "Gerencia") return { title: "Resumen gerencial", copy: "Consulta oportunidades, actividad y referencias para decidir con rapidez.", primary: "radar" as ModuleId };
+  if (role === "Gerencia") return { title: "Resumen gerencial", copy: "Consulta oportunidades, consumo y rendimiento del equipo.", primary: "radar" as ModuleId };
   if (role === "Logistica") return { title: "Mesa logística", copy: "Cotiza transportes y consulta referencias guardadas por el equipo.", primary: "logistica" as ModuleId };
+  if (role === "Admin") return { title: "Panel de administración", copy: "Usuarios, configuración del sistema y estado de las integraciones.", primary: "admin" as ModuleId };
   return { title: "Tu jornada de procura", copy: "Analiza el RFQ y continúa con costos, proveedores y seguimiento.", primary: "rfq" as ModuleId };
 }
 
@@ -68,6 +70,12 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
   const [activeRfq, setActiveRfq] = useState<RfqAnalysisResponse | null>(null);
   const [analystStats, setAnalystStats] = useState({ tracking: 0, workspaces: 0 });
   const [loadingAnalyst, setLoadingAnalyst] = useState(role === "Analista");
+
+  const [gerenciaStats, setGerenciaStats] = useState({ tokens: 0, costUsd: 0, activeUsers: 0, errors: 0 });
+  const [loadingGerencia, setLoadingGerencia] = useState(role === "Gerencia");
+
+  const [adminStats, setAdminStats] = useState({ totalUsers: 0, telegramOk: false, telegramConfigured: false });
+  const [loadingAdmin, setLoadingAdmin] = useState(role === "Admin");
 
   useEffect(() => {
     let mounted = true;
@@ -126,7 +134,7 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
     setActiveRfq(loadLastRfq(user.username));
     setLoadingAnalyst(true);
     Promise.allSettled([
-      getSeguimientos({ username: user.username, role: user.role }),
+      getSeguimientos({ username: user.username, role }),
       listWorkspaces(user.username, false)
     ]).then(([tracking, workspaces]) => {
       if (!mounted) return;
@@ -140,6 +148,43 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
 
     return () => { mounted = false; };
   }, [role, user.role, user.username]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (role !== "Gerencia") { setLoadingGerencia(false); return () => { mounted = false; }; }
+    setLoadingGerencia(true);
+    getUsageMetrics({ days: 30 })
+      .then((response) => {
+        if (!mounted) return;
+        const s = response.summary;
+        setGerenciaStats({
+          tokens: s?.tokens_total ?? 0,
+          costUsd: s?.estimated_cost_usd ?? 0,
+          activeUsers: s?.active_users ?? 0,
+          errors: s?.errors ?? 0
+        });
+      })
+      .catch(() => { if (mounted) setGerenciaStats({ tokens: 0, costUsd: 0, activeUsers: 0, errors: 0 }); })
+      .finally(() => { if (mounted) setLoadingGerencia(false); });
+    return () => { mounted = false; };
+  }, [role]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (role !== "Admin") { setLoadingAdmin(false); return () => { mounted = false; }; }
+    setLoadingAdmin(true);
+    Promise.allSettled([getAdminUsers(), getTelegramNotificationStatus()])
+      .then(([usersResult, telegramResult]) => {
+        if (!mounted) return;
+        setAdminStats({
+          totalUsers: usersResult.status === "fulfilled" ? usersResult.value.users?.length || 0 : 0,
+          telegramOk: telegramResult.status === "fulfilled" ? Boolean(telegramResult.value.telegram?.enabled && telegramResult.value.telegram?.configured) : false,
+          telegramConfigured: telegramResult.status === "fulfilled" ? Boolean(telegramResult.value.telegram?.configured) : false
+        });
+      })
+      .finally(() => { if (mounted) setLoadingAdmin(false); });
+    return () => { mounted = false; };
+  }, [role]);
 
   const primary = allowed.has(definition.primary) ? actions[definition.primary] : actions[[...allowed][0] as ModuleId];
   const PrimaryIcon = primary?.icon;
@@ -176,6 +221,23 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
         </section>
       ) : null}
 
+      {role === "Gerencia" ? (
+        <section className="grid gap-3 sm:grid-cols-4">
+          <StatCard loading={loadingGerencia} label="Usuarios activos" value={gerenciaStats.activeUsers} hint="Últimos 30 días" icon={Users} />
+          <StatCard loading={loadingGerencia} label="Tokens consumidos" value={gerenciaStats.tokens > 1000 ? `${(gerenciaStats.tokens / 1000).toFixed(0)}K` : String(gerenciaStats.tokens)} hint="Uso acumulado del equipo" icon={Gauge} />
+          <StatCard loading={loadingGerencia} label="Costo estimado" value={gerenciaStats.costUsd > 0 ? `$${gerenciaStats.costUsd.toFixed(2)}` : "$0.00"} hint="Inversión en IA (30 días)" icon={DollarSign} />
+          <StatCard loading={loadingGerencia} label="Errores recientes" value={gerenciaStats.errors} hint={gerenciaStats.errors === 0 ? "Sin incidentes" : "Revisar en Métricas"} icon={AlertTriangle} />
+        </section>
+      ) : null}
+
+      {role === "Admin" ? (
+        <section className="grid gap-3 sm:grid-cols-3">
+          <StatCard loading={loadingAdmin} label="Usuarios registrados" value={adminStats.totalUsers} hint="Cuentas en el sistema" icon={Users} />
+          <StatCard loading={loadingAdmin} label="Telegram" value={adminStats.telegramOk ? "Activo" : adminStats.telegramConfigured ? "Configurado" : "Sin configurar"} hint={adminStats.telegramOk ? "Alertas habilitadas" : "Revisar configuración"} icon={Radar} />
+          <StatCard loading={loadingAdmin} label="Sistema" value="En línea" hint="Estado general" icon={Settings} />
+        </section>
+      ) : null}
+
       {role === "Analista" ? (
         <>
           <section className="grid gap-3 sm:grid-cols-3">
@@ -209,7 +271,6 @@ export function RoleHome({ user, onModuleChange }: { user: AuthUser; onModuleCha
                   <Button type="button" variant="primary" onClick={() => onModuleChange?.("rfq")}><FileText className="h-4 w-4" />Abrir RFQ</Button>
                   <Button type="button" variant="secondary" onClick={() => onModuleChange?.("costos")}><BarChart3 className="h-4 w-4" />Costos</Button>
                   <Button type="button" variant="secondary" onClick={() => onModuleChange?.("proveedores")}><PackageSearch className="h-4 w-4" />Proveedores</Button>
-                  <Button type="button" variant="ghost" onClick={() => onModuleChange?.("rfq_email")}><Mail className="h-4 w-4" />Correo</Button>
                 </div>
               </div>
             ) : (

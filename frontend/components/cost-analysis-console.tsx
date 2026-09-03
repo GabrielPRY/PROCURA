@@ -23,10 +23,26 @@ type DisplayHistoryRow = { row: HistoricoRow; sourceIndexes: number[] };
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const normalized = String(value ?? "")
-    .replace(/[$,\s]/g, "")
-    .replace(",", ".")
-    .trim();
+  let normalized = String(value ?? "").trim().replace(/[$\s]/g, "");
+  
+  const lastComma = normalized.lastIndexOf(",");
+  const lastPeriod = normalized.lastIndexOf(".");
+  
+  if (lastComma !== -1 && lastPeriod !== -1) {
+    if (lastComma > lastPeriod) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else if (lastComma !== -1 && lastPeriod === -1) {
+    const parts = normalized.split(",");
+    if (parts.length === 2 && parts[1].length <= 2) {
+      normalized = normalized.replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  }
+
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -248,13 +264,17 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
       const embeddedProyelec = priceFrom(item, ["precio_proy_hist", "PRECIO PROYELEC", "Precio Proyelec", "precio_proyelec"]);
       const historyRows = itemHistoryMap[index]?.rows || [];
       const best = minPositive([embeddedCompetition, embeddedProyelec, ...historyPricesFromRows(historyRows)]);
+      const bestProyelec = minPositive([
+        embeddedProyelec,
+        ...historyRows.map((r) => priceFrom(r as Record<string, unknown>, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]))
+      ]);
       return {
         index,
         item,
         quantity,
         historyRows,
         best,
-        referenceValue: quantity * best,
+        referenceValue: quantity * (bestProyelec > 0 ? bestProyelec : best),
         hasMatch: historyRows.length > 0 || embeddedCompetition > 0 || embeddedProyelec > 0
       };
     }),
@@ -282,15 +302,25 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
   const displayedRows: DisplayHistoryRow[] = manualMode
     ? manualRows.map((row) => ({ row, sourceIndexes: [] }))
     : combinedRows;
-  const selectedPrices = [
-    ...historyPricesFromRows(combinedRows.map((entry) => entry.row)),
-    ...selectedItemRows.flatMap((row) => [
-      priceFrom(row.item, ["precio_comp_hist", "Precio Competencia", "precio_competencia"]),
-      priceFrom(row.item, ["precio_proy_hist", "Precio Proyelec", "precio_proyelec"])
-    ])
+  const proyelecPrices = [
+    ...combinedRows.map((entry) => priceFrom(entry.row as Record<string, unknown>, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"])),
+    ...selectedItemRows.map((row) => priceFrom(row.item, ["precio_proy_hist", "Precio Proyelec", "precio_proyelec"]))
   ].filter((value) => value > 0);
-  const summaryMin = manualMode ? minPositive(historyPricesFromRows(manualRows)) : minPositive(selectedPrices);
-  const summaryAverage = manualMode ? average(historyPricesFromRows(manualRows)) : average(selectedPrices);
+
+  const competenciaPrices = [
+    ...combinedRows.map((entry) => priceFrom(entry.row as Record<string, unknown>, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"])),
+    ...selectedItemRows.map((row) => priceFrom(row.item, ["precio_comp_hist", "Precio Competencia", "precio_competencia"]))
+  ].filter((value) => value > 0);
+
+  const manualProyelecPrices = manualRows.map((row) => priceFrom(row as Record<string, unknown>, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"])).filter((value) => value > 0);
+  const manualCompetenciaPrices = manualRows.map((row) => priceFrom(row as Record<string, unknown>, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"])).filter((value) => value > 0);
+
+  const summaryMinProyelec = manualMode ? minPositive(manualProyelecPrices) : minPositive(proyelecPrices);
+  const summaryMinCompetencia = manualMode ? minPositive(manualCompetenciaPrices) : minPositive(competenciaPrices);
+  
+  const selectedPrices = [...proyelecPrices, ...competenciaPrices];
+  const summaryMin = manualMode ? minPositive([...manualProyelecPrices, ...manualCompetenciaPrices]) : minPositive(selectedPrices);
+  const summaryAverage = manualMode ? average([...manualProyelecPrices, ...manualCompetenciaPrices]) : average(selectedPrices);
   const referenceTotal = selectedItemRows.reduce((sum, row) => sum + row.referenceValue, 0);
   const matchingItems = selectedItemRows.filter((row) => row.hasMatch).length;
   const isLoadingSelection = selectedIndexes.some((index) => loadingIndexes.includes(index));
@@ -312,7 +342,7 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
         <PageHeader
           eyebrow="Comparativa de costos"
           title="Referencias históricas del RFQ"
-          copy="Selecciona los renglones que vas a participar y compara sus precios anteriores sin mezclar partidas no elegidas."
+          copy="Selecciona los renglones en los que vas a participar y compara sus precios anteriores sin mezclar partidas no elegidas."
           actions={
             <StatusBadge tone={items.length ? "info" : "neutral"}>
               <BarChart3 className="h-3.5 w-3.5" /> {items.length ? `RFQ ${rfqNumber || "sin número"}` : "Sin RFQ cargado"}
@@ -338,11 +368,12 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
       ) : (
         <>
           <ModuleSection className="p-0">
-            <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+            <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-5">
               {[
                 ["Seleccionados", `${selectedIndexes.length} de ${items.length}`, "Renglones incluidos", Check],
                 ["Con histórico", `${matchingItems} de ${selectedIndexes.length}`, "Coincidencias encontradas", Database],
-                ["Precio mínimo", money(summaryMin), manualMode ? "Búsqueda manual" : "Selección actual", TrendingDown],
+                ["Mín. Proyelec", money(summaryMinProyelec), "Mejor precio ofertado por Proyelec", TrendingDown],
+                ["Mín. Competencia", money(summaryMinCompetencia), "Mejor precio de la competencia", TrendingDown],
                 ["Referencia total", money(referenceTotal), "Cantidad por mejor precio", Target]
               ].map(([label, value, hint, Icon]) => (
                 <div key={String(label)} className="min-w-0 p-4 sm:p-5">
@@ -512,6 +543,8 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                             const proyelec = priceFrom(record, ["Precio Proyelec", "PRECIO PROYELEC", "precio_proyelec"]);
                             const competition = priceFrom(record, ["Precio Competencia", "PRECIO COMPETENCIA", "precio_competencia"]);
                             const winner = cell(record, ["Adjudicada a Proyelec", "adjudicada_a_proyelec"], "N/D");
+                            const observaciones = cell(record, ["Observaciones", "observaciones", "Descripción", "descripcion"], "");
+                            const descSnippet = observaciones.length > 80 ? observaciones.slice(0, 80) + "..." : observaciones;
                             const specialist = cell(record, ["Analista", "analista", "analista_procura"], "N/D");
                             return (
                               <tr key={`${historySignature(entry.row)}-${index}`}>
@@ -530,13 +563,18 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                                 </td>
                                 <td className="break-words p-3 align-top">
                                   <div className="font-semibold text-ink">{code}</div>
+                                  {descSnippet && <div className="mt-1 text-xs text-muted line-clamp-2">{descSnippet}</div>}
                                   <div className="mt-1 text-muted">Cantidad: {quantity}</div>
                                 </td>
                                 <td className="break-words p-3 align-top">
                                   <div><span className="text-muted">Proyelec:</span> <span className="font-semibold text-ink">{money(proyelec)}</span></div>
                                   <div className="mt-1"><span className="text-muted">Competencia:</span> <span className="font-semibold text-ink">{money(competition)}</span></div>
                                 </td>
-                                <td className="break-words p-3 align-top text-ink">{winner}</td>
+                                <td className="break-words p-3 align-top">
+                                  <StatusBadge tone={winner.toUpperCase().includes("SI") || winner.toLowerCase().includes("proyelec") ? "ok" : winner.toUpperCase().includes("NO") ? "danger" : "neutral"}>
+                                    {winner.toUpperCase().includes("SI") || winner.toLowerCase().includes("proyelec") ? "Adjudicada" : winner.toUpperCase().includes("NO") ? "No adjudicada" : "N/D"}
+                                  </StatusBadge>
+                                </td>
                                 <td className="break-words p-3 align-top">
                                   <StatusBadge tone="neutral">{specialistInitials(specialist)}</StatusBadge>
                                   <div className="mt-2 text-muted">{specialist}</div>
@@ -555,12 +593,18 @@ export function CostAnalysisConsole({ user }: { user: AuthUser }) {
                         const code = cell(record, ["Código ACP", "Codigo ACP", "codigo_acp"]);
                         const proyelec = priceFrom(record, ["Precio Proyelec", "precio_proyelec"]);
                         const competition = priceFrom(record, ["Precio Competencia", "precio_competencia"]);
+                        const winner = cell(record, ["Adjudicada a Proyelec", "adjudicada_a_proyelec"], "N/D");
                         const specialist = cell(record, ["Analista", "analista", "analista_procura"], "N/D");
                         return (
                           <article key={`${historySignature(entry.row)}-mobile-${index}`} className="p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="font-semibold text-ink">Licitación {licitacion}</div>
-                              <StatusBadge tone="neutral">{historicalDateLabel(record)}</StatusBadge>
+                              <div className="flex items-center gap-2">
+                                <StatusBadge tone={winner.toUpperCase().includes("SI") || winner.toLowerCase().includes("proyelec") ? "ok" : winner.toUpperCase().includes("NO") ? "danger" : "neutral"}>
+                                  {winner.toUpperCase().includes("SI") || winner.toLowerCase().includes("proyelec") ? "Adjudicada" : winner.toUpperCase().includes("NO") ? "No adjudicada" : "N/D"}
+                                </StatusBadge>
+                                <StatusBadge tone="neutral">{historicalDateLabel(record)}</StatusBadge>
+                              </div>
                             </div>
                             <div className="mt-3 text-sm font-semibold text-ink">{code}</div>
                             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">

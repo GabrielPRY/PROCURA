@@ -1,4 +1,4 @@
-﻿import { BarChart3, ClipboardList, Database, FileText, FolderOpen, Gauge, Mail, PackageSearch, Radar, Settings, ShieldCheck, Truck } from "lucide-react";
+import { BarChart3, ClipboardList, Database, FileText, FolderOpen, Gauge, Mail, PackageSearch, Radar, Settings, ShieldCheck, Truck } from "lucide-react";
 import { normalizeRole, type AuthUser } from "@/lib/auth";
 
 export type ModuleId =
@@ -30,7 +30,8 @@ export type NavigationItem = {
 export const navigationItems: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Resumen operativo del rol activo.", icon: Gauge, permissions: ["Analista", "Supervisor", "Gerencia", "Logistica"] },
   { id: "rfq", label: "RFQ", description: "Carga, análisis y matriz técnica.", icon: FileText, permissions: ["Analista", "Supervisor", "Gerencia"] },
-  { id: "rfq_email", label: "Correo RFQ", description: "Emisión profesional de solicitudes.", icon: Mail, permissions: ["Analista", "Supervisor", "Gerencia"] },
+  // Temporalmente deshabilitado
+  // { id: "rfq_email", label: "Correo RFQ", description: "Emisión profesional de solicitudes.", icon: Mail, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "costos", label: "Comparativa de costos", description: "Precios históricos y referencias por renglón.", icon: BarChart3, permissions: ["Analista", "Supervisor", "Gerencia"] },
   { id: "radar", label: "Radar SLI", description: "Licitaciones abiertas, filtros y enmiendas.", icon: Radar, permissions: ["Supervisor", "Gerencia"] },
   { id: "seguimiento", label: "Seguimiento", description: "Estados SLI y comentarios de licitaciones.", icon: ClipboardList, permissions: ["Analista", "Supervisor", "Gerencia"] },

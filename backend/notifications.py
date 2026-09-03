@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Dict
 
 import requests
+
+logger = logging.getLogger(__name__)
+
+_TELEGRAM_MIN_INTERVAL = 0.15  # seconds between messages
+_last_send_time = 0.0
+
+def _throttle():
+    """Ensure minimum interval between Telegram sends to respect rate limits."""
+    global _last_send_time
+    now = time.time()
+    elapsed = now - _last_send_time
+    if elapsed < _TELEGRAM_MIN_INTERVAL:
+        time.sleep(_TELEGRAM_MIN_INTERVAL - elapsed)
+    _last_send_time = time.time()
+
 
 
 TRUE_VALUES = {"1", "true", "yes", "si", "sí", "on"}
@@ -52,28 +69,45 @@ def send_telegram_message(text: str, *, silent: bool = False) -> Dict[str, Any]:
     if not message:
         return {"ok": False, "skipped": True, "error": "El mensaje esta vacio."}
 
+    _throttle()
+
     try:
+        url = f"https://api.telegram.org/bot{config.token}/sendMessage"
+        payload = {
+            "chat_id": config.chat_id,
+            "text": message[:4096],
+            "disable_notification": bool(silent),
+            "disable_web_page_preview": True,
+        }
         response = requests.post(
-            f"https://api.telegram.org/bot{config.token}/sendMessage",
-            json={
-                "chat_id": config.chat_id,
-                "text": message[:4096],
-                "disable_notification": bool(silent),
-                "disable_web_page_preview": True,
-            },
+            url,
+            json=payload,
             timeout=20,
         )
         data = response.json() if response.content else {}
+
+        if response.status_code == 429:
+            retry_after = data.get("parameters", {}).get("retry_after", 5)
+            logger.warning(f"[TELEGRAM] Rate limited. Retry after {retry_after}s")
+            time.sleep(min(retry_after, 30))  # Wait, but max 30 seconds
+            # Retry once
+            response = requests.post(url, json=payload, timeout=20)
+            data = response.json() if response.content else {}
+
         if response.ok and data.get("ok"):
             return {
                 "ok": True,
                 "message_id": (data.get("result") or {}).get("message_id"),
             }
         description = str(data.get("description") or f"Telegram respondio HTTP {response.status_code}")
-        return {"ok": False, "error": description[:1000]}
+        error_msg = f"HTTP {response.status_code} - {description}"
+        logger.error(f"[TELEGRAM] Error sending message: {error_msg}")
+        return {"ok": False, "error": error_msg[:1000]}
     except requests.RequestException as exc:
+        logger.error(f"[TELEGRAM] Request exception: {exc}")
         return {"ok": False, "error": f"No se pudo conectar con Telegram: {str(exc)[:800]}"}
     except ValueError:
+        logger.error("[TELEGRAM] Invalid JSON response")
         return {"ok": False, "error": "Telegram devolvio una respuesta no valida."}
 
 

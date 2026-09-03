@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, FileText, Loader2, PackageSearch, Settings, ShieldCheck, Truck } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -47,7 +47,7 @@ const MetricsConsole = dynamic(() => import("@/components/metrics-console").then
 const ProvidersConsole = dynamic(() => import("@/components/providers-console").then((mod) => mod.ProvidersConsole), { ssr: false, loading: ModuleLoading });
 const RadarConsole = dynamic(() => import("@/components/radar-console").then((mod) => mod.RadarConsole), { ssr: false, loading: ModuleLoading });
 const RfqConsole = dynamic(() => import("@/components/rfq-console").then((mod) => mod.RfqConsole), { ssr: false, loading: ModuleLoading });
-const RfqEmailConsole = dynamic(() => import("@/components/rfq-email-console").then((mod) => mod.RfqEmailConsole), { ssr: false, loading: ModuleLoading });
+// const RfqEmailConsole = dynamic(() => import("@/components/rfq-email-console").then((mod) => mod.RfqEmailConsole), { ssr: false, loading: ModuleLoading });
 const SeguimientoConsole = dynamic(() => import("@/components/seguimiento-console").then((mod) => mod.SeguimientoConsole), { ssr: false, loading: ModuleLoading });
 const WorkspacesConsole = dynamic(() => import("@/components/workspaces-console").then((mod) => mod.WorkspacesConsole), { ssr: false, loading: ModuleLoading });
 
@@ -96,7 +96,7 @@ const moduleContent: Record<ModuleId, { eyebrow: string; subtitle: string; icon:
   },
   auditor_empresas: {
     eyebrow: "Auditor IA",
-    subtitle: "Preauditoria comercial para validar si una empresa parece real, trazable y segura.",
+    subtitle: "Preauditoría comercial para validar si una empresa parece real, trazable y segura.",
     icon: ShieldCheck,
     cards: [
       { title: "Empresa real", copy: "Web, contacto, dirección, presencia digital y coherencia comercial." },
@@ -172,8 +172,8 @@ function ModulePlaceholder({ moduleId, user }: ModuleRouterProps) {
       ) : null}
 
       <EmptyState
-        title="Siguiente paso de migracion"
-        copy="Esta pantalla ya esta ordenada para conectar la funcion real desde FastAPI cuando toque migrarla."
+        title="Siguiente paso de migración"
+        copy="Esta pantalla ya está ordenada para conectar la función real desde FastAPI cuando toque migrarla."
         icon={Icon}
       />
     </div>
@@ -188,7 +188,7 @@ export function ModuleRouter({ moduleId, user, active = true, onModuleChange }: 
   if (moduleId === "radar") return <RadarConsole user={user} active={active} />;
   if (moduleId === "rfq") return <RfqConsole user={user} onModuleChange={onModuleChange} />;
   if (moduleId === "evaluacion") return <EvaluationConsole user={user} />;
-  if (moduleId === "rfq_email") return <RfqEmailConsole user={user} />;
+  if (moduleId === "rfq_email") return <div className="p-8 text-center text-muted">Módulo temporalmente deshabilitado.</div>;
   if (moduleId === "ai_command") return <ModulePlaceholder moduleId={moduleId} user={user} />;
   if (moduleId === "costos") return <CostAnalysisConsole user={user} />;
   if (moduleId === "fichas") return <DatasheetsConsole user={user} />;

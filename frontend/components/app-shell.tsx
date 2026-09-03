@@ -26,7 +26,7 @@ const compactNavLabels: Partial<Record<ModuleId, string>> = {
 function productName(role: string) {
   if (role === "Admin") return "Administración";
   if (role === "Logistica") return "Logística";
-  return "Sourcing Console";
+  return "Consola de Procura";
 }
 
 function visibleRole(role: string) {
@@ -147,9 +147,9 @@ export function AppShell({
       <header className="app-header sticky top-0 z-40 border-b border-line">
         <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-4 px-4 sm:px-5 xl:px-7">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand text-xs font-black text-white">PA</div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand text-xs font-black text-white">PI</div>
             <div className="min-w-0">
-              <div className="truncate text-[11px] font-bold uppercase text-brand">Procura AI</div>
+              <div className="truncate text-[11px] font-bold uppercase text-brand">Proyelec Int</div>
               <div className="hidden truncate text-base font-semibold text-ink sm:block">{productName(role)}</div>
             </div>
           </div>

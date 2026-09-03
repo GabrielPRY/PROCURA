@@ -2,6 +2,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 
+from database import _confirmed_radar_acp_codes
 from api import _extract_radar_items_from_documents, _merge_radar_items
 from sli_scraper import _extraer_max_pagina, _extraer_urls_paginacion, parse_sli_datetime
 
@@ -79,6 +80,27 @@ class RadarAcpParserTests(unittest.TestCase):
 
         self.assertEqual(merged[0]["codigo_acp"], "PWR-BAT-00009")
         self.assertEqual(merged[0]["estado_codigo"], "confirmado")
+
+    def test_historical_match_requires_item_evidence_not_summary_code(self):
+        codes = _confirmed_radar_acp_codes([
+            {
+                "codigo_acp": "PWR-BAT-00009",
+                "estado_codigo": "confirmado",
+                "evidencia": "1 PWR-BAT-00009 Battery",
+            },
+            {
+                "codigo_acp": "LLF-LAM-00402",
+                "estado_codigo": "confirmado",
+                "evidencia": "1 Gate valve without article code",
+            },
+            {
+                "codigo_acp": "ABC-DEF-12345",
+                "estado_codigo": "sin_codigo",
+                "evidencia": "1 ABC-DEF-12345",
+            },
+        ])
+
+        self.assertEqual(codes, ["PWR-BAT-00009"])
 
 
 class RadarSliParsingTests(unittest.TestCase):

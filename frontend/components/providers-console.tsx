@@ -82,7 +82,7 @@ function normalizeCompanyName(value?: string) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|sa|gmbh|group|international|intl)\b/g, "")
+    .replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|sa|sas|gmbh|group|international|intl)\b/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -303,8 +303,21 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
     return auditHistory.find((audit) => {
       const auditDomain = String(audit.domain || domainFromUrl(audit.website)).toLowerCase();
       if (providerDomain && auditDomain && providerDomain === auditDomain) return true;
+      
       const auditName = normalizeCompanyName(audit.company_name);
-      return Boolean(providerName && auditName && (providerName === auditName || providerName.includes(auditName) || auditName.includes(providerName)));
+      if (!providerName || !auditName || providerName.length < 4 || auditName.length < 4) return false;
+      
+      if (providerName === auditName) return true;
+      
+      if (providerName.length >= 6 && auditName.length >= 6) {
+        try {
+          if (new RegExp(`\\b${auditName}\\b`).test(providerName)) return true;
+          if (new RegExp(`\\b${providerName}\\b`).test(auditName)) return true;
+        } catch {
+          // fallback
+        }
+      }
+      return false;
     });
   }
 
@@ -516,6 +529,15 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
             </div>
           ) : (
             <div className="space-y-5">
+              {!grounded && (
+                <div className="flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-200 p-4 w-full">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-amber-900">⚠ Resultados sin verificación web</div>
+                    <div className="text-sm text-amber-800 mt-1">Los proveedores fueron generados sin búsqueda en internet en tiempo real. Valida manualmente cada proveedor, sus datos de contacto y su existencia real antes de proceder.</div>
+                  </div>
+                </div>
+              )}
               <ModuleSection>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
@@ -524,7 +546,6 @@ export function ProvidersConsole({ user, onModuleChange }: { user: AuthUser; onM
                       <StatusBadge tone={grounded ? "ok" : "warn"}>{grounded ? "Búsqueda web activa" : "Sin grounding web confirmado"}</StatusBadge>
                     </div>
                     <p className="mt-2 max-w-4xl text-sm leading-6 text-ink">{summary || "Candidatos con fuente verificable, ordenados por evidencia técnica, precio, cobertura y riesgo."}</p>
-                    {!grounded ? <p className="mt-2 text-xs leading-5 text-amber-700">Verifica manualmente URLs, existencia y disponibilidad. Esta ejecución pudo usar razonamiento del modelo sin búsqueda web.</p> : null}
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" onClick={() => setView("prepare")} variant="secondary">Ajustar búsqueda</Button>
