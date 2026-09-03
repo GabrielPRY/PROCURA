@@ -35,6 +35,7 @@ import {
   type CarrierQuote,
   type Forwarder,
   type LocalRate,
+  type LocalRatePayload,
   type LogisticsAddress,
   type LogisticsCalculation,
   type LogisticsCarriersResponse,
@@ -559,7 +560,7 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
     setSavingLocalRate(true);
     setError(null);
     try {
-      await saveLogisticsLocalRate(localRateForm);
+      await saveLogisticsLocalRate(localRateForm as LocalRatePayload);
       const settings = await getLogisticsSettings();
       setLocalRates(settings.local_rates || []);
       setLocalRateForm({ agente: "", destino: "", hasta_400kg: 0, kg_500_1000: 0, mayor_1000kg: 0 });
