@@ -490,9 +490,9 @@ export function LogisticsConsole({ user }: { user: AuthUser }) {
       if (forwarderName && localRates.length > 0) {
         const applicableRate = localRates.find(r => r.activo !== false && r.agente.toLowerCase() === forwarderName.toLowerCase());
         if (applicableRate) {
-          if (weightKg > 1000) costoLocal = applicableRate.mayor_1000kg || 0;
-          else if (weightKg >= 500) costoLocal = applicableRate.kg_500_1000 || 0;
-          else costoLocal = applicableRate.hasta_400kg || 0;
+          if (weightKg > 1000) costoLocal = Number(applicableRate.mayor_1000kg) || 0;
+          else if (weightKg >= 500) costoLocal = Number(applicableRate.kg_500_1000) || 0;
+          else costoLocal = Number(applicableRate.hasta_400kg) || 0;
         }
       }
 
