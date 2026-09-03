@@ -39,7 +39,8 @@ const actions: Record<ModuleId, DashboardAction> = {
   workspaces: { module: "workspaces", title: "Espacios guardados", copy: "Recupera expedientes de trabajo.", icon: FolderOpen },
   logistica: { module: "logistica", title: "Calcular logística", copy: "Cotiza el tránsito doméstico en Estados Unidos.", icon: Truck },
   metricas: { module: "metricas", title: "Métricas", copy: "Actividad y consumo.", icon: BarChart3 },
-  admin: { module: "admin", title: "Administración", copy: "Usuarios, APIs y sistema.", icon: ShieldCheck }
+  admin: { module: "admin", title: "Administración", copy: "Usuarios, APIs y sistema.", icon: ShieldCheck },
+  rfq_email: { module: "rfq_email", title: "Correo RFQ", copy: "Emisión de solicitudes.", icon: FileText }
 };
 
 function dashboardDefinition(role: string) {
