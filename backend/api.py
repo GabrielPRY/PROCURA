@@ -1662,11 +1662,12 @@ def api_health():
     
     result["database_reachable"] = db_ok
     
-    # Validar clave de cifrado
+    # Validar que el módulo de cifrado pueda operar. Esto valida el formato de
+    # ENCRYPTION_KEY; no intenta descifrar secretos de usuarios en el healthcheck.
     key_ok = False
     try:
-        test_payload = cipher_suite.encrypt(b"healthcheck_test")
-        cipher_suite.decrypt(test_payload)
+        test_payload = crypto.cipher_suite.encrypt(b"healthcheck_test")
+        crypto.cipher_suite.decrypt(test_payload)
         key_ok = True
     except Exception as e:
         result["status"] = "error"
