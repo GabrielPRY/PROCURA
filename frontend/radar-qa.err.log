@@ -1,0 +1,97 @@
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [Analista, Gabrielrrp]
+Incoming: [false, Analista, Gabrielrrp] 
+    at SeguimientoConsole (components/seguimiento-console.tsx:213:12)
+    at Set.forEach (<anonymous>)
+  211 |   }
+  212 |
+> 213 |   useEffect(() => {
+      |            ^
+  214 |     if (!active) return;
+  215 |     initialSyncRef.current = false;
+  216 |     setSelected(null); (components/seguimiento-console.tsx:213:12)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [1, false]
+Incoming: [false, 1, false] 
+    at SeguimientoConsole (components/seguimiento-console.tsx:328:12)
+    at Set.forEach (<anonymous>)
+  326 |   }
+  327 |
+> 328 |   useEffect(() => {
+      |            ^
+  329 |     if (!active || loading || initialSyncRef.current || !items.length) return;
+  330 |     initialSyncRef.current = true;
+  331 |     const timer = window.setTimeout(() => void syncItems(nextAutomaticBatch()), 600); (components/seguimiento-console.tsx:328:12)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [Analista, Gabrielrrp]
+Incoming: [false, Analista, Gabrielrrp] 
+    at SeguimientoConsole (components/seguimiento-console.tsx:335:12)
+    at Set.forEach (<anonymous>)
+  333 |   }, [active, items.length, loading]);
+  334 |
+> 335 |   useEffect(() => {
+      |            ^
+  336 |     if (!active) return;
+  337 |     const interval = window.setInterval(() => void syncItems(nextAutomaticBatch()), 25 * ...
+  338 |     return () => window.clearInterval(interval); (components/seguimiento-console.tsx:335:12)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [proveedores, function handleModuleChange(moduleId) {
+        if (!user || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$navigation$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccessModule"])(user, moduleId)) return;
+        setActiveModule(moduleId);
+        setMountedModules((current)=>current.includes(moduleId) ? current : [
+                ...current,
+                moduleId
+            ]);
+        window.localStorage.setItem(moduleSessionKey(user.username), moduleId);
+    }, [object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]]
+Incoming: [proveedores, function handleModuleChange(moduleId) {
+        if (!user || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$navigation$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccessModule"])(user, moduleId)) return;
+        setActiveModule(moduleId);
+        setMountedModules((current)=>current.includes(moduleId) ? current : [
+                ...current,
+                moduleId
+            ]);
+        window.localStorage.setItem(moduleSessionKey(user.username), moduleId);
+    }, [object Object], [object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]] 
+    at AppShell (components/app-shell.tsx:71:12)
+    at Set.forEach (<anonymous>)
+  69 |   }, []);
+  70 |
+> 71 |   useEffect(() => {
+     |            ^
+  72 |     if (!canAccessModule(user, activeModule) && visibleItems[0]) {
+  73 |       onModuleChange(visibleItems[0].id);
+  74 |     } (components/app-shell.tsx:71:12)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [auditor_empresas, function handleModuleChange(moduleId) {
+        if (!user || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$navigation$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccessModule"])(user, moduleId)) return;
+        setActiveModule(moduleId);
+        setMountedModules((current)=>current.includes(moduleId) ? current : [
+                ...current,
+                moduleId
+            ]);
+        window.localStorage.setItem(moduleSessionKey(user.username), moduleId);
+    }, [object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]]
+Incoming: [auditor_empresas, function handleModuleChange(moduleId) {
+        if (!user || !(0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$navigation$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["canAccessModule"])(user, moduleId)) return;
+        setActiveModule(moduleId);
+        setMountedModules((current)=>current.includes(moduleId) ? current : [
+                ...current,
+                moduleId
+            ]);
+        window.localStorage.setItem(moduleSessionKey(user.username), moduleId);
+    }, [object Object], [object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]] 
+    at AppShell (components/app-shell.tsx:71:12)
+    at Set.forEach (<anonymous>)
+  69 |   }, []);
+  70 |
+> 71 |   useEffect(() => {
+     |            ^
+  72 |     if (!canAccessModule(user, activeModule) && visibleItems[0]) {
+  73 |       onModuleChange(visibleItems[0].id);
+  74 |     } (components/app-shell.tsx:71:12)

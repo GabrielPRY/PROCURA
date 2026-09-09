@@ -1,0 +1,271 @@
+INFO:     127.0.0.1:62349 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59789 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59112 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59112 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59789 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62349 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54944 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52847 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52847 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54944 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65125 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60411 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64567 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65125 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50854 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64647 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53412 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50854 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52861 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62087 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50924 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52861 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54591 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50370 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54591 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50370 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58465 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58465 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56778 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56778 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58678 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49283 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58678 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58926 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57391 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58926 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55648 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58678 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49283 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51171 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60153 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60762 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51171 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60153 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60762 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60816 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56465 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54638 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55434 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54638 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60816 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55434 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56465 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60714 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61632 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57443 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57443 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61632 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60714 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 90 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 19 nuevas de 90 totales
+INFO:     127.0.0.1:64049 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61681 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50097 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65100 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62638 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61681 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64049 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50097 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 89 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 0 nuevas de 89 totales
+INFO:     127.0.0.1:50645 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50645 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50646 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50646 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50648 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50649 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50646 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50649 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50648 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50647 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50645 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50650 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50669 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50669 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55651 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55651 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55652 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55651 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55664 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55665 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55664 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55665 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "OPTIONS /api/v1/seguimiento HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "POST /api/v1/seguimiento HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "OPTIONS /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "GET /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "OPTIONS /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "GET /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "OPTIONS /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "POST /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "OPTIONS /api/v1/seguimiento/24/estado HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "POST /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "OPTIONS /api/v1/seguimiento/24/estado HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "POST /api/v1/seguimiento/24/estado HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "OPTIONS /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "POST /api/v1/seguimiento/24/estado HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "GET /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "OPTIONS /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "GET /api/v1/seguimiento/24/historial HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 90 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 1 nuevas de 90 totales
+INFO:     127.0.0.1:53229 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64194 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59573 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64194 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50631 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59573 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65179 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65179 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54861 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51532 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50631 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64194 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59573 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50764 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59917 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64066 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59917 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64066 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59917 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64066 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59917 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64066 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64066 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50764 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59917 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64473 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53402 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64538 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64538 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64538 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64538 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64543 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64538 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64543 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54072 - "OPTIONS /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54072 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "GET /api/v1/seguimiento?username=Gabrielrrp&role=Analista HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54072 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "GET /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "OPTIONS /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54065 - "POST /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64948 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64949 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64949 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64948 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64949 - "OPTIONS /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64948 - "OPTIONS /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64949 - "GET /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64948 - "GET /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64970 - "OPTIONS /api/v1/historico?search=&anio=2016&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64970 - "GET /api/v1/historico?search=&anio=2016&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64978 - "OPTIONS /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64978 - "GET /api/v1/historico?search=&anio=Todos&limit=150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58838 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58838 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58839 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58838 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 86 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 0 nuevas de 86 totales
+INFO:     127.0.0.1:57213 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57213 - "GET /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57213 - "OPTIONS /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57213 - "POST /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 87 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 1 nuevas de 87 totales
+INFO:     127.0.0.1:57386 - "OPTIONS /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57386 - "GET /api/v1/consultar-sli/214490 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57386 - "OPTIONS /api/v1/seguimiento/24/sli-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51525 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51526 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51525 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51526 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 88 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 1 nuevas de 88 totales
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 88 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 1 nuevas de 88 totales
+INFO:     127.0.0.1:63651 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63652 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63651 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63652 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK

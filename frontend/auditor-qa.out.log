@@ -1,0 +1,12 @@
+
+> procura-frontend-dev@0.1.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.252.50.251:3000
+- Environments: .env.local
+✓ Ready in 1032ms
+
+ GET / 200 in 717ms (next.js: 278ms, application-code: 439ms)
+ GET / 200 in 66ms (next.js: 8ms, application-code: 58ms)

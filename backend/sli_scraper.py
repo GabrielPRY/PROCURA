@@ -189,10 +189,14 @@ def _click_visible_page_link(page, page_number):
         f"a[href*='pagina={page_number}']",
     ]
     for selector in selectors:
-        locator = page.locator(selector).filter(visible=True)
-        if locator.count() > 0:
-            locator.first.click()
-            return True
+        # Playwright Python no admite filter(visible=True). Buscar el primer
+        # enlace visible evita que un enlace duplicado/oculto interrumpa el scan.
+        locator = page.locator(selector)
+        for index in range(locator.count()):
+            candidate = locator.nth(index)
+            if candidate.is_visible():
+                candidate.click()
+                return True
 
     return bool(page.evaluate(
         """pageNumber => {
