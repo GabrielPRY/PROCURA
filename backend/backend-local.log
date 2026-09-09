@@ -1,0 +1,113 @@
+INFO:     127.0.0.1:59430 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59986 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59986 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59993 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59987 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59986 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59999 - "GET / HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 88 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 2 nuevas de 88 totales
+INFO:     127.0.0.1:61228 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51442 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58883 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58883 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51442 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52356 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51113 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61876 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61796 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61797 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52065 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61876 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61796 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61797 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52356 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51113 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52079 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49691 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49692 - "OPTIONS /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49691 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49692 - "GET /api/v1/workspaces/Gabrielrrp/list?all_users=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49691 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49692 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49695 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49696 - "OPTIONS /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49696 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49692 - "GET /api/v1/logistics/calculations?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49691 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49695 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 86 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 0 nuevas de 86 totales
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 86 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 1 nuevas de 86 totales
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 85 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 0 nuevas de 85 totales
+[RADAR] Escaneo Playwright: abriendo SLI...
+[RADAR] Playwright completo=True: 10 unicas, 1 paginas.
+[RADAR] Playwright no disponible o fallo el escaneo completo: Playwright devolvio solo 10 licitaciones en escaneo global; se validara con POST directo.
+[RADAR] Obteniendo token de sesion del SLI...
+[RADAR] Buscando licitaciones abiertas...
+[RADAR] Paginas detectadas: 9
+[RADAR] Parseo completado: 85 licitaciones abiertas unicas listas.
+[RADAR] Resultados: 0 nuevas de 85 totales
+INFO:     127.0.0.1:54273 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54274 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54275 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54276 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54273 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54274 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54276 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54278 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54276 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54278 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54276 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54278 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54877 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61454 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52520 - "OPTIONS /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63227 - "OPTIONS /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51624 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54274 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54275 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51624 - "OPTIONS /api/v1/logistics/carriers/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51624 - "GET /api/v1/logistics/carriers/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63227 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61454 - "GET /api/v1/logistics/calculations?limit=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54277 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54273 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52520 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54877 - "GET /api/v1/logistics/settings HTTP/1.1" 200 OK

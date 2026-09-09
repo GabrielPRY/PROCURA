@@ -1,0 +1,6 @@
+INFO:     127.0.0.1:56047 - "OPTIONS /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62031 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63205 - "OPTIONS /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63205 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62031 - "GET /api/v1/sourcing/company-audits?limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56047 - "GET /api/v1/configuracion/Gabrielrrp HTTP/1.1" 200 OK
