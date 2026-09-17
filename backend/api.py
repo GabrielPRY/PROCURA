@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks, Header, Depends, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
@@ -64,25 +64,6 @@ GEMINI_FALLBACK_MODELS = [
     if model.strip()
 ]
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "").strip().rstrip("/")
-
-
-def _json_records(data: Any) -> List[Dict[str, Any]]:
-    """Convierte resultados tabulares de pandas a JSON seguro para FastAPI.
-
-    PostgreSQL devuelve Decimal, Timestamp, NaN y otros valores que no pueden
-    enviarse directamente como JSON. Centralizarlo evita 500 en los endpoints
-    que retornan DataFrames (Logística, Radar, historial y administración).
-    """
-    if data is None:
-        return []
-    if isinstance(data, pd.DataFrame):
-        if data.empty:
-            return []
-        return json.loads(data.to_json(orient="records", date_format="iso"))
-    if isinstance(data, list):
-        return data
-    raise TypeError(f"Resultado tabular no soportado: {type(data).__name__}")
-
 
 def gemini_model_candidates():
     models = [GEMINI_MODEL, *GEMINI_FALLBACK_MODELS]
@@ -1660,65 +1641,12 @@ def estado():
 
 @app.get("/api/v1/health")
 def api_health():
-    """Healthcheck completo que valida BD, clave de cifrado y configuración."""
-    result = {
+    return {
         "status": "ok",
         "database_configured": bool(os.getenv("DATABASE_URL")),
         "frontend_origin_configured": bool(FRONTEND_ORIGIN),
         "internal_token_configured": bool(INTERNAL_API_TOKEN and INTERNAL_API_TOKEN != "default-dev-token"),
     }
-    
-    # Validar que la BD sea accesible
-    db_ok = False
-    try:
-        conn = db.get_connection()
-        conn.close()
-        db_ok = True
-    except Exception as e:
-        result["status"] = "error"
-        result["database_error"] = str(e)[:300]
-        logger.error(f"Healthcheck BD fallida: {e}")
-    
-    result["database_reachable"] = db_ok
-    
-    # Validar que el módulo de cifrado pueda operar. Esto valida el formato de
-    # ENCRYPTION_KEY; no intenta descifrar secretos de usuarios en el healthcheck.
-    key_ok = False
-    try:
-        test_payload = crypto.cipher_suite.encrypt(b"healthcheck_test")
-        crypto.cipher_suite.decrypt(test_payload)
-        key_ok = True
-    except Exception as e:
-        result["status"] = "error"
-        result["encryption_key_error"] = str(e)[:300]
-        logger.error(f"Healthcheck clave de cifrado fallida: {e}")
-    
-    result["encryption_key_valid"] = key_ok
-    
-    # Validar que GEMINI_MODEL esté configurado
-    gemini_model = os.getenv("GEMINI_MODEL")
-    result["gemini_model_configured"] = bool(gemini_model)
-    result["gemini_model"] = gemini_model or "not set"
-    
-    # Validar que el frontend pueda ser alcanzado desde el backend (CORS)
-    # Esto es más informativo que solo verificar que FRONTEND_ORIGIN esté seteado
-    result["frontend_url"] = FRONTEND_ORIGIN or "not set"
-    
-    # Si alguno de los checks críticos falló, indicamos que hay problemas
-    critical_issues = []
-    if not result.get("database_reachable"):
-        critical_issues.append("Base de datos no accesible")
-    if not result.get("encryption_key_valid"):
-        critical_issues.append("Clave de cifrado inválida")
-    
-    if critical_issues:
-        result["status"] = "degraded" if result.get("database_reachable") else "error"
-        result["critical_issues"] = critical_issues
-    
-    # Loguear para debugging en Railway
-    logger.info(f"Healthcheck: status={result['status']}, db={db_ok}, key={key_ok}, model={gemini_model}")
-    
-    return result
 
 # --- 4. PROMPT ANALISTA DE PLIEGOS (Multi-documento) ---
 PROMPT_ANALISTA_MULTI = """

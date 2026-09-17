@@ -12,22 +12,14 @@ No contiene `.env`, logs, `node_modules`, `.next` ni archivos Excel locales.
 1. Sube esta carpeta completa a un repositorio nuevo en GitHub.
 2. En Railway, crea un proyecto nuevo.
 3. Crea un servicio desde GitHub usando root directory `backend`.
-4. **Antes de desplegar**, configura las variables CRÍTICAS del backend:
-
-   **Variables obligatorias (sin estas el backend no funciona):**
-   - `DATABASE_URL` - URL completa de tu BD Postgres (ej: Supabase)
-   - `ENCRYPTION_KEY` - **DEBE SER EXACTAMENTE EL MISMIMO VALOR** que está en tu `.env` local donde se cifraron los datos. Si no coincide, las API keys de los usuarios no pueden descifrase.
-   - `INTERNAL_API_TOKEN` - Un token largo y secreto (mínimo 32 caracteres). Debe ser el mismo que usas en el frontend.
-   - `FRONTEND_ORIGIN` - URL del frontend (ej: `https://procurapry.up.railway.app`) - sin esto el CORS bloquea el frontend.
-   - `GEMINI_MODEL=gemini-2.5-flash` - Modelo de Gemini a usar.
-
-   **Variables opcionales:**
-   - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite`
-   - `RADAR_AUTO_SCAN_ENABLED=true` - Activa el escaneo automático del SLI
-   - `RADAR_AUTO_SCAN_INTERVAL_MINUTES=25` - Intervalo entre escaneos
-   - `TELEGRAM_*` - Variables para notificaciones por Telegram
-   - `SHIPSTATION_*` - Variables para comparación de tarifas de envío
-   - `UPS_*` y `SCHNEIDER_*` - Variables para APIs de logística
+4. Configura las variables del backend usando `backend/.env.example`.
+5. Despliega backend y copia su URL publica.
+6. Crea otro servicio desde el mismo repo usando root directory `frontend`.
+7. Configura `NEXT_PUBLIC_API_BASE_URL` con la URL del backend terminando en `/api/v1`.
+8. Configura `NEXT_PUBLIC_INTERNAL_API_TOKEN` con el mismo token del backend.
+9. Despliega frontend.
+10. Vuelve al backend y configura `FRONTEND_ORIGIN` con la URL publica del frontend.
+11. Redeploy backend.
 
 ## Comandos esperados
 

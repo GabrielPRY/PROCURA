@@ -498,3 +498,858 @@ Traceback (most recent call last):
     raise effect
 RuntimeError: SLI temporalmente no disponible
 2026-09-03 09:29:05,073 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'SLI temporalmente no disponible', 'seguimiento_sli': {'checked': 2, 'sent': 1, 'duplicates': 0, 'errors': 0, 'updated': 1}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 12:53:25,942 - ERROR - [DB] No se pudo inicializar/verificar el esquema: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 883, in start_radar_scheduler
+    db.init_db()
+    ~~~~~~~~~~^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 29, in init_db
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:53:25,996 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 12:53:26,002 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 12:53:32,225 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:53:35,209 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:53:35,209 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 12:55:55,177 - ERROR - [DB] No se pudo inicializar/verificar el esquema: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 883, in start_radar_scheduler
+    db.init_db()
+    ~~~~~~~~~~^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 29, in init_db
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:55:55,210 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 12:55:55,218 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 12:56:00,764 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:56:03,500 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:56:03,500 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 12:56:16,989 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:56:19,856 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:56:22,825 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 12:56:22,828 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 12:56:23,979 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:25,246 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:26,776 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:26,892 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:27,561 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:27,664 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 12:56:27,665 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:10:47,366 - INFO - [DB] Esquema verificado/inicializado correctamente.
+2026-09-09 13:10:47,367 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 13:10:47,368 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 13:10:47,369 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 13:11:12,500 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:15,469 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:18,440 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:18,442 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 13:11:20,922 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:23,394 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:23,699 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:26,132 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:26,552 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:26,552 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:11:29,077 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:11:29,080 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_list_opened).
+2026-09-09 13:11:33,255 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:11:34,013 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:11:34,013 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:13:16,194 - ERROR - [DB] No se pudo inicializar/verificar el esquema: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 883, in start_radar_scheduler
+    db.init_db()
+    ~~~~~~~~~~^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 29, in init_db
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:13:16,202 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 13:13:16,205 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 13:13:16,208 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 13:15:21,951 - INFO - [DB] Esquema verificado/inicializado correctamente.
+2026-09-09 13:15:21,952 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 13:15:21,954 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 13:15:21,958 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 13:15:55,620 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:15:58,448 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:01,171 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:01,174 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 13:16:03,941 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:07,541 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:07,914 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:10,258 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:16:10,258 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:16:18,990 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:19:55,062 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:19:58,134 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:20:01,209 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:20:01,214 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 13:20:03,792 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:20:07,351 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:20:09,211 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:20:09,211 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:21:03,515 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 13:21:07,410 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:21:08,160 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 13:21:08,160 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 13:46:08,167 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 13:46:14,002 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:46:17,074 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 13:46:17,075 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:07:43,861 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:46,833 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:49,904 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:49,909 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:07:52,494 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:55,575 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:56,376 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:58,649 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:07:58,650 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:07:58,651 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:11:17,083 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 14:11:24,096 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:11:26,806 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:11:26,807 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:12:38,512 - ERROR - [DB] No se pudo inicializar/verificar el esquema: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 883, in start_radar_scheduler
+    db.init_db()
+    ~~~~~~~~~~^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 29, in init_db
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:12:38,517 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 14:12:38,518 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 14:12:38,520 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 14:18:25,315 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:18:28,388 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:18:31,562 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:18:31,566 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_list_opened).
+2026-09-09 14:18:38,020 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:18:40,492 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:18:40,493 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:18:43,711 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:44,666 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:45,654 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:46,822 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:46,824 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:18:47,948 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:51,501 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:52,289 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:18:52,289 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:21:30,874 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:21:32,197 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:33,427 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:34,493 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:34,497 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:21:35,476 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:38,602 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:39,384 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:21:39,384 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:22:00,686 - ERROR - [DB] No se pudo inicializar/verificar el esquema: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 883, in start_radar_scheduler
+    db.init_db()
+    ~~~~~~~~~~^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 29, in init_db
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:00,692 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 14:22:00,693 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 14:22:00,694 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 14:22:06,251 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:07,185 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:07,967 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:08,820 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:08,822 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:22:09,881 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:13,414 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:14,175 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:14,176 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:22:22,272 - WARNING - [RADAR STATS] connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:23,500 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:24,729 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:25,958 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:25,963 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:22:26,979 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:29,943 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:30,694 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:30,707 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:22:41,943 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:42,700 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:43,674 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:43,677 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:22:44,800 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:45,926 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:47,133 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:47,889 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:48,611 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:48,662 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:49,408 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:22:49,409 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:23:00,586 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:01,365 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:02,157 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:02,162 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:23:02,976 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:05,872 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:06,643 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:23:06,644 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:24:41,127 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:24:45,036 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:24:47,801 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:24:47,806 - INFO - [RADAR AUTO] Iniciando escaneo SLI (radar_opened).
+2026-09-09 14:24:47,987 - INFO - [DB] Esquema verificado/inicializado correctamente.
+2026-09-09 14:24:47,989 - INFO - [RADAR AUTO] Scheduler iniciado cada 25 minutos.
+2026-09-09 14:24:47,990 - INFO - [RADAR AUTO] Scheduler detenido.
+2026-09-09 14:24:47,992 - INFO - [RADAR AUTO] Iniciando escaneo SLI (startup).
+2026-09-09 14:24:50,694 - WARNING - [RADAR AUTO] No se pudo leer el ultimo escaneo persistido: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:24:52,714 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:24:53,479 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked
+
+2026-09-09 14:24:53,479 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  (ECIRCUITBREAKER) too many authentication failures, new connections are temporarily blocked\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 14:36:26,823 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 14:36:32,558 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:36:35,287 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 14:36:35,288 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 15:01:35,292 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 15:01:41,847 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:01:44,387 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:01:44,387 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 15:26:44,376 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 15:26:50,634 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:26:53,594 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:26:53,594 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 15:51:53,603 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 15:51:59,309 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:52:02,292 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 15:52:02,293 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.252.246.120), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 16:17:02,293 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 16:17:08,728 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 16:17:11,450 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 16:17:11,450 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (44.225.139.66), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
+2026-09-09 16:42:11,451 - INFO - [RADAR AUTO] Iniciando escaneo SLI (scheduler).
+2026-09-09 16:42:17,608 - ERROR - [RADAR AUTO] Fallo el listado de abiertas: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\api.py", line 772, in run_radar_auto_scan
+    result = sli_scraper.ejecutar_radar_detallado(db_module=db)
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\sli_scraper.py", line 713, in ejecutar_radar_detallado
+    nuevas, total = db_module.guardar_licitaciones_radar_bulk(licitaciones)
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 2488, in guardar_licitaciones_radar_bulk
+    conn = get_connection()
+  File "C:\Users\Grodriguez\Desktop\PROCURA_REDISENO_DEV\backend\database.py", line 25, in get_connection
+    conn = psycopg2.connect(db_url)
+  File "C:\Users\Grodriguez\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 16:42:20,200 - WARNING - [SEGUIMIENTO SLI] No se pudieron cargar seguimientos: connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"
+
+2026-09-09 16:42:20,201 - WARNING - [RADAR AUTO] Seguimiento directo completado; Radar parcial: {'radar_status': 'error', 'radar_error': 'connection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\nconnection to server at "aws-1-us-west-2.pooler.supabase.com" (34.215.156.231), port 5432 failed: FATAL:  password authentication failed for user "postgres"\n', 'seguimiento_sli': {'checked': 0, 'sent': 0, 'duplicates': 0, 'errors': 1, 'updated': 0}, 'notifications': {'sent': 0, 'errors': 0, 'skipped': True, 'reason': 'radar_open_list_unavailable'}}
