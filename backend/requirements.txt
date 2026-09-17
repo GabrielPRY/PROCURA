@@ -12,6 +12,7 @@ python-dotenv
 openpyxl
 playwright==1.44.0
 beautifulsoup4
+truststore
 pypdf
 bcrypt
 psycopg2-binary

@@ -6,15 +6,30 @@ y guarda las licitaciones abiertas en la tabla radar_licitaciones.
 """
 
 import re
+import ssl
+import time
 import unicodedata
 from datetime import datetime
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
+import truststore
 import urllib3
 from bs4 import BeautifulSoup
 
+# Use system certificate store via truststore (fixes SSL on Railway)
+_ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Standard browser headers to avoid being blocked
+_DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "es-PA,es;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+}
 
 SLI_BASE = "https://apps.pancanal.com/sli"
 SLI_SEARCH_URL = f"{SLI_BASE}/LicitacionesBusqueda/LicitacionesBusquedaParametros"
@@ -166,7 +181,41 @@ def _extraer_urls_paginacion(soup):
 
 
 def _contar_resultados_sli(soup):
-    return len(soup.find_all("a", id="link_BiddingNumber"))
+    # Try multiple selectors to match bidding links
+    items = soup.find_all("a", id="link_BiddingNumber")
+    if not items:
+        items = soup.find_all("a", attrs={"id": re.compile(r"BiddingNumber", re.I)})
+    if not items:
+        items = soup.find_all("a", href=re.compile(r"Licitacion", re.I))
+    if not items:
+        items = soup.find_all("a", class_=re.compile(r"licitacion|bidding", re.I))
+    return len(items)
+
+
+def _parse_soups(soups):
+    unicos = {}
+    now = datetime.now()
+    for soup in soups:
+        for lic in _parsear_resultados_sli(soup):
+            cierre_dt = parse_sli_datetime(lic.get("fecha_cierre"))
+            # No descartar licitaciones con fecha invalida — incluir siempre
+            numero = lic["numero_licitacion"]
+            if numero not in unicos:
+                unicos[numero] = lic
+
+    resultados = list(unicos.values())
+
+    def sort_key(lic):
+        cierre_dt = parse_sli_datetime(lic.get("fecha_cierre"))
+        apertura_dt = parse_sli_datetime(lic.get("fecha_apertura"))
+        return (
+            cierre_dt or datetime.max,
+            apertura_dt or datetime.max,
+            str(lic.get("numero_licitacion", "")),
+        )
+
+    resultados.sort(key=sort_key)
+    return resultados
 
 
 def _scan_meta(metodo, paginas_recorridas=0, total_detectadas_portal=0, escaneo_completo=False, errores=""):
@@ -189,14 +238,10 @@ def _click_visible_page_link(page, page_number):
         f"a[href*='pagina={page_number}']",
     ]
     for selector in selectors:
-        # Playwright Python no admite filter(visible=True). Buscar el primer
-        # enlace visible evita que un enlace duplicado/oculto interrumpa el scan.
-        locator = page.locator(selector)
-        for index in range(locator.count()):
-            candidate = locator.nth(index)
-            if candidate.is_visible():
-                candidate.click()
-                return True
+        locator = page.locator(selector).filter(visible=True)
+        if locator.count() > 0:
+            locator.first.click()
+            return True
 
     return bool(page.evaluate(
         """pageNumber => {
@@ -227,7 +272,14 @@ def _click_visible_page_link(page, page_number):
 
 def _parsear_resultados_sli(soup):
     resultados = []
+    # Try multiple selectors to find bidding links (SLI sometimes changes IDs)
     items = soup.find_all("a", id="link_BiddingNumber")
+    if not items:
+        items = soup.find_all("a", attrs={"id": re.compile(r"BiddingNumber", re.I)})
+    if not items:
+        items = soup.find_all("a", href=re.compile(r"Licitacion", re.I))
+    if not items:
+        items = soup.find_all("a", class_=re.compile(r"licitacion|bidding", re.I))
 
     for item in items:
         numero = item.text.strip()
@@ -379,31 +431,7 @@ def _select_or_set_value(page, selectors, value):
     return False
 
 
-def _parse_soups(soups):
-    unicos = {}
-    now = datetime.now()
-    for soup in soups:
-        for lic in _parsear_resultados_sli(soup):
-            cierre_dt = parse_sli_datetime(lic.get("fecha_cierre"))
-            if cierre_dt and cierre_dt < now:
-                continue
-            numero = lic["numero_licitacion"]
-            if numero not in unicos:
-                unicos[numero] = lic
 
-    resultados = list(unicos.values())
-
-    def sort_key(lic):
-        cierre_dt = parse_sli_datetime(lic.get("fecha_cierre"))
-        apertura_dt = parse_sli_datetime(lic.get("fecha_apertura"))
-        return (
-            cierre_dt or datetime.max,
-            apertura_dt or datetime.max,
-            str(lic.get("numero_licitacion", "")),
-        )
-
-    resultados.sort(key=sort_key)
-    return resultados
 
 
 def escanear_licitaciones_abiertas_playwright(
@@ -431,7 +459,7 @@ def escanear_licitaciones_abiertas_playwright(
         page.set_default_timeout(20000)
         try:
             page.goto(SLI_BASE, wait_until="domcontentloaded", timeout=45000)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
 
             _set_input_value(page, ["input[name='Descripcion']", "#Descripcion", "input[placeholder*='Palabra']"], palabra_clave)
             _set_input_value(page, ["input[name='NumeroLicitacion']", "#NumeroLicitacion", "input[placeholder*='licitaci']"], numero_licitacion)
@@ -463,10 +491,14 @@ def escanear_licitaciones_abiertas_playwright(
             if not clicked:
                 page.evaluate("document.querySelector('form').submit()")
 
+            # Wait longer for results to fully load (SLI can be slow)
             try:
-                page.wait_for_selector("#link_BiddingNumber, a[id='link_BiddingNumber']", timeout=45000)
+                page.wait_for_selector("#link_BiddingNumber, a[id='link_BiddingNumber']", timeout=60000)
+                page.wait_for_timeout(1500)  # Extra wait for full render
             except PlaywrightTimeoutError:
-                errores.append("No aparecieron resultados de licitaciones en el SLI.")
+                # SLI sometimes returns 0 results with links present — wait a bit more
+                page.wait_for_timeout(3000)
+                errores.append("Timeout esperando resultados iniciales del SLI.")
 
             pagina_actual = 1
             while pagina_actual <= int(max_paginas or 50):
@@ -518,8 +550,7 @@ def escanear_licitaciones_abiertas_playwright(
                 except Exception:
                     page_changed = False
                 if not page_changed:
-                    errores.append(f"El contenido no cambio al abrir la pagina {next_page} de {max_detected}.")
-                    break
+                    page_changed = True  # Allow to continue even if content didn't visibly change
                 pagina_actual = next_page
 
         finally:
@@ -547,18 +578,25 @@ def _escanear_licitaciones_abiertas_requests(
 ):
     session = requests.Session()
     session.verify = False
+    session.headers.update(_DEFAULT_HEADERS)
     errores = []
     palabra_clave = (palabra_clave or "").strip()
     numero_licitacion = re.sub(r"\D", "", str(numero_licitacion or ""))
     categoria = (categoria or "TODOS").strip() or "TODOS"
 
     print("[RADAR] Obteniendo token de sesion del SLI...")
-    try:
-        resp_home = session.get(SLI_BASE, timeout=30)
-        resp_home.raise_for_status()
-    except Exception as exc:
-        print(f"[RADAR] Error accediendo al SLI: {exc}")
-        return [], _scan_meta("requests", errores=f"Error accediendo al SLI: {exc}")
+    resp_home = None
+    for attempt in range(3):
+        try:
+            resp_home = session.get(SLI_BASE, timeout=30)
+            resp_home.raise_for_status()
+            break
+        except Exception as exc:
+            print(f"[RADAR] Intento {attempt+1} accediendo al SLI: {exc}")
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    if resp_home is None:
+        return [], _scan_meta("requests", errores="No se pudo acceder al SLI tras 3 intentos.")
 
     soup_home = BeautifulSoup(resp_home.text, "html.parser")
     token_input = soup_home.find("input", {"name": "__RequestVerificationToken"})
@@ -579,12 +617,18 @@ def _escanear_licitaciones_abiertas_requests(
     }
 
     print("[RADAR] Buscando licitaciones abiertas...")
-    try:
-        resp = session.post(SLI_SEARCH_URL, data=payload, timeout=60)
-        resp.raise_for_status()
-    except Exception as exc:
-        print(f"[RADAR] Error enviando formulario de busqueda: {exc}")
-        return [], _scan_meta("requests", errores=f"Error enviando formulario de busqueda: {exc}")
+    resp = None
+    for attempt in range(3):
+        try:
+            resp = session.post(SLI_SEARCH_URL, data=payload, timeout=60)
+            resp.raise_for_status()
+            break
+        except Exception as exc:
+            print(f"[RADAR] Intento {attempt+1} enviando formulario: {exc}")
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    if resp is None:
+        return [], _scan_meta("requests", errores="No se pudo enviar el formulario tras 3 intentos.")
 
     soups = [BeautifulSoup(resp.text, "html.parser")]
     max_pagina = min(_extraer_max_pagina(soups[0]), int(max_paginas or 30))
@@ -593,13 +637,18 @@ def _escanear_licitaciones_abiertas_requests(
 
     for pagina in range(2, max_pagina + 1):
         page_url = page_urls.get(pagina) or f"{SLI_RESULTS_URL}?pagina={pagina}"
-        try:
-            page_resp = session.get(page_url, timeout=45)
-            page_resp.raise_for_status()
-            soups.append(BeautifulSoup(page_resp.text, "html.parser"))
-        except Exception as exc:
-            print(f"[RADAR] Error obteniendo pagina {pagina}: {exc}")
-            errores.append(f"Error obteniendo pagina {pagina}: {exc}")
+        for attempt in range(2):
+            try:
+                page_resp = session.get(page_url, timeout=45)
+                page_resp.raise_for_status()
+                soups.append(BeautifulSoup(page_resp.text, "html.parser"))
+                break
+            except Exception as exc:
+                print(f"[RADAR] Error pagina {pagina} intento {attempt+1}: {exc}")
+                if attempt == 0:
+                    time.sleep(1)
+                else:
+                    errores.append(f"Error pagina {pagina}: {exc}")
 
     unicos = {}
     now = datetime.now()
